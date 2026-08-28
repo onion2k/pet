@@ -1,0 +1,367 @@
+import { rows, type VoxelModel } from './voxel-format'
+
+/**
+ * Every pet fits a 7x7 footprint so the screen framing never has to change.
+ * Layers run bottom to top; the last row of each layer is the pet's face.
+ */
+
+export const EGG: VoxelModel = {
+  palette: { b: '#f4e8d0', d: '#d9c5a4', p: '#6fd3c4' },
+  layers: [
+    rows(`
+      .......
+      .......
+      ..ddd..
+      ..ddd..
+      ..ddd..
+      .......
+      .......`),
+    rows(`
+      .......
+      ..ddd..
+      .ddddd.
+      .ddddd.
+      .ddddd.
+      ..ddd..
+      .......`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbbbb.
+      ..bbb..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbppbb
+      bbbbbbb
+      .bbbbb.
+      ..bbb..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbpbb.
+      ..bbb..`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      ..bbb..
+      .bbpbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      .......
+      ..bbb..
+      ..bbb..
+      ..bbb..
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      .......
+      ...b...
+      .......
+      .......
+      .......`),
+  ],
+}
+
+export const BLOB: VoxelModel = {
+  palette: { b: '#8fe36a', d: '#57a844', k: '#14121a', l: '#57a844', g: '#ffe066' },
+  emissive: ['g'],
+  head: ['k'],
+  limbs: ['l'],
+  layers: [
+    rows(`
+      .......
+      .......
+      .......
+      .......
+      ..l.l..
+      .......
+      .......`),
+    rows(`
+      .......
+      ..ddd..
+      .ddddd.
+      .ddddd.
+      .ddddd.
+      ..ddd..
+      .......`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbbbb.
+      ..bbb..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbbbb.
+      ..kbk..`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      .......
+      ..bbb..
+      ..bbb..
+      ..bbb..
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      .......
+      ...d...
+      .......
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      .......
+      ...g...
+      .......
+      .......
+      .......`),
+  ],
+}
+
+export const PUDGE: VoxelModel = {
+  palette: { b: '#ffb3d9', d: '#e07aa9', k: '#14121a', m: '#ff6fae', l: '#e07aa9' },
+  head: ['k', 'm'],
+  limbs: ['l'],
+  layers: [
+    rows(`
+      .......
+      .......
+      .......
+      .......
+      .ll.ll.
+      .......
+      .......`),
+    rows(`
+      ..ddd..
+      .ddddd.
+      ddddddd
+      ddddddd
+      ddddddd
+      .ddddd.
+      ..ddd..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbbbb.
+      ..bbb..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbbbb.
+      ..bbb..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .mbbbm.
+      ..kbk..`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      .......
+      ..bbb..
+      ..bbb..
+      ..bbb..
+      .......
+      .......`),
+  ],
+}
+
+export const SPIKE: VoxelModel = {
+  palette: { b: '#ff7a4a', d: '#c4402a', k: '#14121a', s: '#ffd93d', l: '#c4402a' },
+  emissive: ['s'],
+  head: ['k'],
+  limbs: ['l'],
+  layers: [
+    rows(`
+      .......
+      .......
+      .......
+      .......
+      .l.l.l.
+      .......
+      .......`),
+    rows(`
+      .......
+      ..ddd..
+      .ddddd.
+      .ddddd.
+      .ddddd.
+      ..ddd..
+      .......`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      sbbbbbs
+      bbbbbbb
+      .bbbbb.
+      ..bbb..`),
+    rows(`
+      ..bbb..
+      .bbbbb.
+      bbbbbbb
+      bbbbbbb
+      bbbbbbb
+      .bbbbb.
+      ..kbk..`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      .......
+      ..bbb..
+      ..bbb..
+      ..bbb..
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      ..s.s..
+      .......
+      .......
+      .......
+      .......`),
+  ],
+}
+
+export const SPROUT: VoxelModel = {
+  palette: { b: '#a8ef7c', d: '#4f9e3a', k: '#14121a', v: '#6fe04a', l: '#4f9e3a' },
+  emissive: ['v'],
+  head: ['k'],
+  limbs: ['l'],
+  layers: [
+    rows(`
+      .......
+      .......
+      .......
+      .......
+      ..l.l..
+      .......
+      .......`),
+    rows(`
+      .......
+      ..ddd..
+      .ddddd.
+      .ddddd.
+      .ddddd.
+      ..ddd..
+      .......`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..bbb..
+      .......`),
+    rows(`
+      .......
+      ..bbb..
+      .bbbbb.
+      .bbbbb.
+      .bbbbb.
+      ..kbk..
+      .......`),
+    rows(`
+      .......
+      .......
+      ..bbb..
+      ..bbb..
+      ..bbb..
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      .......
+      ...d...
+      .......
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      ...v...
+      ..vvv..
+      ...v...
+      .......
+      .......`),
+    rows(`
+      .......
+      .......
+      .......
+      ...v...
+      .......
+      .......
+      .......`),
+  ],
+}

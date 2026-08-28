@@ -1,0 +1,92 @@
+:root {
+  color-scheme: dark;
+  --ink: #dfe7ff;
+  --dim: #6a7192;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #08080c;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color: var(--ink);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#stage {
+  display: block;
+  width: 100vw;
+  height: 100dvh;
+  /* The canvas handles its own drags, so the browser must not claim them. */
+  touch-action: none;
+  cursor: grab;
+  /* Holding a button is a long press. Without these, iOS raises its image
+     callout part-way through and cancels the pointer, killing the hold. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#stage.grabbing {
+  cursor: grabbing;
+}
+
+#hud {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px env(safe-area-inset-right) calc(10px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+  pointer-events: none;
+}
+
+#hud button {
+  pointer-events: auto;
+  appearance: none;
+  border: 1px solid #23283c;
+  border-radius: 999px;
+  background: rgba(12, 13, 22, 0.72);
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+#hud button:hover,
+#hud button:focus-visible {
+  color: var(--ink);
+  border-color: #3d4462;
+}
+
+#hud button:focus-visible {
+  outline: 2px solid #7fd6ff;
+  outline-offset: 2px;
+}
+
+#hud button[hidden] {
+  display: none;
+}
+
+/* Announcements for screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

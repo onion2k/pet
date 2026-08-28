@@ -1,0 +1,223 @@
+import { Camera, RenderTarget, Transform } from 'ogl'
+import './style.css'
+
+import { speciesOf } from './data/species'
+import { App } from './game/app'
+import { Beeper } from './engine/audio'
+import { createButtonHitTest, createInput } from './engine/input'
+import { Orbit } from './engine/orbit'
+import { createBackdrop } from './render/backdrop'
+import { createBloom } from './render/post'
+import { createShell, SCREEN_CORNER_POWER } from './render/shell'
+import { createStage, watchResize } from './render/core'
+import { Hud } from './render/hud'
+import { Particles } from './render/particles'
+import { PetView } from './render/pet'
+import { drawScreen } from './ui/draw'
+
+/** Native resolution of the pet's screen. Everything above it is upscaling. */
+const SCREEN_PX: [number, number] = [192, 160]
+
+const canvas = document.getElementById('stage') as HTMLCanvasElement | null
+if (!canvas) throw new Error('Missing #stage canvas')
+
+const stage = createStage(canvas)
+const { gl, renderer } = stage
+watchResize(stage)
+
+// --- the world inside the screen -------------------------------------------
+
+const screenScene = new Transform()
+// A long lens: at this size, perspective distortion just reads as a wobbly model.
+const screenCamera = new Camera(gl, { fov: 22, near: 0.1, far: 60, aspect: SCREEN_PX[0] / SCREEN_PX[1] })
+screenCamera.position.set(0, 1.5, 8.6)
+screenCamera.lookAt([0, 0.95, 0])
+
+const backdrop = createBackdrop(gl)
+backdrop.root.setParent(screenScene)
+
+const petView = new PetView(gl, speciesOf('egg').model)
+petView.root.setParent(screenScene)
+
+const particles = new Particles(gl)
+particles.setScale(SCREEN_PX[1])
+particles.root.setParent(screenScene)
+
+const sceneTarget = new RenderTarget(gl, {
+  width: SCREEN_PX[0],
+  height: SCREEN_PX[1],
+  depth: true,
+  // Nearest sampling is the whole point: no smoothing between the pet's pixels.
+  minFilter: gl.NEAREST,
+  magFilter: gl.NEAREST,
+})
+const bloom = createBloom(gl, SCREEN_PX[0], SCREEN_PX[1])
+const hud = new Hud(gl, SCREEN_PX[0], SCREEN_PX[1], SCREEN_CORNER_POWER)
+
+// --- the device ------------------------------------------------------------
+
+const shell = createShell(
+  gl,
+  { scene: sceneTarget.texture, bloom: sceneTarget.texture, hud: hud.texture },
+  SCREEN_PX,
+)
+shell.root.setParent(stage.scene)
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+shell.setMotion(!reduceMotion.matches)
+reduceMotion.addEventListener('change', (event) => shell.setMotion(!event.matches))
+
+// --- game ------------------------------------------------------------------
+
+const beeper = new Beeper(false)
+
+const app = new App({
+  sound: (id) => beeper.play(id),
+  burst: (kind, count) => particles.emit(kind, [0, 1.25, 0], count),
+  pop: (strength) => petView.pop(strength),
+  form: (speciesId, animate) => petView.setModel(speciesOf(speciesId).model, animate),
+})
+beeper.setMuted(app.muted)
+
+const hitButton = createButtonHitTest(canvas, stage.camera, shell.buttons)
+
+createInput({
+  canvas,
+  hit: hitButton,
+  onPress: (id) => {
+    shell.press(id)
+    app.press(id)
+  },
+  onRelease: (id) => app.release(id),
+})
+
+// Drag anywhere off the buttons to turn the device over in your hands.
+const orbit = new Orbit({
+  canvas,
+  isControl: (x, y) => hitButton(x, y) !== null,
+  reducedMotion: () => reduceMotion.matches,
+})
+
+// --- page chrome -----------------------------------------------------------
+
+const chrome = document.getElementById('hud')
+const announce = document.createElement('p')
+announce.className = 'sr-only'
+announce.setAttribute('role', 'status')
+
+const muteButton = document.createElement('button')
+const syncMute = () => {
+  muteButton.textContent = app.muted ? 'SOUND OFF' : 'SOUND ON'
+  muteButton.setAttribute('aria-pressed', String(app.muted))
+}
+muteButton.addEventListener('click', () => {
+  app.toggleMute()
+  beeper.setMuted(app.muted)
+  syncMute()
+})
+syncMute()
+
+const resetButton = document.createElement('button')
+resetButton.textContent = 'NEW PET'
+resetButton.addEventListener('click', () => {
+  if (!window.confirm('Start over with a new egg? Your current pet will be lost.')) return
+  app.restart()
+  petView.setModel(speciesOf('egg').model, true)
+})
+
+// Only offered once the device has actually been turned, so it stays out of
+// the way until it means something.
+const recentreButton = document.createElement('button')
+recentreButton.textContent = 'RECENTRE'
+recentreButton.hidden = true
+recentreButton.addEventListener('click', () => orbit.recentre())
+
+function syncRecentre(): void {
+  const wanted = orbit.turned
+  if (recentreButton.hidden === !wanted) return
+  recentreButton.hidden = !wanted
+}
+
+chrome?.append(muteButton, resetButton, recentreButton, announce)
+
+// Keep the screen-reader summary current without spamming it every frame.
+let announceTimer = 0
+function updateAnnouncement(dt: number): void {
+  announceTimer -= dt
+  if (announceTimer > 0 || !app.pet) return
+  announceTimer = 5
+  const pet = app.pet
+  const needs = app.needs
+  announce.textContent =
+    `${pet.name} the ${app.speciesName}, ${pet.stage}. ` +
+    (pet.asleep ? 'Asleep. ' : '') +
+    (pet.sick ? 'Unwell. ' : '') +
+    (needs.length ? `Needs attention: ${needs.join(', ')}.` : 'Content.')
+}
+
+// --- loop ------------------------------------------------------------------
+
+let last = performance.now()
+let elapsed = 0
+
+function step(dt: number): void {
+  elapsed += dt
+
+  app.update(dt, Date.now())
+  updateAnnouncement(dt)
+
+  shell.setPower(app.mode === 'boot' ? 1 - app.bootTimer / 1.4 : 1)
+  petView.update(dt, elapsed, app.visual)
+  particles.update(dt)
+  backdrop.update(elapsed)
+
+  // Sleep cools the whole scene down; illness drains it.
+  const visual = app.visual
+  if (visual.asleep) {
+    backdrop.setPalette([0.05, 0.06, 0.14], [0.01, 0.01, 0.04], [0.16, 0.22, 0.5])
+  } else if (visual.sick) {
+    backdrop.setPalette([0.12, 0.13, 0.10], [0.03, 0.04, 0.03], [0.34, 0.36, 0.22])
+  } else {
+    backdrop.setPalette([0.10, 0.13, 0.26], [0.03, 0.04, 0.08], [0.28, 0.42, 0.85])
+  }
+
+  renderer.render({ scene: screenScene, camera: screenCamera, target: sceneTarget })
+  const glow = bloom.render(renderer, sceneTarget.texture)
+
+  drawScreen(hud, app)
+
+  shell.setScreenTextures(sceneTarget.texture, glow)
+
+  orbit.update(dt)
+  shell.setOrbit(orbit.yaw, orbit.pitch)
+  shell.update(dt, elapsed)
+  syncRecentre()
+  renderer.render({ scene: stage.scene, camera: stage.camera })
+}
+
+function frame(now: number): void {
+  // Clamp dt so a backgrounded tab resumes smoothly; offline time is handled
+  // separately by the simulation's chunked catch-up.
+  step(Math.min((now - last) / 1000, 0.1))
+  last = now
+  requestAnimationFrame(frame)
+}
+
+requestAnimationFrame(frame)
+
+if (import.meta.env.DEV) {
+  // Lets a test harness advance the game deterministically without waiting on
+  // animation frames, which browser panes and headless runs throttle.
+  Object.assign(window, {
+    __pet: {
+      app,
+      hud,
+      shell,
+      orbit,
+      step,
+      advance: (frames: number, dt = 1 / 60) => {
+        for (let i = 0; i < frames; i++) step(dt)
+      },
+    },
+  })
+}
