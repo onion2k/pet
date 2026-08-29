@@ -198,8 +198,9 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   })
 
   hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
-  hud.text(6, 132, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}`, DIM)
-  hud.text(6, 140, `FOUND ${pet.discovered.length}/${SPECIES_COUNT}`, DIM)
+  const curios = app.curioTally
+  hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
+  hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}  CURIOS ${curios.kinds}/8`, DIM)
   hud.textCentered(hud.width / 2, hud.height - 10, 'ANY KEY TO CLOSE', '#3a4058')
 }
 

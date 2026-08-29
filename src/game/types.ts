@@ -73,6 +73,13 @@ export interface PetState {
   discovered: string[]
 }
 
+/** A pet that lived a full life and was retired with honours. */
+export interface AlbumEntry {
+  speciesId: string
+  name: string
+  retiredAt: number
+}
+
 export interface SaveFile {
   version: number
   pet: PetState | null
@@ -82,4 +89,15 @@ export interface SaveFile {
    * it forward; nothing ever winds it back.
    */
   worldOffset: number
+  /** Species ever reached across every generation, not just the current life. */
+  discovered: string[]
+  /** Retired pets, oldest first. */
+  album: AlbumEntry[]
+  /** Curios the pet brought back from time away, id -> count. */
+  curios: Record<string, number>
+  /** Days-visited streak. `lastDay` is a local YYYY-MM-DD. */
+  streak: { days: number; lastDay: string }
+  counters: { sessions: number; retirements: number }
+  /** Shell colour id. */
+  shell: string
 }

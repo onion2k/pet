@@ -82,11 +82,60 @@ export class App {
 
   constructor(private hooks: AppHooks) {
     this.save = load()
+    this.save.counters.sessions += 1
+    this.updateStreak()
     this.pet = this.save.pet
     if (this.pet) {
       const result = reconcile(this.pet, Date.now(), this.daylight)
       this.awayMs = result.awayMs
+      this.syncDiscovered()
     }
+    saveSoon(this.save)
+  }
+
+  /**
+   * A gentle streak: visiting on consecutive days builds it, and missing days
+   * erodes it one per day missed rather than wiping it out. Rewarding presence
+   * without punishing absence is the whole tone of the game.
+   */
+  private updateStreak(): void {
+    const stamp = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const today = stamp(new Date())
+    const streak = this.save.streak
+    if (streak.lastDay === today) return
+    if (!streak.lastDay) {
+      streak.days = 1
+    } else {
+      const [y, m, d] = streak.lastDay.split('-').map(Number)
+      const then = new Date(y!, m! - 1, d!).getTime()
+      const gap = Math.round((Date.now() - then) / 86_400_000)
+      if (gap <= 1) streak.days += 1
+      else streak.days = Math.max(1, streak.days - (gap - 1))
+    }
+    streak.lastDay = today
+  }
+
+  /** Folds the current pet's discoveries into the lineage-wide list. */
+  private syncDiscovered(): void {
+    if (!this.pet) return
+    for (const id of this.pet.discovered) {
+      if (!this.save.discovered.includes(id)) this.save.discovered.push(id)
+    }
+  }
+
+  /** Species reached across every generation, for the collection counter. */
+  get discoveredCount(): number {
+    return this.save.discovered.length
+  }
+
+  get streakDays(): number {
+    return this.save.streak.days
+  }
+
+  get curioTally(): { kinds: number; total: number } {
+    const counts = Object.values(this.save.curios)
+    return { kinds: counts.length, total: counts.reduce((a, b) => a + b, 0) }
   }
 
   get muted(): boolean {
@@ -226,6 +275,7 @@ export class App {
       this.hooks.sound('move')
     } else {
       this.pet = newPet(NAMES[this.nameIndex]!, Date.now())
+      this.syncDiscovered()
       this.mode = 'main'
       this.hooks.form('egg', true)
       this.hooks.sound('confirm')
@@ -455,6 +505,7 @@ export class App {
       const result = evolve(pet)
       if (result) {
         this.evolution = result
+        this.syncDiscovered()
         this.mode = 'evolve'
         this.hooks.form(result.toId, true)
         this.hooks.sound(result.toId === 'blob' ? 'hatch' : 'evolve')

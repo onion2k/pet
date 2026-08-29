@@ -1,7 +1,7 @@
 import type { PetState, SaveFile } from './types'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 /**
  * Migrations run in order for every version below the current one. Adding a
@@ -12,6 +12,17 @@ const MIGRATIONS: Record<number, (raw: any) => any> = {
   // 1 -> 2 adds the world clock offset. Existing pets start in step with the
   // wall clock, which is where they already were.
   1: (raw) => ({ ...raw, worldOffset: 0 }),
+  // 2 -> 3 adds the lineage: album, curios, streak, counters and shell. What
+  // the current pet has already discovered seeds the lineage-wide list.
+  2: (raw) => ({
+    ...raw,
+    discovered: raw.pet?.discovered ?? [],
+    album: [],
+    curios: {},
+    streak: { days: 0, lastDay: '' },
+    counters: { sessions: 0, retirements: 0 },
+    shell: 'plum',
+  }),
 }
 
 export function newPet(name: string, now: number): PetState {
@@ -35,7 +46,18 @@ export function newPet(name: string, now: number): PetState {
 }
 
 export function emptySave(): SaveFile {
-  return { version: SAVE_VERSION, pet: null, muted: false, worldOffset: 0 }
+  return {
+    version: SAVE_VERSION,
+    pet: null,
+    muted: false,
+    worldOffset: 0,
+    discovered: [],
+    album: [],
+    curios: {},
+    streak: { days: 0, lastDay: '' },
+    counters: { sessions: 0, retirements: 0 },
+    shell: 'plum',
+  }
 }
 
 export function load(): SaveFile {
