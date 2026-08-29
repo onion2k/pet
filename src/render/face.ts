@@ -121,13 +121,46 @@ export function faceAnchors(model: VoxelModel, targetHeight: number): FaceAnchor
     skin: skin ?? [0.5, 0.5, 0.5],
     eyes: [eyeLeft, eyeRight],
     eyeSize: { w: span(left, 'x'), h: span(left, 'y') },
-    mouth: {
-      x: (eyeLeft.x + eyeRight.x) / 2,
-      y: (eyeLeft.y + eyeRight.y) / 2 - span(left, 'y') * 1.15,
-      z: eyeLeft.z,
-    },
+    mouth: mouthAnchor(
+      source,
+      (eyeLeft.x + eyeRight.x) / 2,
+      (eyeLeft.y + eyeRight.y) / 2 - span(left, 'y') * 1.9,
+      scale,
+      originZ,
+    ),
     voxel: scale,
   }
+}
+
+/**
+ * The mouth sits well below the eyes, and by then the body may have bulged out
+ * in front of the face -- on a creature with a chest, a mouth left on the eyes'
+ * own depth plane is simply buried inside it. So the front is measured again at
+ * the mouth's own height.
+ */
+function mouthAnchor(
+  source: ReturnType<typeof modelSource>,
+  x: number,
+  y: number,
+  scale: number,
+  originZ: number,
+): Anchor {
+  const vy = Math.max(0, Math.min(source.h - 1, Math.floor(y / scale)))
+  const middle = Math.floor(source.w / 2)
+  let frontZ = -1
+  // Only the columns the mouth actually spans, so a distant shoulder or a wing
+  // cannot drag it forward.
+  for (let dx = -1; dx <= 1; dx++) {
+    const vx = middle + dx
+    for (let z = source.d - 1; z >= 0; z--) {
+      if (source.at(vx, vy, z)) {
+        frontZ = Math.max(frontZ, z)
+        break
+      }
+    }
+  }
+  if (frontZ < 0) frontZ = source.d - 1
+  return { x, y, z: originZ + (frontZ + 1.25) * scale }
 }
 
 /** What a face vertex belongs to, matching the constants in the pet's shader. */
