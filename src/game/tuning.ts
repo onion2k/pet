@@ -49,6 +49,4 @@ export const CATCHUP_CHUNK_MS = 5 * MIN
 /** Safety valve: never simulate more than this many chunks in one reconcile. */
 export const MAX_CATCHUP_CHUNKS = 4032
 
-/** Local hours in which sleeping counts as on time. */
-export const NIGHT_START_HOUR = 21
-export const NIGHT_END_HOUR = 7
+/** Night is the sun being down; see `world.isNight`. */

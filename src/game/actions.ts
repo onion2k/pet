@@ -2,7 +2,8 @@ import { foodById, type Food } from '../data/foods'
 import { chooseBranch, speciesOf } from '../data/species'
 import { metrics } from './metrics'
 import type { PetState, Stats, StatKey } from './types'
-import { HEALTH_FLOOR, NIGHT_END_HOUR, NIGHT_START_HOUR, STAGE_DURATION } from './tuning'
+import { HEALTH_FLOOR, STAGE_DURATION } from './tuning'
+import { isNight } from './world'
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v)
 
@@ -47,11 +48,6 @@ export function clean(pet: PetState): ActionResult {
   return { ok: true, message: 'All tidied up.' }
 }
 
-function isNight(now: number): boolean {
-  const hour = new Date(now).getHours()
-  return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR
-}
-
 export function toggleSleep(pet: PetState, now: number): ActionResult {
   if (pet.stage === 'egg') return { ok: false, message: 'The egg is already resting.' }
 
@@ -64,6 +60,8 @@ export function toggleSleep(pet: PetState, now: number): ActionResult {
 
   if (pet.stats.energy >= 95) return { ok: false, message: 'Not remotely sleepy.' }
   pet.asleep = true
+  // Judged against the world's own sky, so a bedtime the game calls late is one
+  // the player can see is late.
   if (isNight(now)) pet.sleep.onTimeSleeps += 1
   else pet.sleep.lateSleeps += 1
   return { ok: true, message: `${pet.name} curls up.` }

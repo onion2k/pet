@@ -61,7 +61,7 @@ measures of how the pet was raised, and the highest score wins:
 - **care** — time spent with a stat bottomed out, plus a penalty per illness
 - **diet** — the ratio of sweet / protein / veg / junk meals eaten
 - **play** — minigame win rate weighted by how often you actually played
-- **sleep** — whether bedtimes landed in the pet's night window
+- **sleep** — whether bedtimes landed while the world's sun was down
 
 Egg → Blobbit → one of three children → one of six adults. Eleven forms, and two
 playthroughs genuinely diverge.
@@ -88,17 +88,24 @@ sleeping pet stays where it is.
 
 ### Time, seasons and weather
 
-The day follows the player's own local clock — the pet's world is dark when
-theirs is — and drives a sun that arcs across the sky, warms at dawn and dusk,
-and hands over to a moon at night. Night keeps a usable light floor: this is a
-pet you have to be able to see, so the mood comes from the light shifting cold
-rather than from darkness.
+The world keeps its own clock, running far faster than real time. A day takes
+**twenty-four minutes**, one minute to the hour — following the player's real
+clock was the obvious first move and the wrong one, because someone who only
+plays after work would only ever see night. At this rate a few minutes with the
+pet covers a visible sweep of sky, and a single sitting can span dawn to dusk.
+The sun arcs across, warms through dawn and dusk, and hands over to a moon.
+Night keeps a usable light floor: this is a pet you have to be able to see, so
+the mood comes from the light shifting cold rather than from darkness.
 
-The year runs on a much shorter loop, 47 minutes a season. That period is
-deliberately not a divisor of the day: on a round four-hour year the two lock in
-phase and a given time of day always falls in the same season, so you could
-never see a summer noon if summer landed on your nights. Each season holds, then
-turns over into the next across its last quarter.
+A season lasts **seventy minutes**, a little under three world days, so all four
+pass in under five hours. That period is deliberately not a whole number of
+days: on a round one the two lock in phase and seasons would always turn over at
+the same hour. Each season holds, then turns over into the next across its last
+quarter.
+
+Night is simply the sun being down, so the bedtime the game judges the pet's
+sleep discipline against is the same one the player can see in the sky — and it
+moves with the season, since winter nights are longer.
 
 Weather is drawn from the season — rain and mist in spring and autumn, snow in
 winter, mostly clear in summer — and changes every eighteen minutes, dulling the

@@ -8,20 +8,28 @@ import {
 import { hexToLinear } from '../render/voxel-mesh'
 
 /**
- * Time of day and season both come from the wall clock, so they advance while
- * the app is closed and need nothing saved. The day follows the player's own
- * local clock — the pet's world is dark when theirs is — while the year runs on
- * a much shorter loop so a season change is something you actually see.
+ * The world keeps its own clock, running far faster than real time, and derives
+ * everything from the epoch — so it advances while the app is closed, is the
+ * same for everyone, and needs nothing saved.
+ *
+ * Following the player's real clock was the obvious first move and the wrong
+ * one: someone who only ever plays after work would only ever see night. A day
+ * takes twenty-four minutes instead, one minute to the hour, so a few minutes
+ * with the pet covers a visible stretch of sky and a single sitting can span
+ * dawn to dusk.
  */
+const DAY_MS = 24 * 60_000
+
 /**
- * Deliberately not a divisor of the 24-hour day. A round period — an hour a
- * season, four hours a year — locks in phase with the clock, so a given time of
- * day would always fall in the same season and you could never see a summer
- * noon if summer landed on your nights. 47 minutes drifts the year against the
- * day by about two thirds of a year daily.
+ * Deliberately not a whole number of days. On a round period the two lock in
+ * phase: seasons would always turn over at the same hour, and with a year
+ * shorter than a day a given hour could only ever fall in one season. Seventy
+ * minutes is a little under three days, so the year drifts against the day.
  */
-const SEASON_MS = 47 * 60_000
+const SEASON_MS = 70 * 60_000
 const YEAR_MS = SEASON_MS * SEASONS.length
+/** In-world hours per day. */
+const HOURS = 24
 /** How long a spell of weather lasts. */
 const WEATHER_MS = 18 * 60_000
 /** Fraction of a season spent turning into the next one. */
@@ -98,8 +106,14 @@ function seasonPalette(season: Season): Rgb[] {
   return cached
 }
 
-export function worldAt(now: number): WorldState {
-  // --- season -------------------------------------------------------------
+interface SeasonPoint {
+  season: Season
+  nextSeason: Season
+  blend: number
+  daylightHours: number
+}
+
+function seasonAt(now: number): SeasonPoint {
   const yearPosition = ((now % YEAR_MS) + YEAR_MS) % YEAR_MS
   const index = Math.floor(yearPosition / SEASON_MS)
   const through = (yearPosition % SEASON_MS) / SEASON_MS
@@ -107,17 +121,45 @@ export function worldAt(now: number): WorldState {
   const nextSeason = SEASONS[(index + 1) % SEASONS.length]!
   // Hold the season, then turn over at the end, so each one reads clearly
   // instead of everything sitting permanently half way between two.
-  const seasonBlend = smoothstep(1 - SEASON_FADE, 1, through)
+  const blend = smoothstep(1 - SEASON_FADE, 1, through)
+  return {
+    season,
+    nextSeason,
+    blend,
+    daylightHours: mix(season.daylightHours, nextSeason.daylightHours, blend),
+  }
+}
 
-  const daylightHours = mix(season.daylightHours, nextSeason.daylightHours, seasonBlend)
+/** The hour on the world's own clock, 0 to 24. */
+export function worldHour(now: number): number {
+  const position = ((now % DAY_MS) + DAY_MS) % DAY_MS
+  return (position / DAY_MS) * HOURS
+}
 
-  // --- time of day --------------------------------------------------------
-  const date = new Date(now)
-  const hour = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600
+function sunArc(hour: number, daylightHours: number): { arc: number; height: number } {
   const sunrise = 12 - daylightHours
   const sunset = 12 + daylightHours
   const arc = (Math.PI * (hour - sunrise)) / (sunset - sunrise)
-  const sunHeight = Math.sin(arc)
+  return { arc, height: Math.sin(arc) }
+}
+
+/**
+ * Night is simply the sun being down, so what the game judges a bedtime against
+ * is the same thing the player can see in the sky. It moves with the season,
+ * too: winter nights are longer.
+ */
+export function isNight(now: number): boolean {
+  const point = seasonAt(now)
+  return sunArc(worldHour(now), point.daylightHours).height <= 0
+}
+
+export function worldAt(now: number): WorldState {
+  // --- season -------------------------------------------------------------
+  const { season, nextSeason, blend: seasonBlend, daylightHours } = seasonAt(now)
+
+  // --- time of day --------------------------------------------------------
+  const hour = worldHour(now)
+  const { arc, height: sunHeight } = sunArc(hour, daylightHours)
   const daylight = smoothstep(-0.1, 0.3, sunHeight)
 
   // --- weather ------------------------------------------------------------
@@ -178,7 +220,7 @@ export function worldAt(now: number): WorldState {
   }
 
   return {
-    dayPhase: hour / 24,
+    dayPhase: hour / HOURS,
     hour,
     sunHeight,
     daylight,
