@@ -6,7 +6,7 @@ import { App } from './game/app'
 import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
-import { MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
+import { LAMP_COUNT, MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
 import { worldAt, type Rgb } from './game/world'
 import { PaletteTexture } from './render/palette'
 import { createWeather } from './render/weather'
@@ -84,7 +84,7 @@ petView.root.position.y = terrain.shape.groundY
 // Roaming stays inside the level clearing, so the pet's feet never step onto
 // terrain that steps up or down beneath them.
 petView.setBounds(ROAM_HALF_X, ROAM_HALF_Z)
-petView.setShelter(terrain.shape.shelter)
+petView.setShelter({ ...terrain.shape.shelter, lamps: terrain.shape.lamps })
 petView.root.setParent(screenScene)
 
 const particles = new Particles(gl)
@@ -240,6 +240,10 @@ let last = performance.now()
 let elapsed = 0
 /** Shifts the world clock. Only ever non-zero when a test drives it. */
 let timeOffset = 0
+/** Lantern positions in view space, packed xyz, rewritten every frame. */
+const lampView = new Float32Array(LAMP_COUNT * 3)
+/** How lit the lanterns are, eased toward the target so bedtime is a fade. */
+let lampLevel = 0
 
 function step(dt: number): void {
   elapsed += dt
@@ -253,7 +257,7 @@ function step(dt: number): void {
     terrain.rebuild(terrainSeed, biome)
     petView.root.position.y = terrain.shape.groundY
     // New ground means the shelter may have moved to the other side.
-    petView.setShelter(terrain.shape.shelter)
+    petView.setShelter({ ...terrain.shape.shelter, lamps: terrain.shape.lamps })
   }
 
   shell.setPower(app.mode === 'boot' ? 1 - app.bootTimer / 1.4 : 1)
@@ -308,19 +312,25 @@ function step(dt: number): void {
   terrain.setLighting({ ...lighting, haze: world.haze })
   terrain.setSick(visual.sick ? 1 : 0)
 
-  // The lantern comes up as the sun goes down. Its position is in world space
-  // and the camera turns, so it is transformed into view space here for the
-  // same reason the sun's direction is.
-  const lamp = terrain.shape.shelter.lamp
-  const lampWorld = [lamp.x, terrain.shape.groundY + lamp.y, lamp.z] as const
-  const lampView: Rgb = [
-    m[0]! * lampWorld[0] + m[4]! * lampWorld[1] + m[8]! * lampWorld[2] + m[12]!,
-    m[1]! * lampWorld[0] + m[5]! * lampWorld[1] + m[9]! * lampWorld[2] + m[13]!,
-    m[2]! * lampWorld[0] + m[6]! * lampWorld[1] + m[10]! * lampWorld[2] + m[14]!,
-  ]
-  const lampOn = 1 - world.daylight
-  petView.setLamp(lampView, lampOn)
-  terrain.setLamp(lampView, lampOn)
+  // The lanterns come up as the sun goes down, and go out once the pet is in
+  // bed -- the yard is lit for the pet, not for the player. Their positions are
+  // in world space and the camera turns, so they are transformed into view
+  // space here for the same reason the sun's direction is.
+  const lamps = terrain.shape.lamps
+  for (let i = 0; i < lamps.length && i < LAMP_COUNT; i++) {
+    const lamp = lamps[i]!
+    const lx = lamp.x
+    const ly = terrain.shape.groundY + lamp.y
+    const lz = lamp.z
+    lampView[i * 3] = m[0]! * lx + m[4]! * ly + m[8]! * lz + m[12]!
+    lampView[i * 3 + 1] = m[1]! * lx + m[5]! * ly + m[9]! * lz + m[13]!
+    lampView[i * 3 + 2] = m[2]! * lx + m[6]! * ly + m[10]! * lz + m[14]!
+  }
+  // Eased rather than switched, so bedtime dims the yard instead of snapping it.
+  const lampWanted = (1 - world.daylight) * (app.pet?.asleep ? 0 : 1)
+  lampLevel += (lampWanted - lampLevel) * Math.min(1, dt * 1.6)
+  petView.setLamps(lampView, lampLevel)
+  terrain.setLamps(lampView, lampLevel)
 
   backdrop.setPalette(world.sky.top, world.sky.bottom)
   // Place the sun on the same arc that lights the scene, so the shadows and the
@@ -380,6 +390,7 @@ if (import.meta.env.DEV) {
       petView,
       weather,
       cameraPan: () => cameraPan,
+      lampLevel: () => lampLevel,
       world: () => worldAt(app.worldNow()),
       setTimeOffset: (ms: number) => {
         timeOffset = ms

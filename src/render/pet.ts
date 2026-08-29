@@ -1,5 +1,6 @@
 import { Mesh, Plane, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
+import { LAMP_COUNT } from '../data/biome'
 import type { VoxelModel } from '../data/voxel-format'
 import { buildVoxelGeometry, type VoxelGeometry } from './voxel-mesh'
 
@@ -131,6 +132,8 @@ const vertex = /* glsl */ `
 const fragment = /* glsl */ `
   precision highp float;
 
+  #define LAMP_COUNT ${LAMP_COUNT}
+
   uniform float uSick;
   uniform float uPulse;
   uniform vec3 uTint;
@@ -139,7 +142,7 @@ const fragment = /* glsl */ `
   uniform float uLightIntensity;
   uniform vec3 uAmbientColour;
   uniform float uAmbientIntensity;
-  uniform vec3 uLampPos;
+  uniform vec3 uLampPos[LAMP_COUNT];
   uniform vec3 uLampColour;
   uniform float uLampIntensity;
   uniform float uLampRadius;
@@ -161,14 +164,18 @@ const fragment = /* glsl */ `
     lit += vColor * uAmbientColour * (fill * uAmbientIntensity);
     lit *= vAo;
 
-    // The pet is lit by the lantern too, so walking up to it after dark
+    // The pet is lit by the lanterns too, so walking up to one after dark
     // actually does something.
-    vec3 toLamp = uLampPos - vViewPos;
-    float lampDist = length(toLamp);
-    float falloff = clamp(1.0 - lampDist / uLampRadius, 0.0, 1.0);
-    falloff *= falloff;
-    float lampKey = max(dot(N, normalize(toLamp)), 0.0) * 0.75 + 0.25;
-    lit += vColor * uLampColour * (lampKey * falloff * uLampIntensity);
+    vec3 lampSum = vec3(0.0);
+    for (int i = 0; i < LAMP_COUNT; i++) {
+      vec3 toLamp = uLampPos[i] - vViewPos;
+      float lampDist = length(toLamp);
+      float falloff = clamp(1.0 - lampDist / uLampRadius, 0.0, 1.0);
+      falloff *= falloff;
+      float lampKey = max(dot(N, normalize(toLamp)), 0.0) * 0.75 + 0.25;
+      lampSum += uLampColour * (lampKey * falloff);
+    }
+    lit += vColor * lampSum * uLampIntensity;
 
     // Illness drains the colour toward a sallow green.
     vec3 ill = mix(vec3(dot(lit, vec3(0.33))), vec3(0.42, 0.52, 0.34), 0.55) * 0.85;
@@ -241,8 +248,8 @@ export interface ShelterTarget {
   centre: { x: number; z: number }
   half: { x: number; z: number }
   inside: { x: number; z: number }
-  /** The lantern beside the door, which the pet has to walk around. */
-  lamp: { x: number; z: number }
+  /** Every lantern in the yard, all of which the pet has to walk around. */
+  lamps: readonly { x: number; z: number }[]
 }
 
 /** Shortest-path approach between two angles. */
@@ -309,7 +316,7 @@ export class PetView {
         uLightIntensity: { value: 1 },
         uAmbientColour: { value: [0.5, 0.6, 0.8] },
         uAmbientIntensity: { value: 0.3 },
-        uLampPos: { value: [0, 0, 0] },
+        uLampPos: { value: new Float32Array(LAMP_COUNT * 3) },
         uLampColour: { value: [1, 0.82, 0.5] },
         uLampIntensity: { value: 0 },
         uLampRadius: { value: 4.5 },
@@ -377,10 +384,10 @@ export class PetView {
     u.uAmbientIntensity.value = lighting.ambientIntensity
   }
 
-  /** The lantern, as a view-space position and a strength that rises at dusk. */
-  setLamp(position: [number, number, number], intensity: number): void {
+  /** The lanterns, as view-space positions packed xyz, and one shared strength. */
+  setLamps(positions: Float32Array, intensity: number): void {
     const u = this.program.uniforms
-    u.uLampPos.value = position
+    u.uLampPos.value = positions
     u.uLampIntensity.value = intensity
   }
 
@@ -444,14 +451,19 @@ export class PetView {
   private steerRoundLamp(x: number, z: number, dx: number, dz: number): [number, number] {
     const sh = this.shelter
     if (!sh) return [dx, dz]
-    const ox = x - sh.lamp.x
-    const oz = z - sh.lamp.z
-    const distance = Math.hypot(ox, oz)
     const clear = LAMP_RADIUS + PET_RADIUS * 0.7
-    if (distance > clear || distance < 1e-4) return [dx, dz]
-    const push = ((clear - distance) / clear) * 3.2
-    const nx = dx + (ox / distance) * push
-    const nz = dz + (oz / distance) * push
+    let nx = dx
+    let nz = dz
+    for (const lamp of sh.lamps) {
+      const ox = x - lamp.x
+      const oz = z - lamp.z
+      const distance = Math.hypot(ox, oz)
+      if (distance > clear || distance < 1e-4) continue
+      const push = ((clear - distance) / clear) * 3.2
+      nx += (ox / distance) * push
+      nz += (oz / distance) * push
+    }
+    if (nx === dx && nz === dz) return [dx, dz]
     const length = Math.hypot(nx, nz) || 1
     return [nx / length, nz / length]
   }
@@ -459,8 +471,10 @@ export class PetView {
   private blockedByShelter(x: number, z: number): boolean {
     const sh = this.shelter
     if (!sh) return false
-    // The lantern is a solid post on the way in, so it is dodged like the walls.
-    if (Math.hypot(x - sh.lamp.x, z - sh.lamp.z) < LAMP_RADIUS + PET_RADIUS) return true
+    // The lanterns are solid posts, so they are dodged like the walls.
+    for (const lamp of sh.lamps) {
+      if (Math.hypot(x - lamp.x, z - lamp.z) < LAMP_RADIUS + PET_RADIUS) return true
+    }
     return (
       Math.abs(x - sh.centre.x) < sh.half.x + PET_RADIUS &&
       Math.abs(z - sh.centre.z) < sh.half.z + PET_RADIUS

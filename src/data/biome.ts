@@ -54,5 +54,19 @@ export const PROP_SPACING = 3
 export const SHELTER_CENTRE = { x: 1.22, z: -2.45 }
 /** Footprint in columns, matching the shelter model. */
 export const SHELTER_COLUMNS = { w: 13, d: 11 }
+
+/**
+ * Where the scattered lanterns stand: a row just behind the band the pet roams,
+ * far enough back that nothing walks into them and near enough in that they are
+ * still on the clearing's level ground.
+ */
+export const LAMP_ROW_Z = -1.15
+export const LAMP_ROW_X = [-7.6, -5.0, -2.4, 2.6, 5.2, 7.6]
+/**
+ * How many lanterns the yard holds, the shelter's own included. The shaders
+ * carry a fixed-size array and every slot is lit, so this has to be exact --
+ * a spare slot would sit at the camera and light whatever came near it.
+ */
+export const LAMP_COUNT = LAMP_ROW_X.length + 1
 /** Extra columns of clear ground kept around the pet's clearing. */
 export const PROP_CLEARING_MARGIN = 2

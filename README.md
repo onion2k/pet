@@ -208,12 +208,22 @@ almost its whole width, so the pet has somewhere to roam without ever meeting a
 step. The patch fades into the sky with depth-based haze, so its edge is never a
 visible boundary.
 
-A lantern stands beside the shelter door. Its glass is the one piece of scenery
-that makes its own light: it is emissive, it writes into the bloom mask so it
-glows rather than merely being bright, and it casts a real point light over the
-ground, the shelter and the pet, coming up as the sun goes down. The pet steers
-around the post rather than through it, since it walks by aiming rather than by
-planning a route.
+Lanterns light the yard: one beside the shelter door and a row of six standing
+behind the band the pet roams, far enough back that nothing walks into them and
+near enough in that they stand on the clearing's level ground. Their glass is
+the only scenery that makes its own light — emissive, written into the bloom
+mask so it glows rather than merely being bright, and each driving a real point
+light over the ground, the shelter and the pet.
+
+They come up as the sun goes down and go out again once the pet is in bed: the
+yard is lit for the pet, not for the player. The change is eased over about two
+seconds, so bedtime dims the meadow rather than switching it. The pet steers
+around the posts rather than through them, since it walks by aiming rather than
+by planning a route.
+
+The shaders carry a fixed-size array of lamps and light every slot, so the count
+has to match the number actually placed — a spare slot sits at the origin in
+view space, which is the camera, and lights whatever comes near it.
 
 A shelter stands at the back of the yard, on its own levelled pad with a level
 path running forward to the clearing — the pet does not sample terrain height as

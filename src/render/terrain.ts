@@ -3,6 +3,9 @@ import type { OGLRenderingContext } from 'ogl'
 import {
   PROP_CLEARING_MARGIN,
   PROP_SPACING,
+  LAMP_COUNT,
+  LAMP_ROW_X,
+  LAMP_ROW_Z,
   SHELTER_CENTRE,
   SHELTER_COLUMNS,
   TERRAIN_BASE,
@@ -64,7 +67,7 @@ export interface ShelterPlacement {
   /** Where the pet stands when it has gone inside. */
   inside: { x: number; z: number }
   /** The lantern outside the front, in columns and in world units. */
-  lamp: { ox: number; oz: number; x: number; y: number; z: number }
+  lamp: LampPlacement
 }
 
 export interface TerrainShape {
@@ -74,6 +77,17 @@ export interface TerrainShape {
   /** World Y the pet stands on. */
   groundY: number
   shelter: ShelterPlacement
+  /** Every lantern in the yard, the shelter's own first. */
+  lamps: LampPlacement[]
+}
+
+export interface LampPlacement {
+  ox: number
+  oz: number
+  x: number
+  /** Height of the glass above the ground. */
+  y: number
+  z: number
 }
 
 function placeShelter(seed: number): ShelterPlacement {
@@ -107,7 +121,7 @@ function lampAt(
   centre: { x: number; z: number },
   half: { x: number; z: number },
   flip: number,
-): ShelterPlacement['lamp'] {
+): LampPlacement {
   const x = centre.x - (half.x + 0.34) * flip
   const z = centre.z + half.z + 0.16
   return {
@@ -164,6 +178,18 @@ export function terrainShape(seed: string): TerrainShape {
   return {
     size: TERRAIN_COLS,
     shelter,
+    // The shelter's lantern leads, then the row standing behind the pet's
+    // roaming band, where the ground is level and nothing walks into them.
+    lamps: [
+      shelter.lamp,
+      ...LAMP_ROW_X.map((x) => ({
+        ox: Math.round(TERRAIN_COLS / 2 + x / TERRAIN_VOXEL) - 1,
+        oz: Math.round(TERRAIN_ROWS / 2 + LAMP_ROW_Z / TERRAIN_VOXEL) - 1,
+        x,
+        y: 6.5 * TERRAIN_VOXEL,
+        z: LAMP_ROW_Z,
+      })),
+    ],
     heightAt: (x, z) =>
       x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS
         ? 0
@@ -245,8 +271,10 @@ function scatterProps(
   // are reserved so nothing is scattered against its walls or in its doorway.
   const sh = shape.shelter
   stamp(SHELTER, sh.ox, sh.oz, TERRAIN_BASE)
-  stamp(LANTERN, sh.lamp.ox, sh.lamp.oz, TERRAIN_BASE)
-  count++
+  for (const lamp of shape.lamps) {
+    stamp(LANTERN, lamp.ox, lamp.oz, TERRAIN_BASE)
+    count++
+  }
   // Reserve the shelter and the path back to the clearing, so nothing is
   // scattered against its walls or left standing in the pet's way.
   const reserveMinX = Math.min(sh.ox - 2, sh.lamp.ox - 2)
@@ -255,6 +283,16 @@ function scatterProps(
     for (let x = reserveMinX; x < reserveMaxX; x++) {
       if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
       taken.add(z * TERRAIN_COLS + x)
+    }
+  }
+
+  // Each lantern keeps its own patch clear too, or a shrub grows through it.
+  for (const lamp of shape.lamps) {
+    for (let z = lamp.oz - 1; z < lamp.oz + 4; z++) {
+      for (let x = lamp.ox - 1; x < lamp.ox + 4; x++) {
+        if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
+        taken.add(z * TERRAIN_COLS + x)
+      }
     }
   }
 
@@ -344,6 +382,8 @@ const vertex = /* glsl */ `
 const fragment = /* glsl */ `
   precision highp float;
 
+  #define LAMP_COUNT ${LAMP_COUNT}
+
   uniform sampler2D tPalette;
   uniform float uPaletteStep;
   uniform vec3 uHaze;
@@ -354,7 +394,7 @@ const fragment = /* glsl */ `
   uniform float uLightIntensity;
   uniform vec3 uAmbientColour;
   uniform float uAmbientIntensity;
-  uniform vec3 uLampPos;
+  uniform vec3 uLampPos[LAMP_COUNT];
   uniform vec3 uLampColour;
   uniform float uLampIntensity;
   uniform float uLampRadius;
@@ -381,19 +421,25 @@ const fragment = /* glsl */ `
     lit += base * uAmbientColour * (fill * uAmbientIntensity);
     lit *= vAo;
 
-    // The lantern. A point light with a smooth radius falloff, so the ground
-    // and the shelter around it pick up a pool of warm light after dark.
-    vec3 toLamp = uLampPos - vViewPos;
-    float lampDist = length(toLamp);
-    float falloff = clamp(1.0 - lampDist / uLampRadius, 0.0, 1.0);
-    falloff *= falloff;
-    float lampKey = max(dot(N, normalize(toLamp)), 0.0) * 0.75 + 0.25;
-    lit += base * uLampColour * (lampKey * falloff * uLampIntensity);
+    // The lanterns. Each is a point light with a smooth radius falloff, so the
+    // ground around it picks up a pool of warm light after dark.
+    vec3 lampSum = vec3(0.0);
+    for (int i = 0; i < LAMP_COUNT; i++) {
+      vec3 toLamp = uLampPos[i] - vViewPos;
+      float lampDist = length(toLamp);
+      float falloff = clamp(1.0 - lampDist / uLampRadius, 0.0, 1.0);
+      falloff *= falloff;
+      float lampKey = max(dot(N, normalize(toLamp)), 0.0) * 0.75 + 0.25;
+      lampSum += uLampColour * (lampKey * falloff);
+    }
+    lit += base * lampSum * uLampIntensity;
 
-    // The glass itself is the source, so it ignores all of the above. The lift
-    // is gentle on purpose: pushed harder it saturates to white and the lantern
-    // stops reading as a warm light and starts reading as a hole.
-    lit = mix(lit, base * (1.0 + uLampIntensity * 0.35), vEmissive);
+    // The glass itself is the source, so while it is lit it ignores all of the
+    // above. The lift is gentle on purpose: pushed harder it saturates to white
+    // and the lantern stops reading as a warm light and starts reading as a
+    // hole. Faded out by the same strength, so an unlit lantern is shaded like
+    // any other scenery rather than staying a bright pane all day.
+    lit = mix(lit, base * (1.0 + uLampIntensity * 0.35), vEmissive * uLampIntensity);
 
     // The ground sickens along with its occupant.
     lit = mix(lit, mix(vec3(dot(lit, vec3(0.33))), vec3(0.40, 0.44, 0.30), 0.5) * 0.8, uSick);
@@ -418,7 +464,8 @@ export interface Terrain {
   /** Applies the current sky and sun. */
   setLighting(lighting: TerrainLighting): void
   /** The lantern, as a view-space position and a strength that rises at dusk. */
-  setLamp(position: [number, number, number], intensity: number): void
+  /** All the lanterns, as view-space positions packed xyz, and one strength. */
+  setLamps(positions: Float32Array, intensity: number): void
   faces: number
 }
 
@@ -454,7 +501,7 @@ export function createTerrain(
       uLightIntensity: { value: 1 },
       uAmbientColour: { value: [0.5, 0.6, 0.8] },
       uAmbientIntensity: { value: 0.3 },
-      uLampPos: { value: [0, 0, 0] },
+      uLampPos: { value: new Float32Array(LAMP_COUNT * 3) },
       uLampColour: { value: [1, 0.82, 0.5] },
       uLampIntensity: { value: 0 },
       uLampRadius: { value: 4.5 },
@@ -561,9 +608,9 @@ export function createTerrain(
       u.uAmbientIntensity.value = lighting.ambientIntensity
       u.uHaze.value = lighting.haze
     },
-    setLamp(position, intensity) {
+    setLamps(positions, intensity) {
       const u = program.uniforms
-      u.uLampPos.value = position
+      u.uLampPos.value = positions
       u.uLampIntensity.value = intensity
     },
   }
