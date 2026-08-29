@@ -204,6 +204,25 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
     noteTexture.needsUpdate = true
   }
 
+  /** Breaks a phrase to a character width, splitting a word only if it must. */
+  function fitLines(text: string, width: number): string[] {
+    const lines: string[] = []
+    let line = ''
+    for (const word of text.split(' ')) {
+      if (!line && word.length > width) {
+        // A single word too long for the bubble is cut rather than overflowing.
+        for (let i = 0; i < word.length; i += width) lines.push(word.slice(i, i + width))
+        continue
+      }
+      if (line && line.length + 1 + word.length > width) {
+        lines.push(line)
+        line = word
+      } else line = line ? `${line} ${word}` : word
+    }
+    if (line) lines.push(line)
+    return lines
+  }
+
   /** Draws a pixel string into the bubble canvas at a given scale. */
   function pixelText(text: string, cx: number, cy: number, scale: number, colour: string): void {
     ctx.fillStyle = colour
@@ -278,8 +297,21 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
     }
 
     const midY = (H - 16) / 2 + 4
-    if (SYMBOLS[text]) drawSymbol(text, W / 2, midY, 3, ink)
-    else pixelText(text.toUpperCase(), W / 2, midY - (GLYPH_H * 2) / 2, 2, ink)
+    if (SYMBOLS[text]) {
+      drawSymbol(text, W / 2, midY, 4, ink)
+    } else {
+      // Words are broken to fit the bubble rather than run off the side of it:
+      // the longest line in the game is twenty characters, which at this size
+      // is over twice the width of the canvas on one line.
+      const scale = 2
+      const perLine = Math.max(1, Math.floor((W - 12) / ((GLYPH_W + 1) * scale)))
+      const lines = fitLines(text.toUpperCase(), perLine)
+      const lineHeight = GLYPH_H * scale + 2
+      const top = midY - (lines.length * lineHeight) / 2
+      lines.forEach((line, i) => {
+        pixelText(line, W / 2, top + i * lineHeight, scale, ink)
+      })
+    }
     texture.needsUpdate = true
   }
 
@@ -331,8 +363,8 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
 
       // Off to one side and well in front of the pet: level with it and only a
       // little aside, the quad simply sits inside the head and is never seen.
-      panel.scale.set(0.95)
-      panel.position.set(0.9, 1.9, 0.75)
+      panel.scale.set(1.28)
+      panel.position.set(1.02, 2.02, 0.75)
       // The root carries position only. Turning it would swing the panel around
       // the pet on an arc rather than turning it where it stands.
       root.position.set(at.x, at.y, at.z)
