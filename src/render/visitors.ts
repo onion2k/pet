@@ -1,4 +1,4 @@
-import { Mesh, Program, Transform } from 'ogl'
+import { Mesh, Program, Quat, Transform, Vec3 } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT, VERGE_SLOTS, VERGE_Z } from '../data/biome'
 import { VISITORS, type Visitor, type VisitorId } from '../data/visitors'
@@ -103,12 +103,21 @@ export interface ActiveVisitor {
 interface Entry {
   visitor: Visitor
   mesh: Mesh
+  /**
+   * What actually gets moved. The mesh hangs off it, offset so that the node
+   * sits at the point the visitor turns about -- for the ball, its centre,
+   * which is what lets it roll rather than pivot on the grass.
+   */
+  node: Transform
   /** Where it settled, before any motion is applied. */
   home: { x: number; z: number }
   /** Motion state, meaning whatever its motion kind needs. */
   phase: number
   timer: number
   hop: { fromX: number; fromZ: number; toX: number; toZ: number; t: number; resting: number }
+  /** Rolling state: where the ball is and how fast it is going. */
+  ball: { x: number; z: number; vx: number; vz: number }
+  radius: number
   fade: number
   present: boolean
 }
@@ -141,6 +150,15 @@ export interface VisitorContext {
   announce(name: string): void
 }
 
+/** How close the pet has to get to send the ball on its way. */
+const KICK_REACH = 0.72
+/** Speed of that shove, in world units a second. */
+const KICK_SPEED = 2.1
+/** Rolling friction: how quickly a loose ball gives up. */
+const ROLL_DRAG = 1.35
+/** How much speed survives a bounce off the edge of the roaming band. */
+const BOUNCE = 0.55
+
 /** Deterministic 0..1 from a pair of integers. Same shape as the terrain's. */
 function hash2(a: number, b: number): number {
   let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x165667b1, 0xc2b2ae35)
@@ -156,6 +174,9 @@ const idSeed = (id: VisitorId): number => {
 
 export function createVisitors(gl: OGLRenderingContext, groundY: number): Visitors {
   const root = new Transform()
+  // Scratch, so rolling does not allocate every frame.
+  const spinAxis = new Vec3()
+  const spinStep = new Quat()
   const program = new Program(gl, {
     vertex,
     fragment,
@@ -178,9 +199,15 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
   const entries: Entry[] = VISITORS.map((visitor) => {
     const built = buildVoxelGeometry(gl, visitor.model, visitor.height)
     const mesh = new Mesh(gl, { geometry: built.geometry, program })
-    mesh.position.y = groundY
-    mesh.visible = false
-    mesh.setParent(root)
+    const node = new Transform()
+    node.position.y = groundY
+    node.visible = false
+    node.setParent(root)
+    mesh.setParent(node)
+    // A rolling thing turns about its middle, so its node sits at the centre
+    // and the mesh hangs half a diameter below it.
+    const radius = visitor.height / 2
+    if (visitor.motion === 'roll') mesh.position.y = -radius
     // They share one program, so each hands it its own fade on the way past.
     mesh.onBeforeRender(() => {
       program.uniforms.uFade.value = entry.fade
@@ -188,6 +215,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     const entry: Entry = {
       visitor,
       mesh,
+      node,
+      ball: { x: 0, z: 0, vx: 0, vz: 0 },
+      radius,
       home: { x: 0, z: 0 },
       phase: 0,
       timer: 0,
@@ -244,6 +274,11 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       entry.hop.t = 1
       entry.hop.resting = 0.6 + a * 1.4
       entry.phase = a * Math.PI * 2
+      entry.ball.x = entry.home.x
+      entry.ball.z = entry.home.z
+      entry.ball.vx = 0
+      entry.ball.vz = 0
+      entry.node.quaternion.identity()
     }
   }
 
@@ -265,12 +300,12 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     pumpkinAt() {
       const entry = entries.find((e) => e.visitor.id === 'pumpkin')
       if (!entry || !entry.present || entry.fade < 0.2) return null
-      return { x: entry.mesh.position.x, y: 0.34, z: entry.mesh.position.z }
+      return { x: entry.node.position.x, y: 0.34, z: entry.node.position.z }
     },
     playthingAt() {
       const entry = entries.find((e) => e.visitor.id === 'ball')
       if (!entry || !entry.present || entry.fade < 0.5) return null
-      return { x: entry.mesh.position.x, z: entry.mesh.position.z }
+      return { x: entry.node.position.x, z: entry.node.position.z }
     },
     active() {
       return entries
@@ -278,8 +313,8 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         .map((e) => ({
           id: e.visitor.id,
           name: e.visitor.name,
-          x: e.mesh.position.x,
-          z: e.mesh.position.z,
+          x: e.node.position.x,
+          z: e.node.position.z,
         }))
     },
     update(dt, context) {
@@ -308,17 +343,22 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         entry.fade += (wanted - entry.fade) * Math.min(1, dt * 2.2)
         if (entry.fade < 0.004 && wanted === 0) {
           entry.fade = 0
-          entry.mesh.visible = false
+          entry.node.visible = false
           continue
         }
-        entry.mesh.visible = true
+        entry.node.visible = true
         entry.phase += dt
 
-        const p = entry.mesh.position
-        p.x = entry.home.x
-        p.z = entry.home.z
-        p.y = context.groundY
-        entry.mesh.rotation.y = 0
+        const p = entry.node.position
+        if (entry.visitor.motion !== 'roll') {
+          // A roller owns its own position and orientation: writing to
+          // rotation here would sync Euler back into the quaternion and undo
+          // the roll accumulated so far.
+          p.x = entry.home.x
+          p.z = entry.home.z
+          p.y = context.groundY
+          entry.node.rotation.y = 0
+        }
 
         switch (entry.visitor.motion) {
           case 'hop': {
@@ -348,9 +388,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
             p.z = hop.fromZ + (hop.toZ - hop.fromZ) * t
             // A hop arc, and a nose-down graze between hops.
             p.y = context.groundY + (t < 1 ? Math.sin(t * Math.PI) * 0.22 : 0)
-            entry.mesh.rotation.y = Math.atan2(hop.toX - hop.fromX, hop.toZ - hop.fromZ)
-            if (t >= 1) entry.mesh.rotation.x = Math.sin(entry.phase * 2.2) * 0.12 - 0.1
-            else entry.mesh.rotation.x = 0
+            entry.node.rotation.y = Math.atan2(hop.toX - hop.fromX, hop.toZ - hop.fromZ)
+            if (t >= 1) entry.node.rotation.x = Math.sin(entry.phase * 2.2) * 0.12 - 0.1
+            else entry.node.rotation.x = 0
             break
           }
           case 'flutter': {
@@ -358,22 +398,77 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
             p.x = entry.home.x + Math.sin(entry.phase * 0.7) * 1.5
             p.z = entry.home.z + Math.cos(entry.phase * 0.53) * 0.5
             p.y = context.groundY + 0.85 + Math.sin(entry.phase * 3.1) * 0.22
-            entry.mesh.rotation.y = Math.sin(entry.phase * 0.7 + Math.PI / 2)
-            entry.mesh.rotation.z = Math.sin(entry.phase * 9.0) * 0.5
+            entry.node.rotation.y = Math.sin(entry.phase * 0.7 + Math.PI / 2)
+            entry.node.rotation.z = Math.sin(entry.phase * 9.0) * 0.5
             break
           }
           case 'roll': {
-            // Sits still until the pet comes near, then bounces about.
-            const near = Math.hypot(context.pet.x - entry.home.x, context.pet.z - entry.home.z)
-            const excited = Math.max(0, 1 - near / 2.2)
-            entry.timer += dt * (1.5 + excited * 7)
-            p.y = context.groundY + Math.abs(Math.sin(entry.timer)) * 0.45 * excited
-            entry.mesh.rotation.x = entry.timer * excited * 1.4
-            // Nudged away from the pet, as though it had just been shoved.
-            if (near < 1.2 && near > 0.001) {
-              const away = (1.2 - near) * 0.35
-              p.x += ((entry.home.x - context.pet.x) / near) * away
-              p.z += ((entry.home.z - context.pet.z) / near) * away
+            const ball = entry.ball
+            const radius = entry.radius
+
+            // The pet shoves it along when it catches up with it. The ball is
+            // put just clear of the pet first, so a pet standing over it pushes
+            // once rather than shuddering against it every frame.
+            const dx = ball.x - context.pet.x
+            const dz = ball.z - context.pet.z
+            const gap = Math.hypot(dx, dz)
+            if (gap < KICK_REACH && gap > 1e-4) {
+              const nx = dx / gap
+              const nz = dz / gap
+              ball.x = context.pet.x + nx * KICK_REACH
+              ball.z = context.pet.z + nz * KICK_REACH
+              // Never slows a ball that is already going faster than the kick.
+              const speed = Math.max(KICK_SPEED, Math.hypot(ball.vx, ball.vz))
+              ball.vx = nx * speed
+              ball.vz = nz * speed
+            }
+
+            // Rolling friction, and a floor below which it is simply at rest.
+            const damping = Math.exp(-ROLL_DRAG * dt)
+            ball.vx *= damping
+            ball.vz *= damping
+            if (Math.hypot(ball.vx, ball.vz) < 0.03) {
+              ball.vx = 0
+              ball.vz = 0
+            }
+
+            const moveX = ball.vx * dt
+            const moveZ = ball.vz * dt
+            ball.x += moveX
+            ball.z += moveZ
+
+            // Kept inside the band the pet roams, so it can always be fetched.
+            const boundX = context.roam.x * 0.92
+            const boundZ = context.roam.z * 0.92
+            const reach = Math.hypot(ball.x / boundX, ball.z / boundZ)
+            if (reach > 1) {
+              let nx = ball.x / (boundX * boundX)
+              let nz = ball.z / (boundZ * boundZ)
+              const length = Math.hypot(nx, nz) || 1
+              nx /= length
+              nz /= length
+              const into = ball.vx * nx + ball.vz * nz
+              if (into > 0) {
+                ball.vx -= (1 + BOUNCE) * into * nx
+                ball.vz -= (1 + BOUNCE) * into * nz
+              }
+              ball.x /= reach
+              ball.z /= reach
+            }
+
+            p.x = ball.x
+            p.z = ball.z
+            p.y = context.groundY + radius
+
+            // Rolling without slipping: the axis is horizontal and across the
+            // direction of travel, and one radius of travel is one radian.
+            const travelled = Math.hypot(moveX, moveZ)
+            if (travelled > 1e-6) {
+              spinAxis.set(ball.vz, 0, -ball.vx)
+              spinAxis.normalize()
+              spinStep.fromAxisAngle(spinAxis, travelled / radius)
+              entry.node.quaternion.multiply(spinStep, entry.node.quaternion)
+              entry.node.quaternion.normalize()
             }
             break
           }

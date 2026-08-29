@@ -262,6 +262,17 @@ without collisions. Things that move are freer: the ball sits inside the roaming
 band where the pet can reach it, and the pet steers over to it about a third of
 the time it picks somewhere new to walk.
 
+The ball rolls properly. It carries a velocity, the pet's shove sets that
+velocity, rolling friction takes it away again, and it bounces off the edge of
+the roaming band so it can always be fetched back. Its spin is derived from the
+travel rather than run off a timer: the axis is horizontal and across the
+direction of motion, and one radius of travel is one radian, so it never skates.
+Its node sits at the ball's centre with the mesh hung half a diameter below,
+because a mesh built sitting on the ground would otherwise pivot on the grass
+instead of rolling over it. Nothing else may write to that node's Euler
+rotation, since ogl syncs Euler back into the quaternion and would undo the
+roll.
+
 Rocks and plants are scattered over the rest: pebbles, rocks and boulders, and
 tufts, ferns, shrubs and blooms. They are stamped **into the terrain's own voxel field**
 rather than added as separate meshes, which is what makes them sit convincingly
