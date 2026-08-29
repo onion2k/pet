@@ -372,12 +372,12 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
   // than it, nor sit anywhere but on top of it.
   // Round, so one radius rather than two: a painted eye is not always square,
   // and taking the smaller side keeps the circle inside the patch that hides it.
-  const eyeR = Math.min(eyeHalfW, eyeHalfH) * 0.8
+  const eyeR = Math.min(eyeHalfW, eyeHalfH) * 0.96
   const scleraW = eyeR
   const scleraH = eyeR
   const pupilW = eyeR * 0.52
   const pupilH = eyeR * 0.52
-  const inset = 0.78
+  const inset = 0.72
 
   for (const eye of [left, right]) {
     const x = eye.x * inset
