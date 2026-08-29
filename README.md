@@ -170,14 +170,18 @@ vertex carries which feature it belongs to and its offset from that feature's
 centre, which is enough for the shader to blink the eyes, travel the pupils,
 curve the mouth and tilt the brows before the body deformation runs.
 
-Two things had to be got right for it to read at 192 pixels. The features sit a
-quarter of a voxel proud of the head — at a fiftieth they came out striped with
-z-fighting. And the whites are a fifth wider than the painted eye they cover, with a
-dark rim behind them: several of these creatures are near-white themselves, and
-a pale sclera on a pale head simply disappears, leaving the eye reading as
-nothing but its pupil. The rim has to stay wider than the painted eye or the
-old one shows through at the edges, and the pupil narrower than the white or
-there is no white left to see.
+The first thing drawn is a patch of the head's own colour over the eye the model
+painted. That one quad is what frees the rest: while the drawn eye had to hide
+the old one, it could never be smaller than it, nor sit anywhere but exactly on
+top of it — and the models' eyes are large and wide-set. Painted out, the eye can
+be drawn at whatever size and spacing suits, and it is drawn small and close.
+
+The features sit a quarter of a voxel proud of the head; at a fiftieth they came
+out striped with z-fighting. The whites carry a dark rim behind them, because
+several of these creatures are near-white themselves and a pale sclera on a pale
+head simply disappears, leaving the eye reading as nothing but its pupil. The
+head colour for the patch is sampled from the voxel beside the eye, so it is
+right for every species without a table.
 
 What the face does comes off the same numbers as the rest of the pet, so it can
 never disagree with it. Mood curves the mouth and sets the brows; sadness also

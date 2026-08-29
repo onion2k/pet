@@ -16,6 +16,8 @@ export interface FaceAnchors {
   mouth: Anchor
   /** World size of one voxel, so the overlay can match the model's grain. */
   voxel: number
+  /** The head's own colour beside the eye, for painting the old eye out. */
+  skin: [number, number, number]
 }
 
 export interface Anchor {
@@ -95,7 +97,28 @@ export function faceAnchors(model: VoxelModel, targetHeight: number): FaceAnchor
 
   const eyeLeft = centre(left)
   const eyeRight = centre(right)
+
+  // The head's colour next to the eye. The painted eye is covered over with
+  // this, which is what frees the drawn eye from having to sit exactly where
+  // the model put it, at exactly the size the model made it.
+  const sample = left[0]!
+  let skin: [number, number, number] | null = null
+  for (const [dx, dy] of [
+    [0, 1],
+    [0, 2],
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+  ] as const) {
+    const voxel = source.at(sample.x + dx, sample.y + dy, frontZ)
+    if (voxel && luma(voxel.color) > darkest + 0.01) {
+      skin = voxel.color
+      break
+    }
+  }
+
   return {
+    skin: skin ?? [0.5, 0.5, 0.5],
     eyes: [eyeLeft, eyeRight],
     eyeSize: { w: span(left, 'x'), h: span(left, 'y') },
     mouth: {
@@ -191,28 +214,35 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
   }
 
   const [left, right] = anchors.eyes
-  // Comfortably wider than the painted eye it covers. At a shade over, the
-  // white margin came out under a pixel wide and the pupil sat inside the
-  // model's own dark voxels, so the whole eye just read as a black rectangle.
-  const scleraW = (anchors.eyeSize.w / 2) * 1.2
-  const scleraH = (anchors.eyeSize.h / 2) * 1.18
+  const eyeHalfW = anchors.eyeSize.w / 2
+  const eyeHalfH = anchors.eyeSize.h / 2
+  // Drawn a good deal smaller than the eye the model painted, and set closer
+  // in. Both are only possible because the painted eye is covered over first:
+  // while the drawn eye had to hide the old one, it could never be smaller
+  // than it, nor sit anywhere but on top of it.
+  const scleraW = eyeHalfW * 0.78
+  const scleraH = eyeHalfH * 0.76
   const pupilW = scleraW * 0.5
-  const pupilH = scleraH * 0.58
+  const pupilH = scleraH * 0.56
+  const inset = 0.78
 
   for (const eye of [left, right]) {
+    const x = eye.x * inset
+    // The old eye, painted out in the head's own colour.
+    quad(eye.x, eye.y, eye.z, eyeHalfW * 1.3, eyeHalfH * 1.3, anchors.skin, FACE_NONE, 0)
     // A dark rim behind the white. Several of these creatures are near-white
     // themselves -- a pale sclera on a pale head simply disappears, and the eye
     // reads as nothing but its pupil. The rim gives it an edge on any body.
-    quad(eye.x, eye.y, eye.z, scleraW * 1.14, scleraH * 1.13, INK, FACE_SCLERA, 0)
-    quad(eye.x, eye.y, eye.z + anchors.voxel * 0.08, scleraW, scleraH, SCLERA, FACE_SCLERA, 0)
+    quad(x, eye.y, eye.z + anchors.voxel * 0.06, scleraW * 1.22, scleraH * 1.22, INK, FACE_SCLERA, 0)
+    quad(x, eye.y, eye.z + anchors.voxel * 0.12, scleraW, scleraH, SCLERA, FACE_SCLERA, 0)
     // Pupils sit a hair proud of the whites, so they are never z-fought by them.
-    quad(eye.x, eye.y, eye.z + anchors.voxel * 0.16, pupilW, pupilH, INK, FACE_PUPIL, 0)
+    quad(x, eye.y, eye.z + anchors.voxel * 0.2, pupilW, pupilH, INK, FACE_PUPIL, 0)
   }
 
   // The mouth is a run of small blocks, curved by the shader into a smile or a
   // frown. Segments rather than one quad, because a single quad cannot bend.
   const MOUTH_SEGMENTS = 7
-  const mouthHalf = Math.abs(right.x - left.x) * 0.34
+  const mouthHalf = Math.abs(right.x - left.x) * inset * 0.34
   const segHalf = mouthHalf / MOUTH_SEGMENTS
   for (let i = 0; i < MOUTH_SEGMENTS; i++) {
     const t = (i / (MOUTH_SEGMENTS - 1)) * 2 - 1
@@ -235,11 +265,11 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
     [right, 1],
   ] as const) {
     quad(
-      eye.x,
-      eye.y + scleraH + anchors.voxel * 0.55,
-      eye.z,
-      scleraW * 1.05,
-      anchors.voxel * 0.26,
+      eye.x * inset,
+      eye.y + scleraH + anchors.voxel * 0.62,
+      eye.z + anchors.voxel * 0.12,
+      scleraW * 1.15,
+      anchors.voxel * 0.22,
       INK,
       FACE_BROW,
       side,
