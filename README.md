@@ -508,6 +508,13 @@ gets sampled by the shell's screen shader, which applies barrel distortion,
 scanlines, an aperture grille, chromatic fringing, ordered dithering and a glass
 glare. Everything you see on the screen is genuinely 192 pixels wide.
 
+Every one of those effects has to be measured in the picture's own pixels rather
+than the display's. The dither was keyed on the fragment coordinate, so its
+four-by-four matrix cycled several times inside each source pixel — nearly five
+display pixels across — and beat against it. Against ordinary scenery that
+passed for texture; against something flat and bright, like an eye, it read as
+moire.
+
 That shader is also where the frame is encoded for display. The scene is lit in
 linear light, so it has to be gamma-encoded once at the end or every midtone
 reads far darker than the colour it was picked as — the meadow looked permanently

@@ -203,7 +203,11 @@ const screenFrag = /* glsl */ `
     // quantises where the banding actually lands.
     col = pow(col, vec3(1.0 / 2.2));
 
-    col = floor(col * uLevels + bayer(gl_FragCoord.xy)) / uLevels;
+    // Dithered on the picture's own grid, not the display's. Keyed on
+    // gl_FragCoord the four-by-four matrix cycles several times inside every
+    // source pixel -- which is nearly five display pixels across -- and beats
+    // against it. On a flat bright area like an eye that reads as moire.
+    col = floor(col * uLevels + bayer(floor(uv * uResolution))) / uLevels;
 
     // A hard diagonal glare across the plastic window.
     float glare = smoothstep(0.62, 0.98, (centred.x * 0.6 - centred.y) * 0.5 + 0.5);
