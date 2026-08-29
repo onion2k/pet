@@ -1,5 +1,5 @@
 import { foodById, type Food } from '../data/foods'
-import { chooseBranch, speciesOf } from '../data/species'
+import { chooseBranch, speciesOf, type BranchContext } from '../data/species'
 import { metrics } from './metrics'
 import type { PetState, Stats, StatKey } from './types'
 import { HEALTH_FLOOR, STAGE_DURATION } from './tuning'
@@ -105,8 +105,8 @@ function stageStartAge(pet: PetState): number {
 }
 
 /** Applies the earned branch, if any. Returns what happened so the UI can celebrate it. */
-export function evolve(pet: PetState): Evolution | null {
-  const branch = chooseBranch(pet, metrics(pet))
+export function evolve(pet: PetState, ctx: BranchContext): Evolution | null {
+  const branch = chooseBranch(pet, metrics(pet), ctx)
   if (!branch) return null
 
   const from = speciesOf(pet.speciesId)

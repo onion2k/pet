@@ -771,3 +771,124 @@ export const LUMEN: VoxelModel = {
       ......`),
   ],
 }
+
+export const AURORA: VoxelModel = {
+  palette: { b: '#bfe4f2', d: '#7fb2d4', k: '#14121a', g: '#eaffff', l: '#7fb2d4', a: '#7fb2d4' },
+  emissive: ['g'],
+  head: ['k'],
+  legs: ['l'],
+  arms: ['a'],
+  mirror: true,
+  layers: [
+    rows(`
+      ......
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
+    rows(`
+      ......
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
+    rows(`
+      ......
+      ....dd
+      ...ddd
+      ..dddd
+      ..dddd
+      ..dddd
+      ...ddd
+      ....dd
+      ......`),
+    rows(`
+      ....dd
+      ..dddd
+      ..dddd
+      .ddddd
+      .ddddd
+      .ddddd
+      ..dddd
+      ..dddd
+      ....dd`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
+      .bbbbb
+      .bbbbb
+      ..kkbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbgbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..kkbb`),
+    rows(`
+      ....bb
+      ..bbbb
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb
+      ..bbbb
+      ....bb`),
+    rows(`
+      ......
+      ....bb
+      ...bbb
+      ..bbbb
+      ..bbbb
+      ..bbbb
+      ...bbb
+      ....bb
+      ......`),
+    rows(`
+      ......
+      ......
+      ...g..
+      .....g
+      ....g.
+      .....g
+      ...g..
+      ......
+      ......`),
+  ],
+}

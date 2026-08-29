@@ -165,6 +165,11 @@ export function hoursUntilSunrise(now: number): number {
   return delta > 0 ? delta : delta + HOURS
 }
 
+/** Just the season id, for callers that need nothing else. */
+export function seasonIdAt(now: number): Season['id'] {
+  return seasonAt(now).season.id
+}
+
 export function worldAt(now: number): WorldState {
   // --- season -------------------------------------------------------------
   const { season, nextSeason, blend: seasonBlend, daylightHours } = seasonAt(now)

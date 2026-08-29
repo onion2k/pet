@@ -9,7 +9,7 @@ import { MINIGAMES, type GameSession } from './minigames'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
-import { hoursUntilSunrise, isNight, worldAt, WORLD_HOUR_MS } from './world'
+import { hoursUntilSunrise, isNight, seasonIdAt, worldAt, WORLD_HOUR_MS } from './world'
 import { findCurio, type Curio } from '../data/curios'
 import type { PetState, SaveFile } from './types'
 
@@ -623,7 +623,7 @@ export class App {
 
     // Evolution interrupts whatever screen is up; it is the payoff of the whole loop.
     if (readyToEvolve(pet) && this.mode !== 'evolve' && this.mode !== 'playing') {
-      const result = evolve(pet)
+      const result = evolve(pet, { season: seasonIdAt(this.worldNow()) })
       if (result) {
         this.evolution = result
         this.syncDiscovered()
