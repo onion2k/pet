@@ -390,19 +390,11 @@ function step(dt: number): void {
   keepsakes.setLamps(lampView, lampLevel)
 
   // What the yard has to show for itself: one trinket for each kind of curio
-  // found, one cairn for each ancestor seen off. Both take their colour from
-  // the thing they stand for.
+  // found, in the colour of the curio it stands for.
   keepsakes.set(
-    [
-      ...Object.keys(app.curioCounts).map((id) => ({
-        kind: 'trinket' as const,
-        tint: hexToLinear(curioById(id)?.colour ?? '#ffffff'),
-      })),
-      ...app.ancestors.map((entry) => ({
-        kind: 'cairn' as const,
-        tint: hexToLinear(speciesOf(entry.speciesId).model.palette.b ?? '#cccccc'),
-      })),
-    ] satisfies Placed[],
+    Object.keys(app.curioCounts).map((id) => ({
+      tint: hexToLinear(curioById(id)?.colour ?? '#ffffff'),
+    })) satisfies Placed[],
     terrain.shape.groundY,
   )
 

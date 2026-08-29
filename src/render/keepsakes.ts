@@ -1,7 +1,7 @@
 import { Mesh, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT } from '../data/biome'
-import { CAIRN, TRINKET } from '../data/keepsakes'
+import { TRINKET } from '../data/keepsakes'
 import { buildVoxelGeometry } from './voxel-mesh'
 
 const vertex = /* glsl */ `
@@ -85,7 +85,6 @@ export interface KeepsakeLighting {
 
 /** One thing standing in the yard, and what colour it is. */
 export interface Placed {
-  kind: 'trinket' | 'cairn'
   tint: [number, number, number]
 }
 
@@ -128,10 +127,7 @@ export function createKeepsakes(gl: OGLRenderingContext): Keepsakes {
     },
   })
 
-  const geometry = {
-    trinket: buildVoxelGeometry(gl, TRINKET.model, TRINKET.height).geometry,
-    cairn: buildVoxelGeometry(gl, CAIRN.model, CAIRN.height).geometry,
-  }
+  const geometry = buildVoxelGeometry(gl, TRINKET.model, TRINKET.height).geometry
 
   const pool: { mesh: Mesh; tint: [number, number, number] }[] = []
   let signature = ''
@@ -153,7 +149,7 @@ export function createKeepsakes(gl: OGLRenderingContext): Keepsakes {
       program.uniforms.uLampIntensity.value = intensity
     },
     set(items, groundY) {
-      const next = items.map((i) => `${i.kind}:${i.tint.join(',')}`).join('|')
+      const next = items.map((i) => i.tint.join(',')).join('|')
       if (next === signature) return
       signature = next
 
@@ -161,24 +157,18 @@ export function createKeepsakes(gl: OGLRenderingContext): Keepsakes {
       pool.length = 0
       placed.length = 0
 
-      // Curios take the middle of the row and ancestors work outwards from the
-      // ends, so a long lineage never crowds out what the pet dug up.
-      const trinkets = items.filter((i) => i.kind === 'trinket')
-      const cairns = items.filter((i) => i.kind === 'cairn')
+      // Laid out from the middle of the row outwards, so a short collection
+      // sits in front of the pet rather than off at one end.
       const middle = Math.floor(SLOTS.length / 2)
       const order: number[] = []
       for (let step = 0; step <= middle; step++) {
         if (middle - step >= 0) order.push(middle - step)
         if (step > 0 && middle + step < SLOTS.length) order.push(middle + step)
       }
-      const taken = new Set<number>()
-      const place = (item: Placed, slot: number): void => {
-        if (slot < 0 || slot >= SLOTS.length || taken.has(slot)) return
-        taken.add(slot)
-        const entry = {
-          mesh: new Mesh(gl, { geometry: geometry[item.kind], program }),
-          tint: item.tint,
-        }
+      items.forEach((item, i) => {
+        const slot = order[i]
+        if (slot === undefined) return
+        const entry = { mesh: new Mesh(gl, { geometry, program }), tint: item.tint }
         entry.mesh.position.set(SLOTS[slot]!, groundY, ROW_Z)
         entry.mesh.onBeforeRender(() => {
           program.uniforms.uTint.value = entry.tint
@@ -186,14 +176,7 @@ export function createKeepsakes(gl: OGLRenderingContext): Keepsakes {
         entry.mesh.setParent(root)
         pool.push(entry)
         placed.push({ x: SLOTS[slot]!, z: ROW_Z })
-      }
-      trinkets.forEach((item, i) => place(item, order[i] ?? -1))
-      // Ancestors fill from the outside in, into whatever the curios left.
-      let end = 0
-      for (const cairn of cairns) {
-        while (end < SLOTS.length && taken.has(end)) end++
-        place(cairn, end)
-      }
+      })
     },
   }
 }

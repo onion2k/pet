@@ -347,10 +347,13 @@ surprise.
 ### Keepsakes
 
 The yard keeps what has happened in it. Every kind of curio found puts a trinket
-out in the foreground row, and every pet seen off leaves a cairn, each tinted
-from the curio or the retired form it stands for so one shape serves for all of
-them. Visitors come and go with the seasons; these stay, so the meadow slowly
-becomes a record rather than a backdrop that resets.
+out in the foreground row, tinted from the curio it stands for so one shape
+serves for all of them. Visitors come and go with the seasons; these stay, so
+the meadow slowly becomes a record rather than a backdrop that resets.
+
+Retired ancestors briefly had cairns out here too, and they did not read as
+anything in particular — a small grey stack among the scenery says nothing about
+who it stands for. The lineage still wants showing somewhere; this was not it.
 
 ### Visitors
 

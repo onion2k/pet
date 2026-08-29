@@ -309,11 +309,6 @@ export class App {
     return branch ? branch.because : null
   }
 
-  /** Everyone the lineage has seen off, so the yard can show them. */
-  get ancestors(): { speciesId: string; name: string }[] {
-    return this.save.album
-  }
-
   /** Games played, won and the best run, for the games screen. */
   get playRecord(): { gamesPlayed: number; gamesWon: number; bestStreak: number } {
     return this.pet?.play ?? { gamesPlayed: 0, gamesWon: 0, bestStreak: 0 }
