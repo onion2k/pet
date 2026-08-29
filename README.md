@@ -242,6 +242,13 @@ The bubble stands well in front of the pet and off to one side. Placed level wit
 it and only a little aside, the quad sits inside the pet's own head and is never
 seen.
 
+The weather falls through a volume far wider than it is deep. The yard runs the
+whole width of the meadow and the camera turns forty degrees to follow the pet
+across it, so a volume square in plan — which is what it was — left the rain
+stopping short well inside the frame at either extreme. Its particle counts are
+derived from a density rather than written down, so widening the volume cannot
+quietly thin the rain out.
+
 ### Time, seasons and weather
 
 The world keeps its own clock, running far faster than real time. A day takes

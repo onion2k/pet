@@ -2,11 +2,23 @@ import { Geometry, Mesh, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import type { WeatherId } from '../data/seasons'
 
-/** Volume the weather falls through, centred on the scene. */
-const SPAN = 9
+/**
+ * Volume the weather falls through, centred on the scene. Far wider than it is
+ * deep: the yard runs the whole width of the meadow and the camera turns forty
+ * degrees to follow the pet across it, so a volume square in plan left the
+ * weather stopping short well inside the frame at either extreme.
+ */
+const SPAN_X = 28
+const SPAN_Z = 12
 const HEIGHT = 6
-const RAIN_DROPS = 520
-const SNOW_FLAKES = 260
+/**
+ * Counts are derived from a density rather than written down, so widening the
+ * volume cannot quietly thin the rain out.
+ */
+const RAIN_PER_AREA = 520 / (9 * 9)
+const SNOW_PER_AREA = 260 / (9 * 9)
+const RAIN_DROPS = Math.round(RAIN_PER_AREA * SPAN_X * SPAN_Z)
+const SNOW_FLAKES = Math.round(SNOW_PER_AREA * SPAN_X * SPAN_Z)
 
 const shared = /* glsl */ `
   uniform mat4 modelViewMatrix;
@@ -87,9 +99,9 @@ const snowFragment = /* glsl */ `
 function scatter(count: number, perParticle: number): Float32Array {
   const data = new Float32Array(count * perParticle * 3)
   for (let i = 0; i < count; i++) {
-    const x = (Math.random() - 0.5) * SPAN
+    const x = (Math.random() - 0.5) * SPAN_X
     const y = Math.random() * HEIGHT
-    const z = (Math.random() - 0.5) * SPAN
+    const z = (Math.random() - 0.5) * SPAN_Z
     for (let v = 0; v < perParticle; v++) {
       const at = (i * perParticle + v) * 3
       data[at] = x
