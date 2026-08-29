@@ -85,6 +85,10 @@ Care keeps a pet well; the lineage is why you keep coming back.
   the rest as flat silhouettes, with a tally under any the pet has found more
   than once. Showing the gaps is the point — the board says what is still out
   there without saying when to come back for it.
+- **The album.** A second board under the curios, one slot per form, each drawn
+  in its own body colour taken straight from its voxel model so the board and
+  the creature always agree. Forms the family has never grown show as
+  silhouettes, which is what makes the branch conditions worth chasing.
 - **The streak.** Days visited, shown on the status screen. Consecutive days
   build it; missed days erode it one per day rather than wiping it out.
 - **Shell colours.** Earned by milestones — a streak, a retirement, curios,

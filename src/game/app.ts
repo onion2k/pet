@@ -282,6 +282,11 @@ export class App {
   }
 
   /** Species reached across every generation, for the collection counter. */
+  /** Which forms the lineage has met, for the album. */
+  get discoveredIds(): string[] {
+    return this.save.discovered
+  }
+
   get discoveredCount(): number {
     return this.save.discovered.length
   }

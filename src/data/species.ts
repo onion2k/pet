@@ -22,6 +22,8 @@ export interface Species {
   id: string
   name: string
   stage: Stage
+  /** 8x8 artwork for the album, in the same format as the menu icons. */
+  glyph: string
   model: VoxelModel
   blurb: string
   branches: Branch[]
@@ -32,6 +34,7 @@ const list: Species[] = [
     id: 'egg',
     name: 'Egg',
     stage: 'egg',
+    glyph: '...##.../..####../.######./.######./########/########/.######./..####..',
     model: EGG,
     blurb: 'Something is moving in there.',
     branches: [{ to: 'blob', because: 'it hatched', score: () => 1 }],
@@ -40,6 +43,7 @@ const list: Species[] = [
     id: 'blob',
     name: 'Blobbit',
     stage: 'baby',
+    glyph: '......../..####../.######./##.##.##/########/########/.######./.#....#.',
     model: BLOB,
     blurb: 'Newly hatched and extremely round.',
     branches: [
@@ -64,6 +68,7 @@ const list: Species[] = [
     id: 'pudge',
     name: 'Pudgeling',
     stage: 'child',
+    glyph: '......../.######./##.##.##/########/########/########/########/.##..##.',
     model: PUDGE,
     blurb: 'Soft, pink, and permanently peckish.',
     branches: [
@@ -88,6 +93,7 @@ const list: Species[] = [
     id: 'spike',
     name: 'Spikelet',
     stage: 'child',
+    glyph: '#..##..#/.#.##.#./.######./##.##.##/########/########/.######./.#....#.',
     model: SPIKE,
     blurb: 'Bristling with unearned confidence.',
     branches: [
@@ -112,6 +118,7 @@ const list: Species[] = [
     id: 'sprout',
     name: 'Sproutling',
     stage: 'child',
+    glyph: '...##.../..##..../.######./##.##.##/########/########/.######./.#....#.',
     model: SPROUT,
     blurb: 'Photosynthesises when it thinks nobody is looking.',
     branches: [
@@ -132,23 +139,27 @@ const list: Species[] = [
       },
     ],
   },
-  { id: 'mochi', name: 'Mochimo', stage: 'adult', model: MOCHI, blurb: 'Adored, and knows it.', branches: [] },
+  { id: 'mochi', name: 'Mochimo', stage: 'adult', glyph: '.#....#./.######./########/##.##.##/########/########/.######./..#..#..', model: MOCHI, blurb: 'Adored, and knows it.', branches: [] },
   {
     id: 'aurora',
     name: 'Aurorix',
     stage: 'adult',
+    glyph: '..#..#../...##.../.######./########/##.##.##/########/.######./..####..',
     model: AURORA,
     blurb: 'Hums faintly, like distant lights.',
     branches: [],
   },
-  { id: 'gloop', name: 'Gloopus', stage: 'adult', model: GLOOP, blurb: 'Faintly sticky. Faintly resentful.', branches: [] },
-  { id: 'blaze', name: 'Blazeon', stage: 'adult', model: BLAZE, blurb: 'Undefeated. Ask it about that.', branches: [] },
-  { id: 'grump', name: 'Grumphal', stage: 'adult', model: GRUMP, blurb: 'Has seen things. Mostly ceilings.', branches: [] },
-  { id: 'verdant', name: 'Verdantis', stage: 'adult', model: VERDANT, blurb: 'In full bloom, and well rested.', branches: [] },
-  { id: 'lumen', name: 'Lumenox', stage: 'adult', model: LUMEN, blurb: 'Glows softly at 3am. Always has.', branches: [] },
+  { id: 'gloop', name: 'Gloopus', stage: 'adult', glyph: '..####../.######./########/##.##.##/########/########/########/#.#..#.#', model: GLOOP, blurb: 'Faintly sticky. Faintly resentful.', branches: [] },
+  { id: 'blaze', name: 'Blazeon', stage: 'adult', glyph: '...#..../..###.../.#####../.######./##.##.##/########/.######./.#....#.', model: BLAZE, blurb: 'Undefeated. Ask it about that.', branches: [] },
+  { id: 'grump', name: 'Grumphal', stage: 'adult', glyph: '......../########/########/##.##.##/########/########/########/##....##', model: GRUMP, blurb: 'Has seen things. Mostly ceilings.', branches: [] },
+  { id: 'verdant', name: 'Verdantis', stage: 'adult', glyph: '..#..#../.##..##./..####../.######./##.##.##/########/.######./.##..##.', model: VERDANT, blurb: 'In full bloom, and well rested.', branches: [] },
+  { id: 'lumen', name: 'Lumenox', stage: 'adult', glyph: '#.#..#.#/.#.##.#./..####../.######./########/.######./..####../.#....#.', model: LUMEN, blurb: 'Glows softly at 3am. Always has.', branches: [] },
 ]
 
 export const SPECIES: ReadonlyMap<string, Species> = new Map(list.map((s) => [s.id, s]))
+
+/** Every form in album order: egg, baby, the children, then the adults. */
+export const SPECIES_LIST: readonly Species[] = list
 
 export function speciesOf(id: string): Species {
   const found = SPECIES.get(id)

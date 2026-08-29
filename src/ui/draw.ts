@@ -2,7 +2,7 @@ import { CURIOS, CURIO_COUNT } from '../data/curios'
 import { textWidth } from '../data/font'
 import { FOODS } from '../data/foods'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
-import { speciesOf } from '../data/species'
+import { speciesOf, SPECIES_COUNT, SPECIES_LIST } from '../data/species'
 import { MINIGAMES } from '../game/minigames'
 import { NAMES, type App } from '../game/app'
 import { CRITICAL } from '../game/tuning'
@@ -216,6 +216,7 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
   hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
   drawCurioBoard(hud, app)
+  drawSpeciesBoard(hud, app)
   if (pet.stage === 'adult') {
     const progress = app.retireProgress
     if (progress > 0) {
@@ -232,25 +233,47 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
 }
 
 /**
- * The curio collection, filling the empty right-hand column of the status
- * screen. Everything the pet can find has a slot, so the gaps show what is
- * still out there; unfound ones are drawn as flat silhouettes rather than
- * hidden, because a board with holes in it is what makes the set worth
- * finishing. Duplicates carry a small tally.
+ * The two collection boards, filling the right-hand column of the status
+ * screen. Everything findable has a slot, so the gaps show what is still out
+ * there; unfound entries are drawn as flat silhouettes rather than hidden,
+ * because a board with holes in it is what makes a set worth finishing.
  */
+const BOARD_X = 104
+const BOARD_W = 76
+const CELL = 20
+const MISSING = '#252b40'
+
+function drawBoardHeading(hud: Hud, y: number, label: string): void {
+  hud.text(BOARD_X, y, label, DIM)
+  hud.rect(BOARD_X, y + 8, BOARD_W, 1, '#22283c')
+}
+
 function drawCurioBoard(hud: Hud, app: App): void {
   const counts = app.curioCounts
-  const kinds = app.curioTally.kinds
-  const left = 104
-  hud.text(left, 40, `CURIOS ${kinds}/${CURIO_COUNT}`, DIM)
-  hud.rect(left, 48, 76, 1, '#22283c')
-
+  drawBoardHeading(hud, 40, `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}`)
   CURIOS.forEach((curio, i) => {
-    const x = left + (i % 3) * 26
-    const y = 54 + Math.floor(i / 3) * 26
+    const x = BOARD_X + (i % 4) * CELL
+    const y = 52 + Math.floor(i / 4) * CELL
     const found = counts[curio.id] ?? 0
-    hud.glyph(x, y, curio.glyph.split('/'), found > 0 ? curio.colour : '#252b40', 2)
-    if (found > 1) hud.textCentered(x + 8, y + 17, `x${found}`, '#4a5170')
+    hud.glyph(x, y, curio.glyph.split('/'), found > 0 ? curio.colour : MISSING, 2)
+    // The duplicate count sits on the artwork rather than costing the board a
+    // row, so it needs its own backing to stay readable over the bright ones.
+    if (found > 1) {
+      hud.rect(x + 10, y + 9, 7, 8, '#05050b')
+      hud.text(x + 11, y + 10, String(Math.min(9, found)), '#8b95c0')
+    }
+  })
+}
+
+/** The album. Each form is drawn in its own body colour, straight off its model. */
+function drawSpeciesBoard(hud: Hud, app: App): void {
+  const found = new Set(app.discoveredIds)
+  drawBoardHeading(hud, 94, `FORMS ${app.discoveredCount}/${SPECIES_COUNT}`)
+  SPECIES_LIST.forEach((species, i) => {
+    const x = BOARD_X + (i % 4) * CELL
+    const y = 106 + Math.floor(i / 4) * 18
+    const colour = found.has(species.id) ? (species.model.palette.b ?? INK) : MISSING
+    hud.glyph(x, y, species.glyph.split('/'), colour, 2)
   })
 }
 
