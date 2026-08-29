@@ -405,16 +405,17 @@ and a full one passes on the lot.
 A grown pet can be sent out to look for something. The whole decision is *when*:
 what can be found is gated on the season and the weather, so a snowdrop wants a
 winter afternoon and a toadstool an autumn one, and the knowledge the player has
-built up about the year becomes something to act on rather than wait for. It is
-gone three world hours, comes back with something about three times in four, and
-is judged on the world it comes home to — which is the world the player chose by
-picking their moment.
+built up about the year becomes something to act on rather than wait for. It
+comes back with something about three times in four, judged on the world it
+comes home to — which is the world the player chose by picking their moment.
 
-It genuinely goes. The pet walks to the edge of the yard and over it, and is out
-of sight until it is due back, when it reappears at the side it left by and
-walks in. The camera stops following it once it is over the hill, or it would
-spend three world hours pointed at an empty verge, and a pet that is not there
-keeps its thoughts to itself.
+It is told as a cut rather than a wait. The pet trots off to the right and over
+the hill, the picture fades to black and holds three seconds while the world
+clock gains two hours, then fades back up with the pet walking in — about ten
+seconds all told, against three real minutes of watching an empty yard. The time
+it was away is real, and the sky has moved for it; it simply is not spent in
+front of the player. The camera stops following the pet once it is over the
+hill, and a pet that is not there keeps its thoughts to itself.
 
 It is the one job the game asks of an adult, and the icon strip grew a seventh
 button for it. That strip was written for three icons a row; it now lays out
