@@ -244,7 +244,7 @@ export class PetView {
     timer: 1.5,
     phase: 0,
     blend: 0,
-    where: 'out' as 'out' | 'heading-in' | 'in' | 'heading-out',
+    where: 'out' as 'out' | 'heading-in' | 'in' | 'heading-out' | 'leaving' | 'gone',
   }
 
   constructor(
@@ -345,6 +345,32 @@ export class PetView {
     return this.walk.where === 'in'
   }
 
+  /**
+   * Sends the pet walking off into the meadow haze, for retirement. It keeps
+   * going until it vanishes; only resetPosition brings the stage back.
+   */
+  walkOff(): void {
+    const w = this.walk
+    w.where = 'leaving'
+    w.walking = true
+    w.targetX = 3.4
+    w.targetZ = -3.6
+  }
+
+  /** Returns the stage to the clearing for a new egg. */
+  resetPosition(): void {
+    const w = this.walk
+    w.x = 0
+    w.z = 0
+    w.facing = 0
+    w.walking = false
+    w.where = 'out'
+    w.timer = 1.5
+    w.blend = 0
+    this.mesh.visible = true
+    this.shadow.visible = true
+  }
+
   /** Where the pet currently is, so effects can be emitted at it. */
   get position(): { x: number; z: number } {
     return { x: this.walk.x, z: this.walk.z }
@@ -392,6 +418,29 @@ export class PetView {
   private roam(dt: number, state: PetMood): void {
     const w = this.walk
     const sh = this.shelter
+
+    // A retiring pet walks out of the world and nothing interrupts it.
+    if (w.where === 'leaving' || w.where === 'gone') {
+      if (w.where === 'leaving') {
+        const dx = w.targetX - w.x
+        const dz = w.targetZ - w.z
+        const distance = Math.hypot(dx, dz)
+        if (distance < 0.06) {
+          w.where = 'gone'
+          w.walking = false
+          this.mesh.visible = false
+          this.shadow.visible = false
+        } else {
+          const step = Math.min(distance, WALK_SPEED * 1.6 * dt)
+          w.x += (dx / distance) * step
+          w.z += (dz / distance) * step
+          w.facing = approachAngle(w.facing, Math.atan2(dx, dz), dt * 4)
+          w.phase = (w.phase + dt * STRIDE_RATE) % 1
+        }
+      }
+      w.blend += ((w.walking ? 1 : 0) - w.blend) * Math.min(1, dt * 6)
+      return
+    }
 
     if (!state.mobile) {
       w.walking = false

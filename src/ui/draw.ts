@@ -201,7 +201,19 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   const curios = app.curioTally
   hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
   hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}  CURIOS ${curios.kinds}/8`, DIM)
-  hud.textCentered(hud.width / 2, hud.height - 10, 'ANY KEY TO CLOSE', '#3a4058')
+  if (pet.stage === 'adult') {
+    const progress = app.retireProgress
+    if (progress > 0) {
+      const width = hud.width - 44
+      hud.rect(22, hud.height - 12, width, 3, '#1c1c2c')
+      hud.rect(22, hud.height - 12, Math.round(width * progress), 3, ACCENT)
+      hud.textCentered(hud.width / 2, hud.height - 20, 'RETIRING...', ACCENT)
+    } else {
+      hud.textCentered(hud.width / 2, hud.height - 10, 'HOLD B TO RETIRE', '#96a0c8')
+    }
+  } else {
+    hud.textCentered(hud.width / 2, hud.height - 10, 'ANY KEY TO CLOSE', '#3a4058')
+  }
 }
 
 function drawEvolve(hud: Hud, app: App): void {
@@ -215,6 +227,24 @@ function drawEvolve(hud: Hud, app: App): void {
   hud.textCentered(hud.width / 2, hud.height - 30, `${evolution.fromName.toUpperCase()} > ${evolution.toName.toUpperCase()}`, COOL)
   hud.textCentered(hud.width / 2, hud.height - 20, evolution.because.toUpperCase(), DIM)
   hud.textCentered(hud.width / 2, hud.height - 10, 'PRESS ANY BUTTON', flash ? DIM : '#2a3048')
+}
+
+function drawRetire(hud: Hud, app: App): void {
+  const retiring = app.retiring
+  if (!retiring) return
+  const flash = Math.floor(app.blink * 4) % 2 === 0
+
+  hud.rect(0, 0, hud.width, 26, PANEL)
+  hud.rect(0, hud.height - 36, hud.width, 36, PANEL)
+  hud.textCentered(hud.width / 2, 8, 'FAREWELL', flash ? ACCENT : INK, 2)
+  hud.textCentered(
+    hud.width / 2,
+    hud.height - 32,
+    `${retiring.name} THE ${retiring.speciesName.toUpperCase()}`,
+    COOL,
+  )
+  hud.textCentered(hud.width / 2, hud.height - 22, 'WANDERS INTO THE MEADOW', DIM)
+  hud.textCentered(hud.width / 2, hud.height - 12, 'PRESS ANY BUTTON', flash ? DIM : '#2a3048')
 }
 
 function drawWelcome(hud: Hud, app: App): void {
@@ -319,6 +349,9 @@ export function drawScreen(hud: Hud, app: App, world: WorldState): void {
       break
     case 'evolve':
       drawEvolve(hud, app)
+      break
+    case 'retire':
+      drawRetire(hud, app)
       break
   }
   hud.commit()

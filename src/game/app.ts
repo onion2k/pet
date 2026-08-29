@@ -12,7 +12,17 @@ import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
 import { hoursUntilSunrise, isNight, WORLD_HOUR_MS } from './world'
 import type { PetState, SaveFile } from './types'
 
-export type Mode = 'boot' | 'name' | 'welcome' | 'main' | 'feed' | 'status' | 'games' | 'playing' | 'evolve'
+export type Mode =
+  | 'boot'
+  | 'name'
+  | 'welcome'
+  | 'main'
+  | 'feed'
+  | 'status'
+  | 'games'
+  | 'playing'
+  | 'evolve'
+  | 'retire'
 
 export const NAMES = ['PIP', 'BOB', 'ZED', 'MOSS', 'NIM', 'TOFU', 'KIRA', 'DUSK']
 
@@ -32,6 +42,12 @@ const SKIP_SECONDS_MAX = 6
 
 /** How long C must be held to back out of a submenu or a game. */
 export const HOLD_TO_BACK_SECONDS = 0.8
+/** How long B must be held on the status screen to retire an adult. Longer
+ *  than the back-hold: this one ends a life, gently. */
+export const RETIRE_HOLD_SECONDS = 1.6
+/** Starting-stat bonus per retired ancestor, and its cap. */
+const HEIRLOOM_PER_ANCESTOR = 5
+const HEIRLOOM_CAP = 15
 /** Screens that C can be held to escape from. */
 const ESCAPABLE: Mode[] = ['feed', 'games', 'playing']
 
@@ -41,6 +57,8 @@ export interface AppHooks {
   pop(strength?: number): void
   /** Called when the pet's form changes so the renderer can swap geometry. */
   form(speciesId: string, animate: boolean): void
+  /** Called when a pet retires, so the renderer can walk it off into the meadow. */
+  depart(): void
 }
 
 export class App {
@@ -54,6 +72,8 @@ export class App {
   nameIndex = 0
   session: GameSession | null = null
   evolution: Evolution | null = null
+  /** Who is being seen off, while the retirement screen is up. */
+  retiring: { name: string; speciesName: string } | null = null
   message = ''
   messageTimer = 0
   awayMs = 0
@@ -71,6 +91,9 @@ export class App {
   private skipSpent = false
   /** Set from the renderer once the pet has actually settled in its shelter. */
   petSheltered = false
+  /** True only for a B press that began on the status screen itself, so the
+   *  release of the press that opened the screen cannot close it. */
+  private retireArmed = false
   /**
    * Extra world-clock offset, used only by the dev harness to scrub time. Kept
    * here rather than in the renderer so that scrubbing moves the pet's world
@@ -229,17 +252,70 @@ export class App {
       case 'playing':
         return this.pressPlaying(button)
       case 'status':
+        // B on an adult arms the retire hold; a short tap closes on release.
+        if (button === 'b' && this.pet?.stage === 'adult') {
+          this.retireArmed = true
+          return
+        }
         this.mode = 'main'
         this.hooks.sound('cancel')
+        return
+      case 'retire':
+        this.finishRetirement()
         return
     }
   }
 
   release(button: ButtonId): void {
-    if (this.heldButton === button) {
-      this.heldButton = null
-      this.heldSeconds = 0
+    if (this.heldButton !== button) return
+    const held = this.heldSeconds
+    this.heldButton = null
+    this.heldSeconds = 0
+    // A tap of B on an adult's status page closes it; only a hold retires.
+    // Guarded by the arm flag so releasing the press that opened the screen
+    // does not immediately close it again.
+    if (this.retireArmed && this.mode === 'status' && button === 'b' && held < RETIRE_HOLD_SECONDS) {
+      this.mode = 'main'
+      this.hooks.sound('cancel')
     }
+    if (button === 'b') this.retireArmed = false
+  }
+
+  /** 0..1 while B is being held on an adult's status screen. */
+  get retireProgress(): number {
+    if (!this.retireArmed || this.heldButton !== 'b' || this.mode !== 'status') return 0
+    if (this.pet?.stage !== 'adult') return 0
+    return Math.min(1, this.heldSeconds / RETIRE_HOLD_SECONDS)
+  }
+
+  /**
+   * Sees an adult off into the meadow. The pet joins the album, its
+   * discoveries fold into the lineage, and the next egg inherits an heirloom.
+   */
+  private beginRetirement(): void {
+    const pet = this.pet
+    if (!pet || pet.stage !== 'adult') return
+    this.heldButton = null
+    this.heldSeconds = 0
+    this.save.album.push({ speciesId: pet.speciesId, name: pet.name, retiredAt: Date.now() })
+    this.save.counters.retirements += 1
+    this.syncDiscovered()
+    this.retiring = { name: pet.name, speciesName: speciesOf(pet.speciesId).name }
+    this.mode = 'retire'
+    this.hooks.depart()
+    this.hooks.sound('evolve')
+    this.hooks.burst('sparkle', 30)
+    this.persist()
+  }
+
+  /** Dismisses the ceremony and clears the way for the next egg. */
+  private finishRetirement(): void {
+    this.retiring = null
+    this.pet = null
+    this.save.pet = null
+    this.mode = 'name'
+    this.hooks.sound('confirm')
+    this.persist()
   }
 
   /**
@@ -275,6 +351,13 @@ export class App {
       this.hooks.sound('move')
     } else {
       this.pet = newPet(NAMES[this.nameIndex]!, Date.now())
+      // The heirloom: each retired ancestor leaves the next egg a little
+      // better provisioned, capped so lineage helps but never trivialises.
+      const boost = Math.min(HEIRLOOM_CAP, this.save.album.length * HEIRLOOM_PER_ANCESTOR)
+      if (boost > 0) {
+        this.pet.stats.happiness = Math.min(100, this.pet.stats.happiness + boost)
+        this.pet.stats.hunger = Math.min(100, this.pet.stats.hunger + boost)
+      }
       this.syncDiscovered()
       this.mode = 'main'
       this.hooks.form('egg', true)
@@ -454,6 +537,19 @@ export class App {
       this.heldSeconds += dt
       if (this.heldSeconds >= HOLD_TO_BACK_SECONDS) {
         this.back()
+        return
+      }
+    }
+    // Hold B on an adult's status screen to retire it.
+    if (
+      this.retireArmed &&
+      this.heldButton === 'b' &&
+      this.mode === 'status' &&
+      this.pet?.stage === 'adult'
+    ) {
+      this.heldSeconds += dt
+      if (this.heldSeconds >= RETIRE_HOLD_SECONDS) {
+        this.beginRetirement()
         return
       }
     }

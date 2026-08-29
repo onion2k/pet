@@ -116,7 +116,13 @@ const app = new App({
       count,
     ),
   pop: (strength) => petView.pop(strength),
-  form: (speciesId, animate) => petView.setModel(speciesOf(speciesId).model, animate),
+  form: (speciesId, animate) => {
+    // A fresh egg means a fresh start in the middle of the clearing — the
+    // previous occupant has walked off by now.
+    if (speciesId === 'egg') petView.resetPosition()
+    petView.setModel(speciesOf(speciesId).model, animate)
+  },
+  depart: () => petView.walkOff(),
 })
 beeper.setMuted(app.muted)
 
