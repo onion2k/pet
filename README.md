@@ -333,6 +333,25 @@ it walks, so every surface it crosses has to be flat. Its front is left open so
 the pet stays in view inside, and its interior is tall enough for the pet to
 stand up in. Which side it sits on depends on the seed.
 
+### Showing the stakes
+
+Twelve forms branch on four vectors of behaviour, and every branch carries a
+line of prose explaining it — *a sweet tooth and a quiet life*, *greens and
+early nights*. That line used to appear in exactly one place: the evolution
+screen, at the moment the decision had already been spent. The status screen now
+names the branch the pet is currently earning, in those same words, while there
+is still time to steer it. What it becomes stays hidden, because knowing you are
+heading somewhere is the useful part and knowing exactly where would end the
+surprise.
+
+### Keepsakes
+
+The yard keeps what has happened in it. Every kind of curio found puts a trinket
+out in the foreground row, and every pet seen off leaves a cairn, each tinted
+from the curio or the retired form it stands for so one shape serves for all of
+them. Visitors come and go with the seasons; these stay, so the meadow slowly
+becomes a record rather than a backdrop that resets.
+
 ### Visitors
 
 Some days there is something in the yard: a ball to knock about, a rabbit
