@@ -16,6 +16,16 @@ import {
 
 const HOUR = 3_600_000
 
+/**
+ * Whether the world's sun is up at a given moment. Passed in rather than
+ * imported so the simulation stays about the pet's biology and knows nothing
+ * about skies, seasons or rendering.
+ */
+export type Daylight = (at: number) => boolean
+
+/** A pet that is being carried through a night by the sleep skip never wakes. */
+const NEVER = () => false
+
 export const STAT_KEYS: StatKey[] = ['hunger', 'happiness', 'energy', 'hygiene', 'health']
 /** Health is tracked separately because it reacts to the others rather than draining on its own. */
 const DRAINING_KEYS = ['hunger', 'happiness', 'energy', 'hygiene'] as const
@@ -32,7 +42,13 @@ function clampStats(stats: Stats): void {
  * Advance one pet by `elapsedMs` of wall-clock time. Called both for live frames
  * and, in chunks, for catching up on time spent with the app closed.
  */
-function step(pet: PetState, elapsedMs: number, age = true): void {
+function step(
+  pet: PetState,
+  elapsedMs: number,
+  at: number,
+  isDay: Daylight,
+  age = true,
+): void {
   const hours = (elapsedMs * TIME_SCALE) / HOUR
   const seconds = (elapsedMs * TIME_SCALE) / 1000
   const rates = pet.asleep ? DECAY_ASLEEP : DECAY_AWAKE
@@ -72,8 +88,9 @@ function step(pet: PetState, elapsedMs: number, age = true): void {
   if (exhausted && !pet.asleep) pet.sleep.overtiredSeconds += seconds
 
   if (age) pet.ageMs += elapsedMs * TIME_SCALE
-  // A sleeping pet wakes itself once it's fully rested.
-  if (pet.asleep && stats.energy >= 100) pet.asleep = false
+  // A sleeping pet wakes itself once it is rested and the sun is up — sleeping
+  // off a full night should end at dawn, not in the small hours.
+  if (pet.asleep && stats.energy >= 100 && isDay(at)) pet.asleep = false
 }
 
 /**
@@ -84,7 +101,7 @@ function step(pet: PetState, elapsedMs: number, age = true): void {
  * clean through to adult, since a whole stage is shorter than a night.
  */
 export function sleepThrough(pet: PetState, hours: number): void {
-  step(pet, (hours * HOUR) / TIME_SCALE, false)
+  step(pet, (hours * HOUR) / TIME_SCALE, 0, NEVER, false)
 }
 
 /** How much of the away time actually got simulated, for the welcome-back message. */
@@ -98,7 +115,7 @@ export interface CatchUp {
  * Bring a loaded pet up to `now`, simulating the gap in fixed chunks so long
  * absences follow the same curves a live session would.
  */
-export function reconcile(pet: PetState, now: number): CatchUp {
+export function reconcile(pet: PetState, now: number, isDay: Daylight): CatchUp {
   const awayMs = Math.max(0, now - pet.lastTick)
   const wanted = Math.ceil(awayMs / CATCHUP_CHUNK_MS)
   const chunks = Math.min(wanted, MAX_CATCHUP_CHUNKS)
@@ -106,22 +123,24 @@ export function reconcile(pet: PetState, now: number): CatchUp {
   let simulated = 0
   for (let i = 0; i < chunks; i++) {
     const slice = Math.min(CATCHUP_CHUNK_MS, awayMs - simulated)
-    step(pet, slice)
     simulated += slice
+    // Each chunk is tested at its own moment, so a pet left asleep still wakes
+    // at the dawn it would have woken at rather than sleeping through the lot.
+    step(pet, slice, pet.lastTick + simulated, isDay)
   }
   pet.lastTick = now
   return { awayMs, simulatedMs: simulated, truncated: wanted > chunks }
 }
 
 /** Advance the live simulation. Call once per animation frame. */
-export function tick(pet: PetState, now: number): void {
+export function tick(pet: PetState, now: number, isDay: Daylight): void {
   const elapsed = Math.max(0, now - pet.lastTick)
   // A tab that was backgrounded for a while goes through the chunked path instead.
   if (elapsed > CATCHUP_CHUNK_MS) {
-    reconcile(pet, now)
+    reconcile(pet, now, isDay)
     return
   }
-  step(pet, elapsed)
+  step(pet, elapsed, now, isDay)
   pet.lastTick = now
 }
 

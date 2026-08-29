@@ -226,7 +226,10 @@ function step(dt: number): void {
   // --- the world's own clock ------------------------------------------------
   // The pet has to be in bed before the night can be wound past.
   app.petSheltered = petView.sheltered
-  const world = worldAt(Date.now() + app.worldOffset + timeOffset)
+  app.debugWorldOffset = timeOffset
+  // One definition of what time it is in the pet's world, shared by the picture
+  // and by the pet itself.
+  const world = worldAt(app.worldNow())
   seasonPalette.update(world.palette)
 
   // The sun's direction is in world space; the screen camera never moves, so it
@@ -302,7 +305,7 @@ if (import.meta.env.DEV) {
       biome,
       petView,
       weather,
-      world: () => worldAt(Date.now() + app.worldOffset + timeOffset),
+      world: () => worldAt(app.worldNow()),
       setTimeOffset: (ms: number) => {
         timeOffset = ms
       },

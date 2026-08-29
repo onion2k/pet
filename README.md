@@ -109,7 +109,15 @@ moves with the season, since winter nights are longer.
 
 **Putting the pet to bed winds the night past.** Once it has settled in the
 shelter, the world clock runs forward eight hours over about three seconds: the
-sun comes up, the sky turns, and the pet wakes rested and hungry. It gets the
+sky turns, and the pet wakes rested and hungry.
+
+**The pet wakes on its own in the morning.** Waking needs both a full energy bar
+and the sun to be up, so a night's sleep ends at dawn rather than in the small
+hours. The same rule applies while the app is closed, so a pet left asleep wakes
+at the dawn it would have woken at rather than sleeping through the whole
+absence and dodging its hunger. Bedded down in daylight, the eight hours can
+land after dusk and the pet will sleep on until the next morning — pressing
+SLEEP wakes it early, and costs nothing once it is rested. It gets the
 rest it slept through — energy back, and a night's worth of hunger and grime —
 but it does not age, because a whole stage is shorter than a night and one sleep
 would otherwise carry a hatchling clean through to adult. The offset the sleep

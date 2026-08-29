@@ -9,7 +9,7 @@ import { MINIGAMES, type GameSession } from './minigames'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
-import { WORLD_HOUR_MS } from './world'
+import { isNight, WORLD_HOUR_MS } from './world'
 import type { PetState, SaveFile } from './types'
 
 export type Mode = 'boot' | 'name' | 'welcome' | 'main' | 'feed' | 'status' | 'games' | 'playing' | 'evolve'
@@ -62,6 +62,12 @@ export class App {
   private skipSpent = false
   /** Set from the renderer once the pet has actually settled in its shelter. */
   petSheltered = false
+  /**
+   * Extra world-clock offset, used only by the dev harness to scrub time. Kept
+   * here rather than in the renderer so that scrubbing moves the pet's world
+   * too, not just the picture of it.
+   */
+  debugWorldOffset = 0
   /** Blink phase for the selected icon, driven by update(). */
   blink = 0
 
@@ -69,7 +75,7 @@ export class App {
     this.save = load()
     this.pet = this.save.pet
     if (this.pet) {
-      const result = reconcile(this.pet, Date.now())
+      const result = reconcile(this.pet, Date.now(), this.daylight)
       this.awayMs = result.awayMs
     }
   }
@@ -84,9 +90,16 @@ export class App {
   }
 
   /** The time the world is showing, which is what the pet lives by. */
-  private worldNow(): number {
-    return Date.now() + this.save.worldOffset
+  worldNow(): number {
+    return Date.now() + this.save.worldOffset + this.debugWorldOffset
   }
+
+  /**
+   * Whether the world's sun is up at a given wall-clock moment. Handed to the
+   * simulation so it can decide when the pet has slept until morning.
+   */
+  private daylight = (at: number): boolean =>
+    !isNight(at + this.save.worldOffset + this.debugWorldOffset)
 
   /** True while a night is being wound past. */
   get skipping(): boolean {
@@ -389,8 +402,14 @@ export class App {
     const pet = this.pet
     if (!pet) return
 
-    tick(pet, now)
+    const wasAsleep = pet.asleep
+    tick(pet, now, this.daylight)
     this.advanceSleep(dt)
+    // Waking on its own is worth a word, but only when the player is here to
+    // see it — a pet that woke while the app was closed already did so above.
+    if (wasAsleep && !pet.asleep && !this.skipping) {
+      this.say(`${pet.name} wakes up`, 'confirm')
+    }
 
     if (this.mode === 'playing' && this.session) {
       this.sessionElapsed += dt
