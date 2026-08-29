@@ -172,10 +172,12 @@ curve the mouth and tilt the brows before the body deformation runs.
 
 Two things had to be got right for it to read at 192 pixels. The features sit a
 quarter of a voxel proud of the head — at a fiftieth they came out striped with
-z-fighting. And the whites are almost twice the painted eye they cover, with a
+z-fighting. And the whites are half again the painted eye they cover, with a
 dark rim behind them: several of these creatures are near-white themselves, and
 a pale sclera on a pale head simply disappears, leaving the eye reading as
-nothing but its pupil.
+nothing but its pupil. The rim has to stay wider than the painted eye or the
+old one shows through at the edges, and the pupil narrower than the white or
+there is no white left to see.
 
 What the face does comes off the same numbers as the rest of the pet, so it can
 never disagree with it. Mood curves the mouth and sets the brows; sadness also

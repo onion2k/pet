@@ -194,8 +194,8 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
   // Comfortably wider than the painted eye it covers. At a shade over, the
   // white margin came out under a pixel wide and the pupil sat inside the
   // model's own dark voxels, so the whole eye just read as a black rectangle.
-  const scleraW = (anchors.eyeSize.w / 2) * 1.75
-  const scleraH = (anchors.eyeSize.h / 2) * 1.7
+  const scleraW = (anchors.eyeSize.w / 2) * 1.45
+  const scleraH = (anchors.eyeSize.h / 2) * 1.42
   const pupilW = scleraW * 0.54
   const pupilH = scleraH * 0.62
 
