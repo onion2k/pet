@@ -11,6 +11,12 @@ export const STAGE_DURATION = {
   egg: 45_000,
   baby: 20 * MIN,
   child: 2 * HOUR,
+  /**
+   * How long a grown pet must be kept before it can become an elder. Long on
+   * purpose: it is the one thing in the game that retiring and starting again
+   * cannot get you, so it has to cost the time it is worth.
+   */
+  adult: 3 * HOUR,
 } as const
 
 /** Stat change per real hour, awake. Negative drains. */

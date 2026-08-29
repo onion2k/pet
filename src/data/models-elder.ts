@@ -1,0 +1,404 @@
+import { rows, type VoxelModel } from './voxel-format'
+
+/**
+ * The three forms a pet can only reach by living a long adulthood well. Each
+ * belongs to one temperament, so how a pet was raised decides not merely what
+ * it grew into but what it can still become.
+ *
+ * Built to the same conventions as the adults: mirrored half-rows six wide,
+ * nine deep, with the face on the last row.
+ */
+
+/** Devoted. Broad and settled, wearing a mantle it has clearly had a while. */
+export const WARDEN: VoxelModel = {
+  palette: { b: '#e8c98a', d: '#b8975c', k: '#14121a', m: '#8a5a33', c: '#9b4a3a', l: '#b8975c', a: '#b8975c' },
+  head: ['k', 'm'],
+  legs: ['l'],
+  arms: ['a'],
+  mirror: true,
+  layers: [
+    rows(`
+      ......
+      ......
+      ..lll.
+      ..lll.
+      ..lll.
+      ..lll.
+      ..lll.
+      ......
+      ......`),
+    rows(`
+      ......
+      ......
+      ..lll.
+      ..lll.
+      ..lll.
+      ..lll.
+      ..lll.
+      ......
+      ......`),
+    rows(`
+      ...ddd
+      ..dddd
+      .ddddd
+      .ddddd
+      dddddd
+      .ddddd
+      .ddddd
+      ..dddd
+      ...ddd`),
+    rows(`
+      ..cccc
+      .ccccc
+      .ccccc
+      ccccca
+      cccccc
+      ccccca
+      .ccccc
+      .ccccc
+      ..cccc`),
+    rows(`
+      ..cccc
+      .ccccc
+      .ccccc
+      accccc
+      cccccc
+      accccc
+      .ccccc
+      .ccccc
+      ..cccc`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      abbbbb
+      bbbbbb
+      abbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .mbbbb
+      ..bbmm`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..kkbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..kkbb`),
+    rows(`
+      ...bbb
+      ..bbbb
+      ..bbbb
+      ..bbbb
+      .bbbbb
+      ..bbbb
+      ..bbbb
+      ..bbbb
+      ...bbb`),
+    rows(`
+      ......
+      ...ccc
+      ...ccc
+      ...ccc
+      ..cccc
+      ...ccc
+      ...ccc
+      ...ccc
+      ......`),
+    rows(`
+      ......
+      ......
+      ....cc
+      ....cc
+      ...ccc
+      ....cc
+      ....cc
+      ......
+      ......`),
+  ],
+}
+
+/** Lively. Lean, with swept fins, built like something that never sits down. */
+export const ZEPHYRIX: VoxelModel = {
+  palette: { b: '#ff9a4a', d: '#d4642a', k: '#14121a', s: '#ffd93d', v: '#ffb86b', l: '#d4642a', a: '#d4642a' },
+  head: ['k'],
+  legs: ['l'],
+  arms: ['a'],
+  emissive: ['s'],
+  mirror: true,
+  layers: [
+    rows(`
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
+    rows(`
+      ......
+      ......
+      ..ll..
+      ..lll.
+      ..lll.
+      ..lll.
+      ..ll..
+      ......
+      ......`),
+    rows(`
+      ....dd
+      ...ddd
+      ..dddd
+      .ddddd
+      .ddddd
+      .ddddd
+      ..dddd
+      ...ddd
+      ....dd`),
+    rows(`
+      v..ddd
+      v.dddd
+      vddddd
+      addddd
+      dddddd
+      addddd
+      vddddd
+      v.dddd
+      v..ddd`),
+    rows(`
+      v..bbb
+      v.bbbb
+      vbbbbb
+      abbbbb
+      bbbbbb
+      abbbbb
+      vbbbbb
+      v.bbbb
+      v..bbb`),
+    rows(`
+      ...bbb
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb
+      ...bbb`),
+    rows(`
+      ...bbb
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb
+      ...kkb`),
+    rows(`
+      ...bbb
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb
+      ...kkb`),
+    rows(`
+      ....bb
+      ...bbb
+      ..bbbb
+      ..bbbb
+      .bbbbb
+      ..bbbb
+      ..bbbb
+      ...bbb
+      ....bb`),
+    rows(`
+      ......
+      ....ss
+      ...sss
+      ...sss
+      ..ssss
+      ...sss
+      ...sss
+      ....ss
+      ......`),
+    rows(`
+      ......
+      ......
+      .....s
+      ....ss
+      ....ss
+      ....ss
+      .....s
+      ......
+      ......`),
+  ],
+}
+
+/** Restful. Round, half asleep, in a cap it has plainly never taken off. */
+export const SOMNIX: VoxelModel = {
+  palette: { b: '#bfa8e8', d: '#8d76b8', k: '#14121a', m: '#6f5a99', c: '#5d7fc4', w: '#f2eef8', l: '#8d76b8', a: '#8d76b8' },
+  head: ['k', 'm'],
+  legs: ['l'],
+  arms: ['a'],
+  mirror: true,
+  layers: [
+    rows(`
+      ......
+      ......
+      ..lll.
+      ..lll.
+      ..lll.
+      ..lll.
+      ..lll.
+      ......
+      ......`),
+    rows(`
+      ...ddd
+      ..dddd
+      .ddddd
+      .ddddd
+      dddddd
+      .ddddd
+      .ddddd
+      ..dddd
+      ...ddd`),
+    rows(`
+      ..dddd
+      .ddddd
+      .ddddd
+      addddd
+      dddddd
+      addddd
+      .ddddd
+      .ddddd
+      ..dddd`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      abbbbb
+      bbbbbb
+      abbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..bbbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .mbbbb
+      ..bbmm`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..kkbb`),
+    rows(`
+      ..bbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      bbbbbb
+      .bbbbb
+      .bbbbb
+      .bbbbb
+      ..kkbb`),
+    rows(`
+      ..cccc
+      .ccccc
+      .ccccc
+      .ccccc
+      cccccc
+      .ccccc
+      .ccccc
+      .ccccc
+      ..cccc`),
+    rows(`
+      ...ccc
+      ..cccc
+      ..cccc
+      ..cccc
+      .ccccc
+      ..cccc
+      ..cccc
+      ..cccc
+      ...ccc`),
+    rows(`
+      ......
+      ...ccc
+      ...ccc
+      ...ccc
+      ..cccc
+      ...ccc
+      ...ccc
+      ...ccc
+      ......`),
+    rows(`
+      ......
+      ......
+      ....cc
+      ....cc
+      ...ccc
+      ....cc
+      ....cc
+      ......
+      ......`),
+    rows(`
+      ......
+      ......
+      ......
+      .....w
+      ....ww
+      .....w
+      ......
+      ......
+      ......`),
+  ],
+}

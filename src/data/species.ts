@@ -2,6 +2,8 @@ import type { Metrics } from '../game/metrics'
 import type { PetState, Stage } from '../game/types'
 import { BLOB, EGG, PUDGE, SPIKE, SPROUT } from './models'
 import { AURORA, BLAZE, GLOOP, GRUMP, LUMEN, MOCHI, VERDANT } from './models-adult'
+import { SOMNIX, WARDEN, ZEPHYRIX } from './models-elder'
+import type { TemperamentId } from '../game/temperament'
 import type { SeasonId } from './seasons'
 import type { VoxelModel } from './voxel-format'
 
@@ -14,6 +16,12 @@ export interface Branch {
   to: string
   /** Short reason shown on the evolution screen, e.g. "a diet of greens". */
   because: string
+  /**
+   * A gate, for branches that are not merely unlikely but unavailable. Scoring
+   * alone cannot express this: the highest score always wins, so a branch
+   * scoring zero is still taken when it is the only one there.
+   */
+  available?(pet: PetState): boolean
   /** Higher wins. Scores are unbounded but rules keep them roughly 0..2. */
   score(m: Metrics, pet: PetState, ctx: BranchContext): number
 }
@@ -154,7 +162,64 @@ const list: Species[] = [
   { id: 'grump', name: 'Grumphal', stage: 'adult', glyph: '......../########/########/##.##.##/########/########/########/##....##', model: GRUMP, blurb: 'Has seen things. Mostly ceilings.', branches: [] },
   { id: 'verdant', name: 'Verdantis', stage: 'adult', glyph: '..#..#../.##..##./..####../.######./##.##.##/########/.######./.##..##.', model: VERDANT, blurb: 'In full bloom, and well rested.', branches: [] },
   { id: 'lumen', name: 'Lumenox', stage: 'adult', glyph: '#.#..#.#/.#.##.#./..####../.######./########/.######./..####../.#....#.', model: LUMEN, blurb: 'Glows softly at 3am. Always has.', branches: [] },
+  {
+    id: 'warden',
+    name: 'Wardenor',
+    stage: 'adult',
+    glyph: '..#..#../.######./########/##.##.##/########/########/.######./.##..##.',
+    model: WARDEN,
+    blurb: 'Has kept watch a long while.',
+    branches: [],
+  },
+  {
+    id: 'zephyrix',
+    name: 'Zephyrix',
+    stage: 'adult',
+    glyph: '#..##..#/.#.##.#./..####../.######./##.##.##/.######./..####../.#....#.',
+    model: ZEPHYRIX,
+    blurb: 'Still has not sat down.',
+    branches: [],
+  },
+  {
+    id: 'somnix',
+    name: 'Somnix',
+    stage: 'adult',
+    glyph: '....##../...###../..####../.######./##.##.##/########/.######./..####..',
+    model: SOMNIX,
+    blurb: 'Dreaming of something good.',
+    branches: [],
+  }
 ]
+
+const ELDER_IDS = new Set(['warden', 'zephyrix', 'somnix'])
+
+/**
+ * What a long adulthood can still lead to. One elder per temperament, so how a
+ * pet was raised decides not only what it grew into but what it can become
+ * after that -- and an easygoing pet, having settled on nothing in particular,
+ * stays as it is.
+ */
+const ELDERS: { to: string; because: string; needs: TemperamentId }[] = [
+  { to: 'warden', because: 'a long life spent close by', needs: 'devoted' },
+  { to: 'zephyrix', because: 'years of never sitting still', needs: 'lively' },
+  { to: 'somnix', because: 'a lifetime of good hours kept', needs: 'restful' },
+]
+
+/** The same three branches hang off every adult, gated on its temperament. */
+const elderBranches = (): Branch[] =>
+  ELDERS.map(({ to, because, needs }) => ({
+    to,
+    because,
+    available: (pet) => pet.temperament === needs,
+    // Only one is ever available, so the score is simply a positive constant.
+    score: () => 1,
+  }))
+
+for (const species of list) {
+  if (species.stage === 'adult' && species.branches.length === 0 && !ELDER_IDS.has(species.id)) {
+    species.branches = elderBranches()
+  }
+}
 
 export const SPECIES: ReadonlyMap<string, Species> = new Map(list.map((s) => [s.id, s]))
 
@@ -172,7 +237,7 @@ export const SPECIES_COUNT = list.length
 
 /** Picks the branch this pet has earned. Returns null for terminal adult forms. */
 export function chooseBranch(pet: PetState, m: Metrics, ctx: BranchContext): Branch | null {
-  const { branches } = speciesOf(pet.speciesId)
-  if (branches.length === 0) return null
-  return branches.reduce((best, b) => (b.score(m, pet, ctx) > best.score(m, pet, ctx) ? b : best))
+  const open = speciesOf(pet.speciesId).branches.filter((b) => b.available?.(pet) ?? true)
+  if (open.length === 0) return null
+  return open.reduce((best, b) => (b.score(m, pet, ctx) > best.score(m, pet, ctx) ? b : best))
 }

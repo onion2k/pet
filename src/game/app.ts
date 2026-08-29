@@ -6,7 +6,7 @@ import type { ButtonId } from '../render/shell'
 import type { SoundId } from '../engine/audio'
 import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution } from './actions'
 import { MINIGAMES, type GameSession } from './minigames'
-import { temperamentOf } from './temperament'
+import { legacyOf, temperamentOf } from './temperament'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
@@ -499,7 +499,12 @@ export class App {
     if (!pet || pet.stage !== 'adult') return
     this.heldButton = null
     this.heldSeconds = 0
-    this.save.album.push({ speciesId: pet.speciesId, name: pet.name, retiredAt: Date.now() })
+    this.save.album.push({
+      speciesId: pet.speciesId,
+      name: pet.name,
+      retiredAt: Date.now(),
+      legacy: legacyOf(pet),
+    })
     this.save.counters.retirements += 1
     this.syncDiscovered()
     this.retiring = { name: pet.name, speciesName: speciesOf(pet.speciesId).name }
@@ -555,7 +560,13 @@ export class App {
       this.pet = newPet(NAMES[this.nameIndex]!, Date.now())
       // The heirloom: each retired ancestor leaves the next egg a little
       // better provisioned, capped so lineage helps but never trivialises.
-      const boost = Math.min(HEIRLOOM_CAP, this.save.album.length * HEIRLOOM_PER_ANCESTOR)
+      // What the ancestors are worth, not how many there were. Counting them
+      // made retiring the instant a pet grew up the best move available: it
+      // advanced the album, advanced the heirloom, and restarted the only
+      // system in the game where choices accumulate. A life now has to have
+      // been lived to be worth passing on.
+      const inherited = this.save.album.reduce((sum, entry) => sum + (entry.legacy ?? 0.4), 0)
+      const boost = Math.min(HEIRLOOM_CAP, inherited * HEIRLOOM_PER_ANCESTOR)
       if (boost > 0) {
         this.pet.stats.happiness = Math.min(100, this.pet.stats.happiness + boost)
         this.pet.stats.hunger = Math.min(100, this.pet.stats.hunger + boost)

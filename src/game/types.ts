@@ -84,6 +84,11 @@ export interface AlbumEntry {
   speciesId: string
   name: string
   retiredAt: number
+  /**
+   * What this life is worth to the next one, 0..1. Absent on pets retired
+   * before it was recorded, which are treated as a modest middling life.
+   */
+  legacy?: number
 }
 
 export interface SaveFile {

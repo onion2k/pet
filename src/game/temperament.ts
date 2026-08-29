@@ -1,4 +1,5 @@
-import type { Metrics } from './metrics'
+import { metrics, type Metrics } from './metrics'
+import { STAGE_DURATION } from './tuning'
 import type { PetState } from './types'
 
 /**
@@ -29,6 +30,9 @@ export const TEMPERAMENTS: Record<TemperamentId, Temperament> = {
   easygoing: { id: 'easygoing', name: 'Easygoing', blurb: 'takes the days as they come' },
 }
 
+/** When a pet counts as grown, and how long a full grown life is. */
+const ADULT_FROM = STAGE_DURATION.egg + STAGE_DURATION.baby + STAGE_DURATION.child
+const FULL_LIFE = STAGE_DURATION.adult
 /** The margin a reading needs over the others before it counts as a character. */
 const DISTINCT = 0.1
 
@@ -63,4 +67,19 @@ export function temperamentFrom(m: Metrics): TemperamentId {
 export function temperamentOf(pet: PetState): Temperament | null {
   if (pet.stage !== 'adult' || !pet.temperament) return null
   return TEMPERAMENTS[pet.temperament] ?? null
+}
+
+/**
+ * What a life is worth to the one after it, 0..1. Two things count: how well
+ * the pet was kept, and how long it was allowed to be grown up. A pet retired
+ * the moment it came of age passes on almost nothing however doted on, which is
+ * what stops retiring being free.
+ */
+export function legacyOf(pet: PetState): number {
+  const grownFor = Math.max(0, pet.ageMs - ADULT_FROM)
+  const lived = Math.min(1, grownFor / FULL_LIFE)
+  const kept = metrics(pet).care
+  // No bonus for being an elder: reaching one already requires a full grown
+  // life, so such a pet scores the maximum on the time alone.
+  return Math.min(1, lived * 0.6 + kept * lived * 0.4)
 }

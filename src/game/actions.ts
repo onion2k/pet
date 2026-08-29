@@ -131,6 +131,8 @@ function stageStartAge(pet: PetState): number {
       return STAGE_DURATION.egg
     case 'child':
       return STAGE_DURATION.egg + STAGE_DURATION.baby
+    case 'adult':
+      return STAGE_DURATION.egg + STAGE_DURATION.baby + STAGE_DURATION.child
     default:
       return Infinity
   }

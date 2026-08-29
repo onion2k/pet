@@ -374,6 +374,32 @@ came out devoted. Each is measured against what is typical for that axis
 instead, so an ordinary player gets a spread and a deliberate one gets what they
 raised for.
 
+### Elders, and why you would stay
+
+Adulthood used to be terminal by construction: `STAGE_DURATION` had no entry for
+it, so `readyToEvolve` always answered no. And the heirloom passed to the next
+egg was `album.length × 5` — a count of how many pets you had retired, not how
+they lived. Between them, retiring the moment a pet grew up was strictly
+optimal: it advanced the album, advanced the heirloom, and restarted the only
+system in the game where choices accumulate. There was no incentive to stay
+because the incentive pointed at the exit.
+
+Three **elder** forms answer that. They are reachable only after three hours of
+adulthood, and which one — if any — is decided by the temperament: Wardenor for
+the devoted, Zephyrix for the lively, Somnix for the restful. An easygoing pet,
+having settled on nothing in particular, stays as it is. So the whole chain now
+pays off end to end: how you raise a pet decides its temperament, and its
+temperament decides what it can still become.
+
+Scoring alone could not express this. `chooseBranch` takes the highest score, so
+a branch scoring zero is still taken when it is the only one on offer; branches
+gained an `available` gate for conditions that are not unlikely but impossible.
+
+The heirloom is now what the ancestors were *worth* rather than how many there
+were. A life is scored on how long it was allowed to be grown up and how well it
+was kept, so a pet retired the instant it came of age passes on nothing at all,
+and a full one passes on the lot.
+
 ### Systems that touch each other
 
 Depth came from making the levers depend on one another rather than adding more

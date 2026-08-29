@@ -311,10 +311,10 @@ function drawBoardHeading(hud: Hud, y: number, label: string): void {
 
 function drawCurioBoard(hud: Hud, app: App): void {
   const counts = app.curioCounts
-  drawBoardHeading(hud, 40, `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}`)
+  drawBoardHeading(hud, 38, `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}`)
   CURIOS.forEach((curio, i) => {
     const x = BOARD_X + (i % 4) * CELL
-    const y = 52 + Math.floor(i / 4) * CELL
+    const y = 50 + Math.floor(i / 4) * 18
     const found = counts[curio.id] ?? 0
     hud.glyph(x, y, curio.glyph.split('/'), found > 0 ? curio.colour : MISSING, 2)
     // The duplicate count sits on the artwork rather than costing the board a
@@ -329,10 +329,13 @@ function drawCurioBoard(hud: Hud, app: App): void {
 /** The album. Each form is drawn in its own body colour, straight off its model. */
 function drawSpeciesBoard(hud: Hud, app: App): void {
   const found = new Set(app.discoveredIds)
-  drawBoardHeading(hud, 94, `FORMS ${app.discoveredCount}/${SPECIES_COUNT}`)
+  drawBoardHeading(hud, 88, `FORMS ${app.discoveredCount}/${SPECIES_COUNT}`)
+  // Four by four. Three rows held the twelve forms the game shipped with; the
+  // elders take it past that, and the grid has to grow with the list rather
+  // than quietly dropping whatever will not fit.
   SPECIES_LIST.forEach((species, i) => {
     const x = BOARD_X + (i % 4) * CELL
-    const y = 106 + Math.floor(i / 4) * 18
+    const y = 96 + Math.floor(i / 4) * 16
     const colour = found.has(species.id) ? (species.model.palette.b ?? INK) : MISSING
     hud.glyph(x, y, species.glyph.split('/'), colour, 2)
   })
