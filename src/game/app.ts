@@ -9,7 +9,8 @@ import { MINIGAMES, type GameSession } from './minigames'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
-import { hoursUntilSunrise, isNight, WORLD_HOUR_MS } from './world'
+import { hoursUntilSunrise, isNight, worldAt, WORLD_HOUR_MS } from './world'
+import { findCurio, type Curio } from '../data/curios'
 import type { PetState, SaveFile } from './types'
 
 export type Mode =
@@ -28,6 +29,10 @@ export const NAMES = ['PIP', 'BOB', 'ZED', 'MOSS', 'NIM', 'TOFU', 'KIRA', 'DUSK'
 
 /** Long absences get a summary screen rather than a silent stat drop. */
 const WELCOME_THRESHOLD_MS = 5 * 60_000
+/** How long the pet must have been alone before it can have found something. */
+const CURIO_AWAY_MS = 20 * 60_000
+/** Chance a long enough absence turns something up. */
+const CURIO_CHANCE = 0.65
 
 /**
  * A sleep runs to sunrise, however far off that is. Bedded down at dusk that is
@@ -74,6 +79,8 @@ export class App {
   evolution: Evolution | null = null
   /** Who is being seen off, while the retirement screen is up. */
   retiring: { name: string; speciesName: string } | null = null
+  /** What the pet found while the player was away, for the welcome screen. */
+  found: Curio | null = null
   message = ''
   messageTimer = 0
   awayMs = 0
@@ -112,6 +119,7 @@ export class App {
       const result = reconcile(this.pet, Date.now(), this.daylight)
       this.awayMs = result.awayMs
       this.syncDiscovered()
+      this.rollCurio()
     }
     saveSoon(this.save)
   }
@@ -145,6 +153,23 @@ export class App {
     for (const id of this.pet.discovered) {
       if (!this.save.discovered.includes(id)) this.save.discovered.push(id)
     }
+  }
+
+  /**
+   * The pet sometimes turns something up while the player is away — the
+   * anticipation half of coming back, alongside the maintenance half. What it
+   * finds depends on the season and the weather it was found in.
+   */
+  private rollCurio(): void {
+    const pet = this.pet
+    if (!pet || pet.stage === 'egg') return
+    if (this.awayMs < CURIO_AWAY_MS) return
+    if (Math.random() > CURIO_CHANCE) return
+    const world = worldAt(this.worldNow())
+    const curio = findCurio(world.season.id, world.weather, Math.random())
+    if (!curio) return
+    this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
+    this.found = curio
   }
 
   /** Species reached across every generation, for the collection counter. */

@@ -1,3 +1,4 @@
+import { CURIO_COUNT } from '../data/curios'
 import { textWidth } from '../data/font'
 import { FOODS } from '../data/foods'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
@@ -200,7 +201,7 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
   const curios = app.curioTally
   hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
-  hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}  CURIOS ${curios.kinds}/8`, DIM)
+  hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}  CURIOS ${curios.kinds}/${CURIO_COUNT}`, DIM)
   if (pet.stage === 'adult') {
     const progress = app.retireProgress
     if (progress > 0) {
@@ -261,9 +262,12 @@ function drawWelcome(hud: Hud, app: App): void {
   if (pet.stats.happiness <= CRITICAL) lines.push('FEELING LONELY')
   if (lines.length === 0) lines.push('EVERYTHING IS FINE')
 
-  lines.slice(0, 4).forEach((line, i) => {
+  lines.slice(0, 3).forEach((line, i) => {
     hud.textCentered(hud.width / 2, 66 + i * 12, line, i === 0 && pet.sick ? BAD : DIM)
   })
+  if (app.found) {
+    hud.textCentered(hud.width / 2, 108, `IT FOUND A ${app.found.name.toUpperCase()}!`, ACCENT)
+  }
   hud.textCentered(hud.width / 2, hud.height - 20, 'PRESS ANY BUTTON', DIM)
 }
 
