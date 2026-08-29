@@ -63,10 +63,21 @@ export const SHELTER_COLUMNS = { w: 13, d: 11 }
 export const LAMP_ROW_Z = -1.15
 export const LAMP_ROW_X = [-7.6, -5.0, -2.4, 2.6, 5.2, 7.6]
 /**
- * How many lanterns the yard holds, the shelter's own included. The shaders
- * carry a fixed-size array and every slot is lit, so this has to be exact --
- * a spare slot would sit at the camera and light whatever came near it.
+ * How many lights the shaders carry: the lantern row, the shelter's own, and
+ * one spare for a jack-o-lantern when there is one. Every slot is lit, so an
+ * unused one has to be parked out of range -- left at the origin it would sit
+ * at the camera and light whatever came near it.
  */
-export const LAMP_COUNT = LAMP_ROW_X.length + 1
+export const LAMP_COUNT = LAMP_ROW_X.length + 2
+/** Where an unused light slot is parked: far enough that its falloff is zero. */
+export const LAMP_PARKED: readonly [number, number, number] = [0, -10000, 0]
+
+/**
+ * Standing room on the verge, for whatever is visiting. Each slot is inside the
+ * clearing's level ground and outside the band the pet roams, and they step
+ * around both the lantern row and the shelter's frontage.
+ */
+export const VERGE_Z = -1.42
+export const VERGE_SLOTS = [-6.1, -3.9, -1.8, 4.0, 6.1]
 /** Extra columns of clear ground kept around the pet's clearing. */
 export const PROP_CLEARING_MARGIN = 2

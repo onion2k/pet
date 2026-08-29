@@ -6,12 +6,13 @@ import { App } from './game/app'
 import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
-import { LAMP_COUNT, MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
-import { worldAt, type Rgb } from './game/world'
+import { LAMP_COUNT, LAMP_PARKED, MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
+import { DAY_MS, worldAt, type Rgb } from './game/world'
 import { PaletteTexture } from './render/palette'
 import { createWeather } from './render/weather'
 import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
+import { createVisitors } from './render/visitors'
 import { createBloom } from './render/post'
 import { createShell, SCREEN_CORNER_POWER } from './render/shell'
 import { createStage, watchResize } from './render/core'
@@ -78,6 +79,9 @@ terrain.root.setParent(screenScene)
 
 const weather = createWeather(gl)
 weather.root.setParent(screenScene)
+
+const visitors = createVisitors(gl, terrain.shape.groundY)
+visitors.root.setParent(screenScene)
 
 const petView = new PetView(gl, speciesOf('egg').model)
 petView.root.position.y = terrain.shape.groundY
@@ -317,11 +321,13 @@ function step(dt: number): void {
   // in world space and the camera turns, so they are transformed into view
   // space here for the same reason the sun's direction is.
   const lamps = terrain.shape.lamps
-  for (let i = 0; i < lamps.length && i < LAMP_COUNT; i++) {
-    const lamp = lamps[i]!
-    const lx = lamp.x
-    const ly = terrain.shape.groundY + lamp.y
-    const lz = lamp.z
+  // A carved lantern, when one is out, is a light like any other.
+  const pumpkin = visitors.pumpkinAt()
+  for (let i = 0; i < LAMP_COUNT; i++) {
+    const lamp = i < lamps.length ? lamps[i]! : i === lamps.length ? pumpkin : null
+    const lx = lamp ? lamp.x : LAMP_PARKED[0]
+    const ly = lamp ? terrain.shape.groundY + lamp.y : LAMP_PARKED[1]
+    const lz = lamp ? lamp.z : LAMP_PARKED[2]
     lampView[i * 3] = m[0]! * lx + m[4]! * ly + m[8]! * lz + m[12]!
     lampView[i * 3 + 1] = m[1]! * lx + m[5]! * ly + m[9]! * lz + m[13]!
     lampView[i * 3 + 2] = m[2]! * lx + m[6]! * ly + m[10]! * lz + m[14]!
@@ -331,6 +337,8 @@ function step(dt: number): void {
   lampLevel += (lampWanted - lampLevel) * Math.min(1, dt * 1.6)
   petView.setLamps(lampView, lampLevel)
   terrain.setLamps(lampView, lampLevel)
+  visitors.setLighting(lighting)
+  visitors.setLamps(lampView, lampLevel)
 
   backdrop.setPalette(world.sky.top, world.sky.bottom)
   // Place the sun on the same arc that lights the scene, so the shadows and the
@@ -351,6 +359,19 @@ function step(dt: number): void {
   weather.set(world.weather)
   weather.setColour(nightside ? [0.5, 0.58, 0.8] : [0.85, 0.9, 1])
   weather.update(dt, elapsed)
+
+  // Who is in the yard today. Keyed on the world day, so a visitor stays for
+  // the day rather than flickering in and out between frames.
+  visitors.update(dt, {
+    season: world.season.id,
+    day: Math.floor(app.worldNow() / DAY_MS),
+    groundY: terrain.shape.groundY,
+    pet: petView.position,
+    roam: { x: ROAM_HALF_X, z: ROAM_HALF_Z },
+    door: { x: terrain.shape.shelter.lamp.x, z: terrain.shape.shelter.lamp.z },
+    announce: (name) => app.pushTicker(`${name} is in the yard`),
+  })
+  petView.setPlaything(visitors.playthingAt())
 
   renderer.render({ scene: screenScene, camera: screenCamera, target: sceneTarget })
   const glow = bloom.render(renderer, sceneTarget.texture)
@@ -389,6 +410,7 @@ if (import.meta.env.DEV) {
       biome,
       petView,
       weather,
+      visitors,
       cameraPan: () => cameraPan,
       lampLevel: () => lampLevel,
       world: () => worldAt(app.worldNow()),

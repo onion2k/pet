@@ -231,6 +231,31 @@ it walks, so every surface it crosses has to be flat. Its front is left open so
 the pet stays in view inside, and its interior is tall enough for the pet to
 stand up in. Which side it sits on depends on the seed.
 
+### Visitors
+
+Some days there is something in the yard: a ball to knock about, a rabbit
+grazing on the verge, a snowman somebody built, wildflowers, a jack-o-lantern
+by the door, a butterfly, a pile of leaves, a sled. Each belongs to one or two
+seasons and turns up on a given world day only if the dice say so, rolled from
+the day number so it is settled for the day rather than flickering. Arrivals are
+announced on the ticker, which is the only reason a small thing on the far verge
+gets noticed at all.
+
+They are not scenery. Scenery is stamped into the terrain's voxel field, and
+that field is only meshed when the pet changes — a 40ms rebuild is far too much
+to spend on the year turning. Each visitor is its own small mesh instead, faded
+in and out, sharing one program that carries the same sun, fill and lanterns as
+everything else.
+
+Standing room is the constraint that shapes the placement. The clearing is level
+only inside an ellipse, and the pet roams a smaller one inside that, so anything
+standing still has to sit in the gap between the two — past the pet, still on the
+flat. That leaves a short row of pitches, which also have to miss the lantern row
+and the shelter's frontage, so they are picked from a fixed set and handed out
+without collisions. Things that move are freer: the ball sits inside the roaming
+band where the pet can reach it, and the pet steers over to it about a third of
+the time it picks somewhere new to walk.
+
 Rocks and plants are scattered over the rest: pebbles, rocks and boulders, and
 tufts, ferns, shrubs and blooms. They are stamped **into the terrain's own voxel field**
 rather than added as separate meshes, which is what makes them sit convincingly

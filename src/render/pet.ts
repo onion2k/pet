@@ -275,6 +275,8 @@ export class PetView {
   /** How far the pet may roam: half-extents, wide in x and shallow in z. */
   private bounds = { x: 1.2, z: 1.0 }
   private shelter: ShelterTarget | null = null
+  /** Something in the yard worth walking over to, when there is one. */
+  private plaything: { x: number; z: number } | null = null
   /** False until the first update, so a pet loaded asleep starts indoors. */
   private started = false
   private walk = {
@@ -391,6 +393,11 @@ export class PetView {
     u.uLampIntensity.value = intensity
   }
 
+  /** A ball or the like, which the pet will wander over to more often than not. */
+  setPlaything(target: { x: number; z: number } | null): void {
+    this.plaything = target
+  }
+
   /** Tells the pet where its shelter is, so it can take itself to bed. */
   setShelter(shelter: ShelterTarget | null): void {
     this.shelter = shelter
@@ -496,6 +503,29 @@ export class PetView {
   }
 
   /**
+   * Where to amble next. A ball in the yard pulls the pet over about a third of
+   * the time, which is enough to read as playing with it without the pet
+   * standing over it all day.
+   */
+  private nextTarget(): { x: number; z: number } | null {
+    const toy = this.plaything
+    if (toy && Math.random() < 0.35) {
+      // Stopping a short way off, so the pet noses at it rather than standing in it.
+      const angle = Math.random() * Math.PI * 2
+      const x = toy.x + Math.cos(angle) * 0.75
+      const z = toy.z + Math.sin(angle) * 0.4
+      if (
+        Math.abs(x) < this.bounds.x &&
+        Math.abs(z) < this.bounds.z &&
+        !this.blockedByShelter(x, z)
+      ) {
+        return { x, z }
+      }
+    }
+    return this.pickRoamTarget()
+  }
+
+  /**
    * Ambles around the clearing, and takes itself into the shelter to sleep.
    * Targets are biased across the frame rather than into it, so the pet spends
    * most of its time showing its face.
@@ -540,7 +570,7 @@ export class PetView {
         w.targetZ = sh.inside.z
         w.walking = true
       } else if (!state.asleep && w.where === 'in') {
-        const next = this.pickRoamTarget()
+        const next = this.nextTarget()
         w.where = 'heading-out'
         w.targetX = next?.x ?? 0
         w.targetZ = next?.z ?? 0
@@ -571,7 +601,7 @@ export class PetView {
       if (w.where === 'out') {
         w.timer -= dt
         if (w.timer <= 0) {
-          const next = this.pickRoamTarget()
+          const next = this.nextTarget()
           if (next) {
             w.targetX = next.x
             w.targetZ = next.z

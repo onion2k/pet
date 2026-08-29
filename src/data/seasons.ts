@@ -143,8 +143,8 @@ export const SEASONS: Season[] = [
     id: 'winter',
     name: 'Winter',
     palette: {
-      surfaceA: '#c8d5dd',
-      surfaceB: '#aebdc7',
+      surfaceA: '#b0c2cf',
+      surfaceB: '#98abba',
       soil: '#6b5a4c',
       rock: '#7a7d76',
       rockLight: '#9aa0a4',
