@@ -410,6 +410,12 @@ gone three world hours, comes back with something about three times in four, and
 is judged on the world it comes home to — which is the world the player chose by
 picking their moment.
 
+It genuinely goes. The pet walks to the edge of the yard and over it, and is out
+of sight until it is due back, when it reappears at the side it left by and
+walks in. The camera stops following it once it is over the hill, or it would
+spend three world hours pointed at an empty verge, and a pet that is not there
+keeps its thoughts to itself.
+
 It is the one job the game asks of an adult, and the icon strip grew a seventh
 button for it. That strip was written for three icons a row; it now lays out
 whatever it is given, so the extra one did not quietly fall off the end.
