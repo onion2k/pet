@@ -183,6 +183,16 @@ head simply disappears, leaving the eye reading as nothing but its pupil. The
 head colour for the patch is sampled from the voxel beside the eye, so it is
 right for every species without a table.
 
+The muzzle some of the models paint between the eyes gets the same treatment as
+the eyes: covered over and redrawn at about half the size, since a big blunt
+nose is the least cute thing on a face. Finding it takes more care than finding
+the eyes, because a model's secondary shading colour also sits below the eyes
+and is also "not skin" — ungrouped, a whole band of belly shading reads as an
+enormous muzzle. Candidates are grouped by colour, and a muzzle is the group
+that straddles the middle, spans a few voxels rather than the whole body, and
+sits within two voxels of the eyes. Three of the eleven have one; on the rest
+nothing is drawn.
+
 The mouth is set a good way below the eyes to clear whatever muzzle the model has
 painted between them, and by that height the body may have bulged out in front
 of the face — so the front surface is measured again at the mouth's own height

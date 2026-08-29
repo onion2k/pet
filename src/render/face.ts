@@ -18,6 +18,18 @@ export interface FaceAnchors {
   voxel: number
   /** The head's own colour beside the eye, for painting the old eye out. */
   skin: [number, number, number]
+  /** The muzzle the model paints between the eyes, if it has one. */
+  nose: NoseAnchor | null
+}
+
+export interface NoseAnchor {
+  x: number
+  y: number
+  z: number
+  /** Half-extent of the painted nose, in world units. */
+  halfW: number
+  halfH: number
+  colour: [number, number, number]
 }
 
 export interface Anchor {
@@ -117,8 +129,58 @@ export function faceAnchors(model: VoxelModel, targetHeight: number): FaceAnchor
     }
   }
 
+  const resolvedSkin = skin ?? [0.5, 0.5, 0.5]
+
+  // The nose: a small run of front-face voxels just below the eyes, straddling
+  // the middle. Candidates are grouped by colour first, because a model's
+  // secondary shading colour also sits below the eyes and is also "not skin" --
+  // ungrouped, a whole band of belly shading reads as an enormous muzzle.
+  const eyeRowY = Math.min(...left.map((v) => v.y))
+  const skinLuma = luma(resolvedSkin)
+  const groups = new Map<string, { xs: number[]; ys: number[]; colour: [number, number, number] }>()
+  for (let y = Math.max(0, eyeRowY - 3); y < eyeRowY; y++) {
+    for (let x = 0; x < source.w; x++) {
+      const voxel = source.at(x, y, frontZ)
+      if (!voxel) continue
+      const l = luma(voxel.color)
+      if (Math.abs(l - darkest) < 1e-6 || Math.abs(l - skinLuma) < 1e-6) continue
+      const key = voxel.color.join(',')
+      const group = groups.get(key) ?? { xs: [], ys: [], colour: voxel.color }
+      group.xs.push(x + 0.5)
+      group.ys.push(y)
+      groups.set(key, group)
+    }
+  }
+
+  const middleX = source.w / 2
+  let nose: NoseAnchor | null = null
+  let bestRow = -1
+  for (const group of groups.values()) {
+    const minX = Math.min(...group.xs)
+    const maxX = Math.max(...group.xs)
+    // A muzzle straddles the middle and is a few voxels across. A band of
+    // shading spans most of the body and is thrown out here.
+    if (minX >= middleX || maxX <= middleX || maxX - minX > 4) continue
+    const minY = Math.min(...group.ys)
+    const maxY = Math.max(...group.ys)
+    // And it sits right under the eyes. Further down the body it is a marking
+    // of some other kind, not a muzzle.
+    if (eyeRowY - maxY > 2) continue
+    if (maxY <= bestRow) continue
+    bestRow = maxY
+    nose = {
+      x: originX + ((minX + maxX) / 2) * scale,
+      y: ((minY + maxY) / 2 + 0.5) * scale,
+      z: originZ + (frontZ + 1.25) * scale,
+      halfW: ((maxX - minX) / 2 + 0.5) * scale,
+      halfH: ((maxY - minY) / 2 + 0.5) * scale,
+      colour: group.colour,
+    }
+  }
+
   return {
-    skin: skin ?? [0.5, 0.5, 0.5],
+    nose,
+    skin: resolvedSkin,
     eyes: [eyeLeft, eyeRight],
     eyeSize: { w: span(left, 'x'), h: span(left, 'y') },
     mouth: mouthAnchor(
@@ -244,6 +306,23 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
       param.push(featureParam)
     }
     faces++
+  }
+
+  const nose = anchors.nose
+  if (nose) {
+    // The painted muzzle is covered over and redrawn smaller, the same trick
+    // the eyes use. A big blunt nose is the least cute thing on the face.
+    quad(nose.x, nose.y, nose.z, nose.halfW * 1.25, nose.halfH * 1.4, anchors.skin, FACE_NONE, 0)
+    quad(
+      nose.x,
+      nose.y,
+      nose.z + anchors.voxel * 0.06,
+      nose.halfW * 0.52,
+      nose.halfH * 0.62,
+      nose.colour,
+      FACE_NONE,
+      0,
+    )
   }
 
   const [left, right] = anchors.eyes
