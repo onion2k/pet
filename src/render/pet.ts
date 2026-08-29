@@ -137,9 +137,10 @@ const shadowFrag = /* glsl */ `
   varying vec2 vUv;
   void main() {
     // Soft round contact patch. Without it the pet reads as floating above the
-    // ground rather than standing on it.
+    // ground rather than standing on it. Blended over the ground, the result is
+    // roughly grass * (1 - alpha), so alpha is what controls how dark it gets.
     float d = length(vUv - 0.5) * 2.0;
-    float a = (1.0 - smoothstep(0.35, 1.0, d)) * uStrength;
+    float a = (1.0 - smoothstep(0.45, 1.0, d)) * uStrength;
     gl_FragColor = vec4(0.02, 0.03, 0.02, a);
   }
 `
@@ -187,7 +188,7 @@ export class PetView {
       program: new Program(gl, {
         vertex: shadowVert,
         fragment: shadowFrag,
-        uniforms: { uStrength: { value: 0.55 } },
+        uniforms: { uStrength: { value: 0.78 } },
         transparent: true,
         depthWrite: false,
       }),
@@ -247,6 +248,6 @@ export class PetView {
     const tighten = 1 - lift * 1.6
     this.shadow.scale.set(tighten, 1, tighten)
     this.shadow.program.uniforms.uStrength.value =
-      (0.55 - lift * 1.3) * (1 - this.smoothAsleep * 0.35)
+      (0.78 - lift * 1.3) * (1 - this.smoothAsleep * 0.3)
   }
 }
