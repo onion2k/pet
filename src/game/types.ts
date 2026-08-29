@@ -77,4 +77,9 @@ export interface SaveFile {
   version: number
   pet: PetState | null
   muted: boolean
+  /**
+   * Milliseconds the world clock runs ahead of the wall clock. Sleeping pushes
+   * it forward; nothing ever winds it back.
+   */
+  worldOffset: number
 }

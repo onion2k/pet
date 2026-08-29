@@ -107,6 +107,14 @@ Night is simply the sun being down, so the bedtime the game judges the pet's
 sleep discipline against is the same one the player can see in the sky — and it
 moves with the season, since winter nights are longer.
 
+**Putting the pet to bed winds the night past.** Once it has settled in the
+shelter, the world clock runs forward eight hours over about three seconds: the
+sun comes up, the sky turns, and the pet wakes rested and hungry. It gets the
+rest it slept through — energy back, and a night's worth of hunger and grime —
+but it does not age, because a whole stage is shorter than a night and one sleep
+would otherwise carry a hatchling clean through to adult. The offset the sleep
+adds is saved, so the world stays where the pet left it.
+
 Weather is drawn from the season — rain and mist in spring and autumn, snow in
 winter, mostly clear in summer — and changes every eighteen minutes, dulling the
 sky, flattening the sun and lifting the fill light the way an overcast day does.

@@ -18,7 +18,10 @@ import { hexToLinear } from '../render/voxel-mesh'
  * with the pet covers a visible stretch of sky and a single sitting can span
  * dawn to dusk.
  */
-const DAY_MS = 24 * 60_000
+export const DAY_MS = 24 * 60_000
+
+/** Milliseconds of world clock per in-world hour. */
+export const WORLD_HOUR_MS = DAY_MS / 24
 
 /**
  * Deliberately not a whole number of days. On a round period the two lock in

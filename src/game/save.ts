@@ -1,14 +1,17 @@
 import type { PetState, SaveFile } from './types'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 /**
  * Migrations run in order for every version below the current one. Adding a
  * field means adding a migration here rather than wiping anyone's pet.
  */
 const MIGRATIONS: Record<number, (raw: any) => any> = {
-  // 0 -> 1 is the initial format; nothing to do yet.
+  // 0 -> 1 is the initial format; nothing to do.
+  // 1 -> 2 adds the world clock offset. Existing pets start in step with the
+  // wall clock, which is where they already were.
+  1: (raw) => ({ ...raw, worldOffset: 0 }),
 }
 
 export function newPet(name: string, now: number): PetState {
@@ -32,7 +35,7 @@ export function newPet(name: string, now: number): PetState {
 }
 
 export function emptySave(): SaveFile {
-  return { version: SAVE_VERSION, pet: null, muted: false }
+  return { version: SAVE_VERSION, pet: null, muted: false, worldOffset: 0 }
 }
 
 export function load(): SaveFile {

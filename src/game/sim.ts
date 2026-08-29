@@ -32,7 +32,7 @@ function clampStats(stats: Stats): void {
  * Advance one pet by `elapsedMs` of wall-clock time. Called both for live frames
  * and, in chunks, for catching up on time spent with the app closed.
  */
-function step(pet: PetState, elapsedMs: number): void {
+function step(pet: PetState, elapsedMs: number, age = true): void {
   const hours = (elapsedMs * TIME_SCALE) / HOUR
   const seconds = (elapsedMs * TIME_SCALE) / 1000
   const rates = pet.asleep ? DECAY_ASLEEP : DECAY_AWAKE
@@ -71,9 +71,20 @@ function step(pet: PetState, elapsedMs: number): void {
   }
   if (exhausted && !pet.asleep) pet.sleep.overtiredSeconds += seconds
 
-  pet.ageMs += elapsedMs * TIME_SCALE
+  if (age) pet.ageMs += elapsedMs * TIME_SCALE
   // A sleeping pet wakes itself once it's fully rested.
   if (pet.asleep && stats.energy >= 100) pet.asleep = false
+}
+
+/**
+ * Applies a stretch of sleep to the pet's condition without advancing its age.
+ *
+ * Used by the sleep time-skip: the night passes for the pet's body but not for
+ * its development. Ageing it too would let a single sleep carry a hatchling
+ * clean through to adult, since a whole stage is shorter than a night.
+ */
+export function sleepThrough(pet: PetState, hours: number): void {
+  step(pet, (hours * HOUR) / TIME_SCALE, false)
 }
 
 /** How much of the away time actually got simulated, for the welcome-back message. */
