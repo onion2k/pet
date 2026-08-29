@@ -1,3 +1,4 @@
+import type { TemperamentId } from './temperament'
 /** All persistent game state. Anything not in here is derived or ephemeral. */
 
 export type StatKey = 'hunger' | 'happiness' | 'energy' | 'hygiene' | 'health'
@@ -56,6 +57,11 @@ export interface PetState {
   name: string
   speciesId: string
   stage: Stage
+  /**
+   * How it turned out, settled on reaching adulthood. Absent while growing, and
+   * on any pet saved before temperaments existed.
+   */
+  temperament?: TemperamentId
   /** Wall-clock ms the egg was laid. */
   bornAt: number
   /** Wall-clock ms of the last simulated tick. Drives offline decay. */

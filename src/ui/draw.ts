@@ -257,10 +257,16 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   // use when it gets there. Named on its own line because it is the one thing
   // on this screen the player can still change.
   const leaning = app.leaning
+  const character = app.temperament
   if (!leaning) {
-    // An adult has nowhere left to go. Saying so is better than the line
-    // quietly disappearing and leaving a hole where it used to be.
-    if (pet.stage === 'adult') hud.text(6, 139, 'FULLY GROWN', DIM)
+    // A grown pet has nowhere left to go, but it has turned out a particular
+    // way, and that is worth rather more than saying it has stopped.
+    if (character) {
+      hud.text(6, 139, character.name.toUpperCase(), ACCENT)
+      wrapped(character.blurb.toUpperCase(), 16).forEach((line, i) => {
+        hud.text(6, 147 + i * 7, line, COOL)
+      })
+    } else if (pet.stage === 'adult') hud.text(6, 139, 'FULLY GROWN', DIM)
   } else {
     hud.text(6, 139, 'BECOMING', ACCENT)
     // Sixteen characters is what fits between the margin and the boards, and

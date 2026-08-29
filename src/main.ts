@@ -8,6 +8,8 @@ import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
 import { LAMP_COUNT, LAMP_PARKED, MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
 import { DAY_MS, worldAt, type Rgb } from './game/world'
+import { temperamentFrom } from './game/temperament'
+import { feed, recordPlay } from './game/actions'
 import { PaletteTexture } from './render/palette'
 import { createWeather } from './render/weather'
 import { createBackdrop } from './render/backdrop'
@@ -519,6 +521,9 @@ if (import.meta.env.DEV) {
       visitors,
       bubble,
       museTimer: () => museTimer,
+      temperamentFrom: (m: Parameters<typeof temperamentFrom>[0]) => temperamentFrom(m),
+      recordPlay,
+      feed,
       cameraPan: () => cameraPan,
       faceAnchors: (id: string) => faceAnchors(speciesOf(id).model, 1.85),
       setSpecies: (id: string) => petView.setModel(speciesOf(id).model, false),

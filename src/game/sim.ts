@@ -1,3 +1,4 @@
+import { temperamentOf } from './temperament'
 import type { PetState, Stats, StatKey } from './types'
 import {
   CATCHUP_CHUNK_MS,
@@ -32,6 +33,27 @@ const DRAINING_KEYS = ['hunger', 'happiness', 'energy', 'hygiene'] as const
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v)
 
+/**
+ * How fast each stat drains for this pet in particular. A grown pet's
+ * temperament shifts what it costs to keep: a lively one burns through its
+ * spirits and its energy, a restful one holds both, a devoted one frets when
+ * left. Multipliers rather than offsets, so the shape of the day is unchanged
+ * and only its slope differs.
+ */
+function decayBias(pet: PetState): Record<(typeof DRAINING_KEYS)[number], number> {
+  const flat = { hunger: 1, happiness: 1, energy: 1, hygiene: 1 }
+  switch (temperamentOf(pet)?.id) {
+    case 'lively':
+      return { ...flat, happiness: 1.35, energy: 1.3, hunger: 1.15 }
+    case 'restful':
+      return { ...flat, energy: 0.7, happiness: 0.85 }
+    case 'devoted':
+      return { ...flat, happiness: 1.2, hygiene: 0.85 }
+    default:
+      return flat
+  }
+}
+
 /** Stats other than health, which has its own floor. */
 function clampStats(stats: Stats): void {
   for (const key of DRAINING_KEYS) stats[key] = clamp(stats[key], 0, 100)
@@ -56,7 +78,8 @@ function step(
 
   // The egg has no metabolism — it just waits to hatch.
   if (pet.stage !== 'egg') {
-    for (const key of DRAINING_KEYS) stats[key] += rates[key] * hours
+    const bias = decayBias(pet)
+    for (const key of DRAINING_KEYS) stats[key] += rates[key] * hours * bias[key]
   }
   clampStats(stats)
 

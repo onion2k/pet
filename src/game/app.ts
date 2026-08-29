@@ -6,6 +6,7 @@ import type { ButtonId } from '../render/shell'
 import type { SoundId } from '../engine/audio'
 import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution } from './actions'
 import { MINIGAMES, type GameSession } from './minigames'
+import { temperamentOf } from './temperament'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
@@ -302,6 +303,12 @@ export class App {
    * The destination is deliberately withheld -- knowing you are heading
    * somewhere is the useful part, knowing exactly where would end the surprise.
    */
+  /** How the grown pet turned out, or null while it is still growing. */
+  get temperament(): { name: string; blurb: string } | null {
+    const pet = this.pet
+    return pet ? temperamentOf(pet) : null
+  }
+
   get leaning(): string | null {
     const pet = this.pet
     if (!pet || pet.stage === 'egg') return null
@@ -604,7 +611,7 @@ export class App {
         return
       }
       case 'medicine': {
-        const result = feed(pet, 'medicine')
+        const result = feed(pet, 'medicine', seasonIdAt(this.worldNow()))
         this.say(result.message, result.ok ? 'eat' : 'refuse')
         if (result.ok) {
           this.hooks.burst('sparkle', 12)
@@ -648,7 +655,7 @@ export class App {
     const food = menu[this.foodIndex]
     if (!pet || !food) return
 
-    const result = feed(pet, food.id)
+    const result = feed(pet, food.id, seasonIdAt(this.worldNow()))
     this.say(result.message, result.ok ? 'eat' : 'refuse')
     if (result.ok) {
       this.hooks.burst('crumb', 12)

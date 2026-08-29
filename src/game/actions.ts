@@ -1,6 +1,8 @@
 import { foodById, type Food } from '../data/foods'
 import { chooseBranch, speciesOf, type BranchContext } from '../data/species'
+import type { SeasonId } from '../data/seasons'
 import { metrics } from './metrics'
+import { temperamentFrom, temperamentOf } from './temperament'
 import type { PetState, Stats, StatKey } from './types'
 import { HEALTH_FLOOR, STAGE_DURATION } from './tuning'
 import { isNight } from './world'
@@ -21,7 +23,7 @@ export type ActionResult =
 /** The pet refuses food when it is already full, so hunger can't be spammed to 100. */
 const FULL_THRESHOLD = 92
 
-export function feed(pet: PetState, foodId: string): ActionResult {
+export function feed(pet: PetState, foodId: string, season: SeasonId): ActionResult {
   if (pet.stage === 'egg') return { ok: false, message: 'It has not hatched yet.' }
   if (pet.asleep) return { ok: false, message: `${pet.name} is asleep.` }
 
@@ -34,11 +36,21 @@ export function feed(pet: PetState, foodId: string): ActionResult {
     return { ok: false, message: 'It is not poorly.' }
   }
 
-  apply(pet.stats, food.effect)
+  // A hot meal is worth more in the cold, and a light one worth more in the
+  // heat. The same food is a different thing depending on the day it is served.
+  const warmth = food.effect.energy ?? 0
+  const seasonal =
+    (season === 'winter' && warmth > 0) || (season === 'summer' && warmth <= 0) ? 1.3 : 1
+  const effect: Partial<Stats> = {}
+  for (const [key, amount] of Object.entries(food.effect) as [StatKey, number][]) {
+    effect[key] = amount * seasonal
+  }
+  apply(pet.stats, effect)
   pet.diet.meals += 1
   if (food.axis) pet.diet[food.axis] += 1
 
-  return { ok: true, message: `${pet.name} ate the ${food.name.toLowerCase()}.` }
+  const relished = seasonal > 1 ? ' and relished it' : ''
+  return { ok: true, message: `${pet.name} ate the ${food.name.toLowerCase()}${relished}.` }
 }
 
 export function clean(pet: PetState): ActionResult {
@@ -67,12 +79,30 @@ export function toggleSleep(pet: PetState, now: number): ActionResult {
   return { ok: true, message: `${pet.name} curls up.` }
 }
 
+/**
+ * How much a pet has to give a game right now. A tired or hungry one is poor
+ * company: it gets less out of playing and tires faster for it, so there is a
+ * right time to play as well as a right amount.
+ */
+export function readiness(pet: PetState): number {
+  const rested = clamp(pet.stats.energy / 60, 0, 1)
+  const fed = clamp(pet.stats.hunger / 50, 0, 1)
+  return clamp(0.35 + rested * 0.4 + fed * 0.25, 0, 1)
+}
+
 /** Called once a minigame finishes, whatever the game was. */
 export function recordPlay(pet: PetState, won: boolean, streak: number): void {
   pet.play.gamesPlayed += 1
   if (won) pet.play.gamesWon += 1
   pet.play.bestStreak = Math.max(pet.play.bestStreak, streak)
-  apply(pet.stats, won ? { happiness: 20, energy: -8, hunger: -4 } : { happiness: 6, energy: -8, hunger: -4 })
+  const keen = readiness(pet)
+  const lively = temperamentOf(pet)?.id === 'lively' ? 1.25 : 1
+  apply(pet.stats, {
+    happiness: (won ? 20 : 6) * keen * lively,
+    // Tiring either way, and more so when it had little to give.
+    energy: -8 * (2 - keen),
+    hunger: -4,
+  })
 }
 
 export interface Evolution {
@@ -114,6 +144,10 @@ export function evolve(pet: PetState, ctx: BranchContext): Evolution | null {
   pet.speciesId = to.id
   pet.stage = to.stage
   if (!pet.discovered.includes(to.id)) pet.discovered.push(to.id)
+
+  // Growing up settles the character. Read once, from the raising that has just
+  // finished, and kept for the rest of the pet's life.
+  if (to.stage === 'adult') pet.temperament = temperamentFrom(metrics(pet))
 
   // A fresh form arrives alert and in a good mood.
   apply(pet.stats, { happiness: 25, energy: 25 })
