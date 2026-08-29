@@ -302,7 +302,7 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
       eye.y + scleraH + anchors.voxel * 0.62,
       eye.z + anchors.voxel * 0.12,
       scleraW * 1.15,
-      anchors.voxel * 0.22,
+      anchors.voxel * 0.14,
       INK,
       FACE_BROW,
       side,
