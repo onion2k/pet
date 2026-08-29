@@ -14,6 +14,9 @@ import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
 import { createVisitors } from './render/visitors'
 import { createBubble } from './render/bubble'
+import { createKeepsakes, type Placed } from './render/keepsakes'
+import { curioById } from './data/curios'
+import { hexToLinear } from './render/voxel-mesh'
 import { faceAnchors } from './render/face'
 import { createBloom } from './render/post'
 import { createShell, SCREEN_CORNER_POWER } from './render/shell'
@@ -98,6 +101,9 @@ visitors.root.setParent(screenScene)
 
 const bubble = createBubble(gl)
 bubble.root.setParent(screenScene)
+
+const keepsakes = createKeepsakes(gl)
+keepsakes.root.setParent(screenScene)
 /**
  * Counts down to the pet's next unprompted thought. Long on purpose: a bubble
  * that turns up every half minute is wallpaper, and stops being worth looking
@@ -380,6 +386,25 @@ function step(dt: number): void {
   terrain.setLamps(lampView, lampLevel)
   visitors.setLighting(lighting)
   visitors.setLamps(lampView, lampLevel)
+  keepsakes.setLighting(lighting)
+  keepsakes.setLamps(lampView, lampLevel)
+
+  // What the yard has to show for itself: one trinket for each kind of curio
+  // found, one cairn for each ancestor seen off. Both take their colour from
+  // the thing they stand for.
+  keepsakes.set(
+    [
+      ...Object.keys(app.curioCounts).map((id) => ({
+        kind: 'trinket' as const,
+        tint: hexToLinear(curioById(id)?.colour ?? '#ffffff'),
+      })),
+      ...app.ancestors.map((entry) => ({
+        kind: 'cairn' as const,
+        tint: hexToLinear(speciesOf(entry.speciesId).model.palette.b ?? '#cccccc'),
+      })),
+    ] satisfies Placed[],
+    terrain.shape.groundY,
+  )
 
   backdrop.setPalette(world.sky.top, world.sky.bottom)
   // Place the sun on the same arc that lights the scene, so the shadows and the
@@ -406,11 +431,12 @@ function step(dt: number): void {
   visitors.update(dt, {
     season: world.season.id,
     day: Math.floor(app.worldNow() / DAY_MS),
+    hour: world.hour,
     groundY: terrain.shape.groundY,
     pet: petView.position,
     roam: { x: ROAM_HALF_X, z: ROAM_HALF_Z },
     door: { x: terrain.shape.shelter.lamp.x, z: terrain.shape.shelter.lamp.z },
-    announce: (name) => app.pushTicker(`${name} is in the yard`),
+    announce: (text) => app.pushTicker(text),
   })
   petView.setPlaything(visitors.playthingAt())
 

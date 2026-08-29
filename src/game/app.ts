@@ -1,6 +1,6 @@
 import { FOODS } from '../data/foods'
 import { ICON_ORDER, type IconId } from '../data/icons'
-import { speciesOf } from '../data/species'
+import { chooseBranch, speciesOf } from '../data/species'
 import type { Burst } from '../render/particles'
 import type { ButtonId } from '../render/shell'
 import type { SoundId } from '../engine/audio'
@@ -294,6 +294,31 @@ export class App {
   }
 
   /** Species reached across every generation, for the collection counter. */
+  /**
+   * Which branch the pet is currently earning, in the words the evolution
+   * screen would use. The stakes of every meal and every bedtime were real
+   * already, but the player could not see them until the moment they were
+   * spent; this is that same reasoning, shown while it can still be steered.
+   * The destination is deliberately withheld -- knowing you are heading
+   * somewhere is the useful part, knowing exactly where would end the surprise.
+   */
+  get leaning(): string | null {
+    const pet = this.pet
+    if (!pet || pet.stage === 'egg') return null
+    const branch = chooseBranch(pet, metrics(pet), { season: seasonIdAt(this.worldNow()) })
+    return branch ? branch.because : null
+  }
+
+  /** Everyone the lineage has seen off, so the yard can show them. */
+  get ancestors(): { speciesId: string; name: string }[] {
+    return this.save.album
+  }
+
+  /** Games played, won and the best run, for the games screen. */
+  get playRecord(): { gamesPlayed: number; gamesWon: number; bestStreak: number } {
+    return this.pet?.play ?? { gamesPlayed: 0, gamesWon: 0, bestStreak: 0 }
+  }
+
   /** Which forms the lineage has met, for the album. */
   get discoveredIds(): string[] {
     return this.save.discovered

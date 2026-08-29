@@ -142,7 +142,7 @@ function drawMain(hud: Hud, app: App): void {
 
 function drawFeed(hud: Hud, app: App): void {
   const menu = FOODS.filter((f) => f.axis !== null)
-  hud.rect(0, 0, hud.width, hud.height, 'rgba(5,5,11,0.93)')
+  hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   hud.textCentered(hud.width / 2, 8, 'FEED', ACCENT)
 
   menu.forEach((food, i) => {
@@ -157,8 +157,20 @@ function drawFeed(hud: Hud, app: App): void {
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B EAT', DIM)
 }
 
+/**
+ * A backing panel, given how much of the world should show through it as the
+ * eye sees it. The frame is encoded for display after the HUD is mixed in, so
+ * a panel's leftover scene contribution is lifted by that curve on its way to
+ * the screen: at 0.88 alpha, twelve percent of linear scene arrives looking
+ * like thirty-eight. Asking for the look and solving back for the alpha keeps
+ * these honest.
+ */
+function panel(showThrough: number, ink = '5,5,11'): string {
+  return `rgba(${ink},${1 - Math.pow(showThrough, 2.2)})`
+}
+
 function drawGames(hud: Hud, app: App): void {
-  hud.rect(0, 0, hud.width, hud.height, 'rgba(5,5,11,0.93)')
+  hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   hud.textCentered(hud.width / 2, 10, 'GAMES', ACCENT)
   MINIGAMES.forEach((game, i) => {
     const y = 34 + i * 22
@@ -167,7 +179,32 @@ function drawGames(hud: Hud, app: App): void {
     hud.text(16, y, game.title, selected ? INK : DIM, selected ? 2 : 1)
     hud.text(16, y + (selected ? 12 : 6), game.hint, '#40465e')
   })
+  // Already counted in the save and shown nowhere until now.
+  const play = app.playRecord
+  if (play.gamesPlayed > 0) {
+    hud.rect(8, hud.height - 42, hud.width - 16, 1, '#22283c')
+    hud.textCentered(
+      hud.width / 2,
+      hud.height - 36,
+      `BEST RUN ${play.bestStreak}   WON ${play.gamesWon}/${play.gamesPlayed}`,
+      DIM,
+    )
+  }
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B START', DIM)
+}
+
+/** Breaks a phrase onto lines of at most `width` characters, on word breaks. */
+function wrapped(text: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(' ')) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line)
+      line = word
+    } else line = line ? `${line} ${word}` : word
+  }
+  if (line) lines.push(line)
+  return lines
 }
 
 function drawStatus(hud: Hud, app: App, world: WorldState): void {
@@ -175,7 +212,7 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   const m = app.metrics
   if (!pet || !m) return
 
-  hud.rect(0, 0, hud.width, hud.height, 'rgba(5,5,11,0.95)')
+  hud.rect(0, 0, hud.width, hud.height, panel(0.035))
   const left = Math.round(hud.safeInset(10)) + 2
   hud.text(left, 10, pet.name, ACCENT, 2)
   // The world's own clock, so the season and the weather are legible somewhere.
@@ -215,6 +252,24 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
 
   hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
   hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
+
+  // Where the pet is currently headed, in the words the evolution screen will
+  // use when it gets there. Named on its own line because it is the one thing
+  // on this screen the player can still change.
+  const leaning = app.leaning
+  if (!leaning) {
+    // An adult has nowhere left to go. Saying so is better than the line
+    // quietly disappearing and leaving a hole where it used to be.
+    if (pet.stage === 'adult') hud.text(6, 139, 'FULLY GROWN', DIM)
+  } else {
+    hud.text(6, 139, 'BECOMING', ACCENT)
+    // Sixteen characters is what fits between the margin and the boards, and
+    // every reason in the game falls in two lines at that width.
+    wrapped(leaning.toUpperCase(), 16).forEach((line, i) => {
+      hud.text(6, 147 + i * 7, line, COOL)
+    })
+  }
+
   drawCurioBoard(hud, app)
   drawSpeciesBoard(hud, app)
   if (pet.stage === 'adult') {
@@ -311,7 +366,7 @@ function drawRetire(hud: Hud, app: App): void {
 function drawWelcome(hud: Hud, app: App): void {
   const pet = app.pet
   if (!pet) return
-  hud.rect(0, 0, hud.width, hud.height, 'rgba(6,6,12,0.88)')
+  hud.rect(0, 0, hud.width, hud.height, panel(0.08, '6,6,12'))
   hud.textCentered(hud.width / 2, 24, 'WELCOME BACK', ACCENT)
   hud.textCentered(hud.width / 2, 44, `AWAY ${duration(app.awayMs)}`, INK)
 
@@ -332,7 +387,7 @@ function drawWelcome(hud: Hud, app: App): void {
 }
 
 function drawName(hud: Hud, app: App): void {
-  hud.rect(0, 0, hud.width, hud.height, 'rgba(6,6,12,0.88)')
+  hud.rect(0, 0, hud.width, hud.height, panel(0.08, '6,6,12'))
   hud.textCentered(hud.width / 2, 34, 'NAME YOUR PET', DIM)
   hud.textCentered(hud.width / 2, 62, NAMES[app.nameIndex] ?? '', ACCENT, 3)
   hud.text(20, 64, '<', COOL, 2)

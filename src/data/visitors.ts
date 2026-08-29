@@ -10,6 +10,7 @@ import { rows, type VoxelModel } from './voxel-format'
  * the dice decide.
  */
 export type VisitorId =
+  | 'fireflies'
   | 'ball'
   | 'rabbit'
   | 'snowman'
@@ -38,6 +39,14 @@ export interface Visitor {
   seasons: SeasonId[]
   /** Chance of being there on any given world day. */
   chance: number
+  /**
+   * World hours it can be seen between, if it keeps to a time. A visitor with
+   * a window is announced on the ticker before it opens, so there is a reason
+   * to come back at a particular moment rather than merely at some point.
+   */
+  hours?: [number, number]
+  /** What the ticker says while one is expected but not yet due. */
+  expected?: string
   model: VoxelModel
   /** World height the model is scaled to. */
   height: number
@@ -342,7 +351,25 @@ const sled: VoxelModel = {
   ],
 }
 
+const fireflies: VoxelModel = {
+  palette: { g: '#fff2a0' },
+  emissive: ['g'],
+  layers: [rows(`g`)],
+}
+
 export const VISITORS: Visitor[] = [
+  {
+    id: 'fireflies',
+    name: 'fireflies',
+    seasons: ['spring', 'summer'],
+    chance: 0.5,
+    hours: [20, 4],
+    expected: 'something will be out after dark',
+    model: fireflies,
+    height: 0.14,
+    motion: 'flutter',
+    spot: 'roam',
+  },
   { id: 'ball', name: 'a ball', seasons: ['summer', 'autumn'], chance: 0.5, model: ball, height: 0.44, motion: 'roll', spot: 'roam' },
   { id: 'rabbit', name: 'a rabbit', seasons: ['spring', 'summer'], chance: 0.4, model: rabbit, height: 0.74, motion: 'hop', spot: 'verge' },
   { id: 'snowman', name: 'a snowman', seasons: ['winter'], chance: 0.55, model: snowman, height: 1.4, motion: 'still', spot: 'verge' },

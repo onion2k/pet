@@ -119,7 +119,11 @@ interface Entry {
   ball: { x: number; z: number; vx: number; vz: number }
   radius: number
   fade: number
+  /** Rolled for today. A visitor with a window is chosen but not yet due. */
+  chosen: boolean
   present: boolean
+  /** Whether its arrival has already been foretold today. */
+  foretold: boolean
 }
 
 export interface Visitors {
@@ -139,6 +143,8 @@ export interface VisitorContext {
   season: SeasonId
   /** Which world day it is, so a visitor stays put for the day. */
   day: number
+  /** The hour in the pet's world, for anything that keeps to a time. */
+  hour: number
   groundY: number
   /** Where the pet is, so a ball knows to bounce and a rabbit knows to bolt. */
   pet: { x: number; z: number }
@@ -223,7 +229,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       timer: 0,
       hop: { fromX: 0, fromZ: 0, toX: 0, toZ: 0, t: 1, resting: 0 },
       fade: 0,
+      chosen: false,
       present: false,
+      foretold: false,
     }
     return entry
   })
@@ -241,7 +249,10 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       const seed = idSeed(visitor.id)
       const here =
         visitor.seasons.includes(context.season) && hash2(context.day, seed) < visitor.chance
-      entry.present = here
+      entry.chosen = here
+      entry.foretold = false
+      // Anything without a window is simply here for the day.
+      entry.present = here && !visitor.hours
       if (!here) continue
 
       const a = hash2(context.day, seed ^ 0x1111)
@@ -328,8 +339,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         // already standing there when the app opened.
         if (!first) {
           for (const entry of entries) {
+            if (entry.visitor.hours) continue
             if (entry.present && !announced.has(entry.visitor.id)) {
-              context.announce(entry.visitor.name)
+              context.announce(`${entry.visitor.name} is in the yard`)
             }
           }
         }
@@ -337,6 +349,23 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       }
 
       for (const entry of entries) {
+        const window = entry.visitor.hours
+        if (window) {
+          // A window may run through midnight, so the test wraps with it.
+          const [from, to] = window
+          const open =
+            from <= to
+              ? context.hour >= from && context.hour < to
+              : context.hour >= from || context.hour < to
+          entry.present = entry.chosen && open
+          // Foretold once, while it is still expected rather than here. That
+          // gap is the whole point: it gives a reason to come back at a time.
+          if (entry.chosen && !open && !entry.foretold && entry.visitor.expected) {
+            entry.foretold = true
+            context.announce(entry.visitor.expected)
+          }
+        }
+
         // Everything fades rather than popping, including a visitor whose day
         // has ended while the player is watching.
         const wanted = entry.present ? 1 : 0
