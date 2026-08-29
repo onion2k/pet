@@ -42,6 +42,15 @@ The egg has lines of its own. Pet-voice lines occupy a single slot rather than a
 queue, so five quick meals thank you once, not five times; breaking news still
 outranks them.
 
+Every species has its own personality pack (`src/data/voice.ts`) layered over
+the shared pools, so the voice changes as the pet evolves: the wide-eyed
+hatchling ("I HAVE FEET! LOOK! FEET!") grows into whatever it was raised into —
+a braggart Blazeon ("THE SUN WAS IN MY EYES"), a begrudging Gloopus ("IT WAS...
+ADEQUATE. THANKS."), a world-weary Grumphal ("HMPH. TOOK YOU LONG ENOUGH."), a
+serene Verdantis, a nocturnal Lumenox whose best line only comes out at night.
+Species lines win about 60% of draws, so the character shows without the shared
+voice disappearing.
+
 **Hold C** — press and hold the third button, or the C key — to back out of the
 feed menu, the game menu, or a game in progress:
 every button is spoken for during a minigame, so leaving is a held press rather

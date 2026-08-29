@@ -2,13 +2,152 @@ import type { StatKey } from '../game/types'
 import type { WeatherId } from './seasons'
 
 /**
- * The pet's voice: little lines it says through the news ticker. All are
- * shown as `NAME: LINE`, so they read as the pet talking rather than the
- * device reporting. Kept short — the screen is 192 pixels wide and a line
- * should finish its crawl before it wears out its welcome.
+ * The pet's voice: little lines it says through the news ticker, shown as
+ * `NAME: LINE` so they read as the pet talking rather than the device
+ * reporting. Kept short — the screen is 192 pixels wide and a line should
+ * finish its crawl before it wears out its welcome.
+ *
+ * Every species carries a personality pack layered over the generic pools, so
+ * the voice changes as the pet evolves: the wide-eyed hatchling grows into a
+ * braggart, a stoic, a garden mystic — whatever it was raised into.
  */
 
 const pick = <T>(pool: T[]): T => pool[Math.floor(Math.random() * pool.length)]!
+
+/** How often a species line wins over a generic one, when the pack has any. */
+const PACK_BIAS = 0.6
+
+function blend<T>(base: T[], extra: T[] | undefined): T {
+  if (extra && extra.length > 0 && Math.random() < PACK_BIAS) return pick(extra)
+  return pick(base)
+}
+
+/** A species' contribution to the voice. Everything optional; gaps fall back. */
+interface VoicePack {
+  monologue?: string[]
+  night?: string[]
+  welcome?: string[]
+  fed?: ((food: string) => string)[]
+  cleaned?: string[]
+  medicine?: string[]
+  won?: string[]
+  lost?: string[]
+  goodnight?: string[]
+  morning?: string[]
+  needs?: Partial<Record<StatKey, string>>
+}
+
+const PACKS: Record<string, VoicePack> = {
+  blob: {
+    monologue: [
+      "EVERYTHING IS SO BIG OUT HERE",
+      "I HAVE FEET! LOOK! FEET!",
+      "WHAT DOES 'OUTSIDE' TASTE LIKE?",
+      "BEING ROUND IS GOING GREAT SO FAR",
+    ],
+    welcome: ["HI HI HI HI HI!"],
+    goodnight: ["FIRST SLEEPS ARE THE BEST SLEEPS"],
+  },
+  pudge: {
+    monologue: [
+      "THINKING ABOUT SECOND BREAKFAST",
+      "IS IT SNACK TIME? IT FEELS SNACKY",
+      "I DREAM IN FLAVOURS",
+      "STEP ONE: EAT. THERE IS NO STEP TWO",
+    ],
+    fed: [(food) => `${food}! AND YET I COULD GO AGAIN`],
+    needs: { hunger: "FEED ME OR I SHALL BE VERY SAD" },
+  },
+  spike: {
+    monologue: [
+      "MY SPIKES LOOK EXTRA SHARP TODAY",
+      "I COULD TAKE THAT BOULDER. EASY.",
+      "FEAR ME, TINY BEETLES",
+      "BEING COOL IS A FULL TIME JOB",
+    ],
+    won: ["OBVIOUSLY. I NEVER LOSE."],
+    lost: ["THAT ONE DIDN'T COUNT. REMATCH."],
+  },
+  sprout: {
+    monologue: [
+      "PSST. I ATE SUNLIGHT AGAIN.",
+      "THE FERNS TELL EXCELLENT JOKES",
+      "GROWING TAKES SO MUCH PATIENCE",
+      "I THINK I FEEL A LEAF COMING IN",
+    ],
+    morning: ["SUN'S UP! TIME TO PHOTOSYNTHESISE!"],
+  },
+  mochi: {
+    monologue: [
+      "ADORABLE? ME? WELL. YES.",
+      "A CREATURE THIS SOFT NEEDS REST",
+      "I ACCEPT COMPLIMENTS ALL DAY",
+      "SOMEONE SHOULD PAINT MY PORTRAIT",
+    ],
+    welcome: ["YOU RETURN TO YOUR FAVOURITE. WISE."],
+    cleaned: ["YES. POLISH THE MASTERPIECE."],
+  },
+  gloop: {
+    monologue: [
+      "EVERYTHING STICKS TO ME. FINE.",
+      "I'M NOT SULKING. I'M GLISTENING.",
+      "TODAY I TOUCHED A ROCK. BIG DAY.",
+      "DON'T TELL ANYONE I'M HAPPY",
+    ],
+    welcome: ["OH. IT'S YOU. ...GOOD."],
+    fed: [() => "IT WAS... ADEQUATE. THANKS."],
+  },
+  blaze: {
+    monologue: [
+      "UNDEFEATED. JUST SAYING.",
+      "I RACED MY SHADOW. I WON.",
+      "TRAINING MONTAGE STARTS NOW",
+      "IS THERE A TROPHY FOR EXISTING?",
+    ],
+    won: ["CHAMPION! AS FORETOLD!"],
+    lost: ["THE SUN WAS IN MY EYES"],
+  },
+  grump: {
+    monologue: [
+      "IN MY DAY THE GRASS WAS GREENER",
+      "BAH. CLOUDS AGAIN.",
+      "MY BACK HURTS FROM ALL THIS JOY",
+      "I'VE SEEN THINGS. MOSTLY CEILINGS.",
+    ],
+    welcome: ["HMPH. TOOK YOU LONG ENOUGH."],
+    fed: [() => "NOT BAD. I'VE HAD WORSE."],
+    needs: { hunger: "A CREATURE COULD STARVE OUT HERE" },
+  },
+  verdant: {
+    monologue: [
+      "BLOOM WHERE YOU ARE PLANTED",
+      "THE GARDEN GROWS. SO DO I.",
+      "EVERY PETAL KNOWS ITS TIME",
+      "BREATHE IN. BREATHE OUT. BLOOM.",
+    ],
+    goodnight: ["REST IS HOW GARDENS GROW..."],
+  },
+  lumen: {
+    monologue: [
+      "I GLOW, THEREFORE I AM",
+      "THE DARK IS JUST LIGHT RESTING",
+      "STARS ARE JUST FAR AWAY FRIENDS",
+    ],
+    night: ["3AM IS MY FINEST HOUR"],
+    goodnight: ["DIMMING TO STANDBY... GOODNIGHT"],
+  },
+  aurora: {
+    monologue: [
+      "THE SNOW REMEMBERS EVERYTHING",
+      "I HUM WHEN THE SKY LISTENS",
+      "WINTER CHOSE ME. I CHOSE IT BACK.",
+      "COLD IS JUST ANOTHER KIND OF WARM",
+    ],
+    morning: ["THE FROST AND I ARE BOTH AWAKE"],
+  },
+}
+
+const packOf = (speciesId: string): VoicePack => PACKS[speciesId] ?? {}
 
 /** Coming back after a short while away. */
 const WELCOME = [
@@ -47,7 +186,7 @@ const GOODNIGHT = ["GOODNIGHT... SEE YOU TOMORROW...", "OFF TO DREAM ABOUT SNACK
 const MORNING = ["GOOD MORNING! WHAT A DAY AHEAD!", "I DREAMT I WAS ENORMOUS. ANYWAY."]
 
 /** First-person needs, for the ambient rotation. */
-export const NEED_LINES: Partial<Record<StatKey, string>> = {
+const NEED_BASE: Partial<Record<StatKey, string>> = {
   hunger: "MY TUMMY IS RUMBLING...",
   hygiene: "I AM ABSOLUTELY FILTHY. HELP?",
   energy: "SO... SLEEPY... COULD I NAP?",
@@ -56,13 +195,11 @@ export const NEED_LINES: Partial<Record<StatKey, string>> = {
 
 export const SICK_LINE = "I DON'T FEEL SO GOOD..."
 
-/** Idle musings. General pool plus lines the moment makes true. */
+/** Idle musings everyone shares. Species packs colour them heavily. */
 const MONOLOGUE = [
   "DO CLOUDS EVER GET LONELY?",
   "I LIKE IT HERE. IT'S HOME.",
-  "ONE DAY I'LL CLIMB THAT BOULDER",
   "THE SHRUBS ARE WHISPERING AGAIN",
-  "AM I ROUND? I FEEL ROUND TODAY",
   "NOTE TO SELF: DIG A HOLE LATER",
 ]
 
@@ -85,18 +222,25 @@ export const EGG_LINES = [
 ]
 
 export const voice = {
-  welcome: (longAway: boolean) => pick(longAway ? WELCOME_LONG : WELCOME),
-  fed: (food: string) => pick(FED)(food.toUpperCase()),
-  cleaned: () => pick(CLEANED),
-  medicine: () => pick(MEDICINE),
-  game: (won: boolean) => pick(won ? WON : LOST),
-  goodnight: () => pick(GOODNIGHT),
-  morning: () => pick(MORNING),
-  monologue: (night: boolean, weather: WeatherId): string => {
-    const pool = [...MONOLOGUE]
-    if (night) pool.push(...MONOLOGUE_NIGHT)
-    pool.push(...(MONOLOGUE_WEATHER[weather] ?? []))
-    return pick(pool)
+  welcome: (longAway: boolean, speciesId: string) =>
+    longAway ? pick(WELCOME_LONG) : blend(WELCOME, packOf(speciesId).welcome),
+  fed: (food: string, speciesId: string) =>
+    blend(FED, packOf(speciesId).fed)(food.toUpperCase()),
+  cleaned: (speciesId: string) => blend(CLEANED, packOf(speciesId).cleaned),
+  medicine: (speciesId: string) => blend(MEDICINE, packOf(speciesId).medicine),
+  game: (won: boolean, speciesId: string) =>
+    won ? blend(WON, packOf(speciesId).won) : blend(LOST, packOf(speciesId).lost),
+  goodnight: (speciesId: string) => blend(GOODNIGHT, packOf(speciesId).goodnight),
+  morning: (speciesId: string) => blend(MORNING, packOf(speciesId).morning),
+  need: (need: StatKey, speciesId: string): string | undefined =>
+    packOf(speciesId).needs?.[need] ?? NEED_BASE[need],
+  monologue: (night: boolean, weather: WeatherId, speciesId: string): string => {
+    const base = [...MONOLOGUE]
+    if (night) base.push(...MONOLOGUE_NIGHT)
+    base.push(...(MONOLOGUE_WEATHER[weather] ?? []))
+    const pack = packOf(speciesId)
+    const extra = [...(pack.monologue ?? []), ...(night ? (pack.night ?? []) : [])]
+    return blend(base, extra)
   },
   egg: () => pick(EGG_LINES),
 }

@@ -15,7 +15,7 @@ import { textWidth } from '../data/font'
 import { SPECIES_COUNT } from '../data/species'
 import type { SeasonId, WeatherId } from '../data/seasons'
 import { SHELLS, shellById, type ShellColour } from '../data/shells'
-import { NEED_LINES, SICK_LINE, voice } from '../data/voice'
+import { SICK_LINE, voice } from '../data/voice'
 import type { PetState, SaveFile } from './types'
 
 export type Mode =
@@ -148,7 +148,7 @@ export class App {
       // The pet is pleased to see you, and says so — more pleased the longer
       // you were gone.
       if (this.pet.stage !== 'egg' && this.awayMs >= WELCOME_THRESHOLD_MS) {
-        this.sayAsPet(voice.welcome(this.awayMs >= 3 * 3_600_000))
+        this.sayAsPet(voice.welcome(this.awayMs >= 3 * 3_600_000, this.pet.speciesId))
       }
     }
     saveSoon(this.save)
@@ -241,9 +241,10 @@ export class App {
         out.push(`${pet.name}: ${SICK_LINE}`)
       } else {
         const need = urgentNeeds(pet)[0]
-        if (need && NEED_LINES[need]) out.push(`${pet.name}: ${NEED_LINES[need]}`)
+        const line = need ? voice.need(need, pet.speciesId) : undefined
+        if (line) out.push(`${pet.name}: ${line}`)
       }
-      out.push(`${pet.name}: ${voice.monologue(night, world.weather)}`)
+      out.push(`${pet.name}: ${voice.monologue(night, world.weather, pet.speciesId)}`)
       if (night) out.push('THE SUN IS DOWN... BEDTIME?')
     }
 
@@ -555,7 +556,7 @@ export class App {
         if (result.ok) {
           this.hooks.burst('bubble', 14)
           this.hooks.pop(0.6)
-          this.sayAsPet(voice.cleaned())
+          this.sayAsPet(voice.cleaned(pet.speciesId))
         }
         this.persist()
         return
@@ -566,7 +567,7 @@ export class App {
         if (result.ok) {
           this.hooks.burst('sparkle', 12)
           this.hooks.pop(0.8)
-          this.sayAsPet(voice.medicine())
+          this.sayAsPet(voice.medicine(pet.speciesId))
         }
         this.persist()
         return
@@ -576,7 +577,7 @@ export class App {
         this.say(result.message, result.ok ? 'sleep' : 'refuse')
         if (result.ok && pet.asleep) {
           this.hooks.burst('zzz', 5)
-          this.sayAsPet(voice.goodnight())
+          this.sayAsPet(voice.goodnight(pet.speciesId))
         }
         this.persist()
         return
@@ -610,7 +611,7 @@ export class App {
     if (result.ok) {
       this.hooks.burst('crumb', 12)
       this.hooks.pop(1)
-      this.sayAsPet(voice.fed(food.name))
+      this.sayAsPet(voice.fed(food.name, pet.speciesId))
       this.mode = 'main'
     }
     this.persist()
@@ -734,7 +735,7 @@ export class App {
     // see it — a pet that woke while the app was closed already did so above.
     if (wasAsleep && !pet.asleep && !this.skipping) {
       this.say(`${pet.name} wakes up`, 'confirm')
-      this.sayAsPet(voice.morning())
+      this.sayAsPet(voice.morning(pet.speciesId))
     }
 
     if (this.mode === 'playing' && this.session) {
@@ -747,7 +748,7 @@ export class App {
       if (this.session.done) {
         recordPlay(pet, this.session.won, this.session.streak)
         this.say(this.session.won ? `${pet.name} won!` : 'better luck next time', this.session.won ? 'win' : 'lose')
-        this.sayAsPet(voice.game(this.session.won))
+        this.sayAsPet(voice.game(this.session.won, pet.speciesId))
         if (this.session.won) {
           this.hooks.burst('heart', 18)
           this.hooks.pop(1)
