@@ -3,6 +3,8 @@ import type { OGLRenderingContext } from 'ogl'
 import {
   PROP_CLEARING_MARGIN,
   PROP_SPACING,
+  SHELTER_CENTRE,
+  SHELTER_COLUMNS,
   TERRAIN_BASE,
   TERRAIN_CLEARING,
   TERRAIN_RELIEF,
@@ -10,7 +12,7 @@ import {
   TERRAIN_VOXEL,
   type Biome,
 } from '../data/biome'
-import { PROPS, type Prop, type PropKey } from '../data/props'
+import { PROPS, SHELTER, type Prop, type PropKey } from '../data/props'
 import { expandLayers } from '../data/voxel-format'
 import { buildVoxels, hexToLinear, PART_BODY, type Voxel, type VoxelSource } from './voxel-mesh'
 
@@ -47,18 +49,54 @@ function seedFrom(text: string): number {
   return h >>> 0
 }
 
+/** Where the shelter sits, in both columns and world units. */
+export interface ShelterPlacement {
+  ox: number
+  oz: number
+  w: number
+  d: number
+  centre: { x: number; z: number }
+  half: { x: number; z: number }
+  /** Where the pet stands when it has gone inside. */
+  inside: { x: number; z: number }
+}
+
 export interface TerrainShape {
   size: number
   /** Column height in voxels. */
   heightAt(x: number, z: number): number
   /** World Y the pet stands on. */
   groundY: number
+  shelter: ShelterPlacement
+}
+
+function placeShelter(seed: number): ShelterPlacement {
+  // Mirrored either side of the clearing depending on the seed, so the yard is
+  // laid out differently from one pet to the next.
+  const flip = hash2(7, 13, seed) > 0.5 ? 1 : -1
+  const centre = { x: SHELTER_CENTRE.x * flip, z: SHELTER_CENTRE.z }
+  const half = {
+    x: (SHELTER_COLUMNS.w / 2) * TERRAIN_VOXEL,
+    z: (SHELTER_COLUMNS.d / 2) * TERRAIN_VOXEL,
+  }
+  const middle = TERRAIN_SIZE / 2
+  return {
+    ox: Math.round(middle + centre.x / TERRAIN_VOXEL - SHELTER_COLUMNS.w / 2),
+    oz: Math.round(middle + centre.z / TERRAIN_VOXEL - SHELTER_COLUMNS.d / 2),
+    w: SHELTER_COLUMNS.w,
+    d: SHELTER_COLUMNS.d,
+    centre,
+    half,
+    // Standing just inside the open front, where it stays visible.
+    inside: { x: centre.x, z: centre.z + half.z * 0.35 },
+  }
 }
 
 export function terrainShape(seed: string): TerrainShape {
   const s = seedFrom(seed)
   const half = TERRAIN_SIZE / 2
   const clearing = TERRAIN_CLEARING / TERRAIN_VOXEL
+  const shelter = placeShelter(s)
 
   const cache = new Int8Array(TERRAIN_SIZE * TERRAIN_SIZE)
   for (let z = 0; z < TERRAIN_SIZE; z++) {
@@ -73,6 +111,17 @@ export function terrainShape(seed: string): TerrainShape {
       const flatten = 1 - Math.min(1, Math.max(0, (distance - clearing) / (clearing * 1.4)))
       value = value * (1 - flatten) + 0.5 * flatten
 
+      // The shelter gets its own level pad rather than a wider clearing, which
+      // would push all the scenery out of the foreground. The pad runs forward
+      // to meet the clearing, so the walk to bed is over flat ground the whole
+      // way — the pet does not sample terrain height as it moves.
+      const onPad =
+        x >= shelter.ox - 1 &&
+        x < shelter.ox + shelter.w + 1 &&
+        z >= shelter.oz - 1 &&
+        z < half + 2
+      if (onPad) value = 0.5
+
       const height = Math.round(TERRAIN_BASE + (value - 0.5) * 2 * TERRAIN_RELIEF)
       cache[z * TERRAIN_SIZE + x] = Math.max(1, height)
     }
@@ -80,6 +129,7 @@ export function terrainShape(seed: string): TerrainShape {
 
   return {
     size: TERRAIN_SIZE,
+    shelter,
     heightAt: (x, z) =>
       x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE
         ? 0
@@ -131,6 +181,38 @@ function scatterProps(
     return PROPS[PROPS.length - 1]!
   }
 
+  /** Writes a prop's voxels into the field with its base at `baseY`. */
+  const stamp = (prop: Prop, ox: number, oz: number, baseY: number) => {
+    const layers = expandLayers(prop.model)
+    for (let y = 0; y < layers.length; y++) {
+      const layer = layers[y]!
+      for (let z = 0; z < layer.length; z++) {
+        const row = layer[z]!
+        for (let x = 0; x < row.length; x++) {
+          const ch = row[x]
+          if (!ch || ch === '.') continue
+          const wy = baseY + y
+          voxels.set((wy * TERRAIN_SIZE + (oz + z)) * TERRAIN_SIZE + (ox + x), colour(ch as PropKey))
+          top = Math.max(top, wy)
+        }
+      }
+    }
+  }
+
+  // The shelter goes down first, on its own levelled pad, and its surroundings
+  // are reserved so nothing is scattered against its walls or in its doorway.
+  const sh = shape.shelter
+  stamp(SHELTER, sh.ox, sh.oz, TERRAIN_BASE)
+  count++
+  // Reserve the shelter and the path back to the clearing, so nothing is
+  // scattered against its walls or left standing in the pet's way.
+  for (let z = sh.oz - 2; z < half + 2; z++) {
+    for (let x = sh.ox - 2; x < sh.ox + sh.w + 2; x++) {
+      if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) continue
+      taken.add(z * TERRAIN_SIZE + x)
+    }
+  }
+
   for (let cz = 0; cz < TERRAIN_SIZE; cz += PROP_SPACING) {
     for (let cx = 0; cx < TERRAIN_SIZE; cx += PROP_SPACING) {
       if (hash2(cx, cz, seed ^ 0x1111) > biome.propDensity) continue
@@ -164,19 +246,7 @@ function scatterProps(
       }
       if (blocked || highest - lowest > 1) continue
 
-      for (let y = 0; y < layers.length; y++) {
-        const layer = layers[y]!
-        for (let z = 0; z < layer.length; z++) {
-          const row = layer[z]!
-          for (let x = 0; x < row.length; x++) {
-            const ch = row[x]
-            if (!ch || ch === '.') continue
-            const wy = lowest + y
-            voxels.set(((wy * TERRAIN_SIZE + (oz + z)) * TERRAIN_SIZE + (ox + x)), colour(ch as PropKey))
-            top = Math.max(top, wy)
-          }
-        }
-      }
+      stamp(prop, ox, oz, lowest)
 
       // Reserve the footprint plus the prop's own breathing room.
       const pad = prop.spacing
@@ -269,9 +339,9 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
     fragment,
     uniforms: {
       uHaze: { value: biome.haze },
-      // In view depth: the near ground is crisp, and the patch is fully hazed
-      // before its far edge at a depth of about 16.
-      uFog: { value: [9.0, 15.0] },
+      // In view depth. Pushed out far enough that the shelter and the scenery
+      // around it stay crisp, while the patch's far edge is still fully hazed.
+      uFog: { value: [11.0, 18.0] },
       uSick: { value: 0 },
     },
     cullFace: gl.BACK,

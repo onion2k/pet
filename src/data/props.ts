@@ -7,7 +7,8 @@ import { rows, type VoxelModel } from './voxel-format'
  *
  * Palette characters are placeholders resolved against the biome at build time:
  *   s / t  stone, dark and light      f / e  foliage, dark and light
- *   w      stem or twig               p      flower
+ *   w      stem, twig or wall         p      flower
+ *   r      roof                       n      shaded interior
  */
 export interface Prop {
   id: string
@@ -25,10 +26,12 @@ const palette = {
   e: '#000004',
   w: '#000005',
   p: '#000006',
+  r: '#000007',
+  n: '#000008',
 }
 
 /** Order matters: the resolver maps these characters onto biome colours. */
-export const PROP_KEYS = ['s', 't', 'f', 'e', 'w', 'p'] as const
+export const PROP_KEYS = ['s', 't', 'f', 'e', 'w', 'p', 'r', 'n'] as const
 export type PropKey = (typeof PROP_KEYS)[number]
 
 export const PROPS: Prop[] = [
@@ -221,3 +224,63 @@ export const PROPS: Prop[] = [
     },
   },
 ]
+
+/**
+ * The pet's shelter. Placed at a fixed spot rather than scattered, on ground
+ * levelled for it, with the front left open so the pet stays visible inside.
+ * Thirteen columns wide and eleven deep, with an eleven-voxel interior — tall
+ * enough for the pet to stand up in. The roof is kept to two steps so its ridge
+ * stays clear of the screen's upper icon strip.
+ */
+export const SHELTER: Prop = {
+  id: 'shelter',
+  weight: 0,
+  spacing: 1,
+  model: {
+    palette,
+    mirror: true,
+    layers: [
+      // Walls: a solid back, two sides, and an open front.
+      ...Array.from({ length: 11 }, () => [
+        'wwwwwww',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+      ]),
+      // Roof, stepped inward.
+      [
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+        'rrrrrrr',
+      ],
+      [
+        '.......',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.rrrrrr',
+        '.......',
+      ],
+    ],
+  },
+}

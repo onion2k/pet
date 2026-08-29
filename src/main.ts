@@ -65,6 +65,7 @@ petView.root.position.y = terrain.shape.groundY
 // Roaming stays inside the level clearing, so the pet's feet never step onto
 // terrain that steps up or down beneath them.
 petView.setBounds(TERRAIN_CLEARING - ROAM_INSET)
+petView.setShelter(terrain.shape.shelter)
 petView.root.setParent(screenScene)
 
 const particles = new Particles(gl)
@@ -204,6 +205,8 @@ function step(dt: number): void {
     terrainSeed = app.pet.id
     terrain.rebuild(terrainSeed, biome)
     petView.root.position.y = terrain.shape.groundY
+    // New ground means the shelter may have moved to the other side.
+    petView.setShelter(terrain.shape.shelter)
   }
 
   shell.setPower(app.mode === 'boot' ? 1 - app.bootTimer / 1.4 : 1)

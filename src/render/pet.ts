@@ -189,6 +189,16 @@ const WALK_SPEED = 0.42
 /** Stride cycles per second. */
 const STRIDE_RATE = 1.15
 
+/** Roughly the pet's half-width, used to keep it clear of the shelter walls. */
+const PET_RADIUS = 0.8
+
+/** Where the shelter is, so the pet can walk into it. */
+export interface ShelterTarget {
+  centre: { x: number; z: number }
+  half: { x: number; z: number }
+  inside: { x: number; z: number }
+}
+
 /** Shortest-path approach between two angles. */
 function approachAngle(from: number, to: number, t: number): number {
   let delta = (to - from) % (Math.PI * 2)
@@ -211,6 +221,9 @@ export class PetView {
   private shadow: Mesh
   /** How far from the centre of the clearing the pet may roam. */
   private bounds = 1.2
+  private shelter: ShelterTarget | null = null
+  /** False until the first update, so a pet loaded asleep starts indoors. */
+  private started = false
   private walk = {
     x: 0,
     z: 0,
@@ -221,6 +234,7 @@ export class PetView {
     timer: 1.5,
     phase: 0,
     blend: 0,
+    where: 'out' as 'out' | 'heading-in' | 'in' | 'heading-out',
   }
 
   constructor(
@@ -290,6 +304,16 @@ export class PetView {
     this.bounds = Math.max(0, radius)
   }
 
+  /** Tells the pet where its shelter is, so it can take itself to bed. */
+  setShelter(shelter: ShelterTarget | null): void {
+    this.shelter = shelter
+  }
+
+  /** True while the pet is settled inside its shelter. */
+  get sheltered(): boolean {
+    return this.walk.where === 'in'
+  }
+
   /** Where the pet currently is, so effects can be emitted at it. */
   get position(): { x: number; z: number } {
     return { x: this.walk.x, z: this.walk.z }
@@ -305,19 +329,69 @@ export class PetView {
    * turn back to face the viewer. Targets are biased across the frame rather
    * than into it, so the pet spends most of its time showing its face.
    */
+  /** A spot inside the shelter is off limits to ordinary wandering. */
+  private blockedByShelter(x: number, z: number): boolean {
+    const sh = this.shelter
+    if (!sh) return false
+    return (
+      Math.abs(x - sh.centre.x) < sh.half.x + PET_RADIUS &&
+      Math.abs(z - sh.centre.z) < sh.half.z + PET_RADIUS
+    )
+  }
+
+  /** Somewhere in the clearing that is not inside the shelter. */
+  private pickRoamTarget(): { x: number; z: number } | null {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const angle = Math.random() * Math.PI * 2
+      const radius = this.bounds * (0.35 + Math.random() * 0.65)
+      const x = Math.cos(angle) * radius
+      // Flattened in z: wandering toward or away from the camera reads badly
+      // on a screen this small.
+      const z = Math.sin(angle) * radius * 0.45
+      if (!this.blockedByShelter(x, z)) return { x, z }
+    }
+    return null
+  }
+
+  /**
+   * Ambles around the clearing, and takes itself into the shelter to sleep.
+   * Targets are biased across the frame rather than into it, so the pet spends
+   * most of its time showing its face.
+   */
   private roam(dt: number, state: PetMood): void {
     const w = this.walk
-    const canWalk = state.mobile && !state.asleep
+    const sh = this.shelter
 
-    if (!canWalk) {
+    if (!state.mobile) {
       w.walking = false
-    } else if (w.walking) {
+      return
+    }
+
+    // Going to bed, and getting up again, take priority over wandering.
+    if (sh) {
+      if (state.asleep && w.where === 'out') {
+        w.where = 'heading-in'
+        w.targetX = sh.inside.x
+        w.targetZ = sh.inside.z
+        w.walking = true
+      } else if (!state.asleep && w.where === 'in') {
+        const next = this.pickRoamTarget()
+        w.where = 'heading-out'
+        w.targetX = next?.x ?? 0
+        w.targetZ = next?.z ?? 0
+        w.walking = true
+      }
+    }
+
+    if (w.walking) {
       const dx = w.targetX - w.x
       const dz = w.targetZ - w.z
       const distance = Math.hypot(dx, dz)
       if (distance < 0.04) {
         w.walking = false
         w.timer = 2.5 + Math.random() * 4.5
+        if (w.where === 'heading-in') w.where = 'in'
+        else if (w.where === 'heading-out') w.where = 'out'
       } else {
         const step = Math.min(distance, WALK_SPEED * dt)
         w.x += (dx / distance) * step
@@ -326,16 +400,20 @@ export class PetView {
         w.phase = (w.phase + dt * STRIDE_RATE) % 1
       }
     } else {
-      w.timer -= dt
+      // Settled: face the viewer, and only set off again if awake and outdoors.
       w.facing = approachAngle(w.facing, 0, dt * 2)
-      if (w.timer <= 0) {
-        const angle = Math.random() * Math.PI * 2
-        const radius = this.bounds * (0.35 + Math.random() * 0.65)
-        w.targetX = Math.cos(angle) * radius
-        // Flattened in z: wandering toward or away from the camera reads badly
-        // on a screen this small.
-        w.targetZ = Math.sin(angle) * radius * 0.45
-        w.walking = true
+      if (w.where === 'out') {
+        w.timer -= dt
+        if (w.timer <= 0) {
+          const next = this.pickRoamTarget()
+          if (next) {
+            w.targetX = next.x
+            w.targetZ = next.z
+            w.walking = true
+          } else {
+            w.timer = 2
+          }
+        }
       }
     }
 
@@ -346,11 +424,23 @@ export class PetView {
     // Ease every visual input so stat changes never snap.
     const ease = (from: number, to: number, rate: number) => from + (to - from) * Math.min(1, dt * rate)
     this.smoothMood = ease(this.smoothMood, state.mood, 2)
-    this.smoothAsleep = ease(this.smoothAsleep, state.asleep ? 1 : 0, 3)
+    // Curl up only once it has arrived: a pet shuffling to bed should still be
+    // walking, not hunched over mid-stride.
+    const settled = state.asleep && (!this.shelter || this.walk.where === 'in')
+    this.smoothAsleep = ease(this.smoothAsleep, settled ? 1 : 0, 3)
     this.smoothSick = ease(this.smoothSick, state.sick ? 1 : 0, 2)
     this.pulse = Math.max(0, this.pulse - dt * 2.6)
     this.hatch = Math.min(1, this.hatch + dt * 0.9)
 
+    // A pet loaded from a save while asleep is already indoors.
+    if (!this.started) {
+      this.started = true
+      if (state.asleep && state.mobile && this.shelter) {
+        this.walk.x = this.shelter.inside.x
+        this.walk.z = this.shelter.inside.z
+        this.walk.where = 'in'
+      }
+    }
     this.roam(dt, state)
 
     // A hop is a short arc followed by a long beat standing still, not a

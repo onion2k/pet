@@ -76,7 +76,11 @@ a walk, and the body rises and falls with each stride while the feet stay
 planted.
 
 The pet ambles around its clearing: it picks somewhere to go, walks there,
-pauses, then turns back to face the viewer. Targets are flattened along the
+pauses, then turns back to face the viewer. Put it to bed and it walks itself
+into the shelter, settles just inside the open front where it stays visible,
+and curls up only once it has arrived — a pet shuffling to bed should still be
+walking, not hunched over mid-stride. Wake it and it comes back out. A pet
+loaded from a save while asleep starts indoors rather than trudging there. Targets are flattened along the
 view axis, so it mostly moves across the frame rather than into it, and roaming
 is bounded well inside the level clearing so its feet never step onto ground
 that steps up or down beneath them. Eggs have nothing to walk with, and a
@@ -91,16 +95,20 @@ from the pet's id — every life gets its own ground. The middle is levelled int
 a clearing for the pet to stand and eventually move around in. The patch fades
 into the sky with depth-based haze, so its edge is never a visible boundary.
 
-Rocks and plants are scattered over it: pebbles, rocks and boulders, and tufts,
-ferns, shrubs and blooms. They are stamped **into the terrain's own voxel field**
+A shelter stands at the back of the yard, on its own levelled pad with a level
+path running forward to the clearing — the pet does not sample terrain height as
+it walks, so every surface it crosses has to be flat. Its front is left open so
+the pet stays in view inside, and its interior is tall enough for the pet to
+stand up in. Which side it sits on depends on the seed.
+
+Rocks and plants are scattered over the rest: pebbles, rocks and boulders, and
+tufts, ferns, shrubs and blooms. They are stamped **into the terrain's own voxel field**
 rather than added as separate meshes, which is what makes them sit convincingly
 in the grass — a rock occludes the ground it rests on and picks up real contact
 shading, and the buried faces are culled along with everything else. Placement
 is a deterministic jittered scatter that keeps props out of the pet's clearing,
-apart from each other, and off ground too uneven to stand on.
-
-Shelter is the remaining piece of the environment, and slots into the same
-system as another prop.
+out of the shelter's pad and path, apart from each other, and off ground too
+uneven to stand on.
 
 ### Rendering
 
