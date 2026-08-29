@@ -19,6 +19,8 @@ const vertex = /* glsl */ `
   uniform float uAsleep;
   uniform float uPulse;
   uniform float uHatch;
+  uniform float uLift;
+  uniform float uBreath;
 
   varying vec3 vNormal;
   varying vec3 vColor;
@@ -28,34 +30,41 @@ const vertex = /* glsl */ `
   void main() {
     vec3 p = position;
 
-    // Squash and stretch about the pet's feet, so it never sinks through the floor.
-    float speed = 1.5 + uMood * 1.7;
-    float hop = abs(sin(uTime * speed)) * (0.02 + 0.09 * uMood) * (1.0 - uAsleep);
-    float breath = sin(uTime * 1.6) * 0.018 * (1.0 - uAsleep * 0.5);
-    float squash = 1.0 - hop * 0.9 + breath;
-    p.y *= squash;
-    p.xz *= 1.0 + (1.0 - squash) * 0.55;
-    p.y += hop;
+    // Stretch on the way up, plus a slow breath while standing. Scaling about
+    // the model's base keeps the feet planted.
+    float stretch = 1.0 + uLift * 0.55 + uBreath;
+    p.y *= stretch;
+    p.xz *= 1.0 - (stretch - 1.0) * 0.45;
 
-    // The head lags the body, which is what sells the whole thing as alive.
+    // Sleeping compresses and leans the pet. It must not translate downward:
+    // there is ground underneath now, and it would sink into it.
+    p.y *= 1.0 - uAsleep * 0.16;
+    p.x += uAsleep * p.y * 0.22;
+
+    // The head turns rather than sliding sideways. A rotation is rigid, so the
+    // model never shears apart the way a translation of one part does.
     if (part > 0.5 && part < 1.5) {
-      float lag = sin(uTime * speed - 0.7) * 0.035 * (1.0 - uAsleep);
-      p.x += lag;
-      p.y += hop * 0.35;
+      float a = sin(uTime * 0.55) * 0.10 * (1.0 - uAsleep);
+      float sa = sin(a);
+      float ca = cos(a);
+      p.xz = mat2(ca, -sa, sa, ca) * p.xz;
     }
-    // Limbs swing opposite each other.
+    // Feet splay only while airborne, rather than marching on the spot.
     if (part > 1.5) {
-      p.z += sin(uTime * speed * 2.0 + sign(p.x) * 3.14159) * 0.05 * (1.0 - uAsleep);
+      p.z += uLift * 0.5 * sign(p.x + 0.0001);
     }
 
-    // Sleeping: sink, tilt, and go still.
-    p.y -= uAsleep * 0.18;
-    p.x += uAsleep * p.y * 0.25;
+    p.y += uLift;
 
-    // Action impulse: a quick pop outward from the centre.
-    p += normalize(p + vec3(0.0, 0.001, 0.0)) * uPulse * 0.16;
+    // Action pop, outward and up only so it never drives voxels into the ground.
+    p.xz += normalize(p.xz + vec2(0.0001)) * uPulse * 0.10;
+    p.y += uPulse * 0.05;
 
-    // Hatching wipes the new body upward out of the shell.
+    // Nothing may sink through the ground the pet is standing on.
+    p.y = max(p.y, 0.0);
+
+    // Hatching wipes the new body upward out of the shell. Applied after the
+    // floor clamp, or the hidden half would pile up at ground level.
     float reveal = step(p.y, uHatch * 3.0);
     p.y = mix(p.y - 4.0, p.y, reveal);
 
@@ -107,6 +116,8 @@ const fragment = /* glsl */ `
 
 /** World height every form is normalised to, so framing never changes on evolution. */
 const PET_HEIGHT = 1.85
+/** Fraction of the hop cycle spent in the air. The rest is stood on the ground. */
+const HOP_WINDOW = 0.38
 
 const shadowVert = /* glsl */ `
   attribute vec3 position;
@@ -144,6 +155,8 @@ export class PetView {
   private smoothMood = 0.6
   private smoothAsleep = 0
   private smoothSick = 0
+  /** Position within the hop cycle. Accumulated so changing pace never jumps. */
+  private phase = 0
   private shadow: Mesh
 
   constructor(
@@ -160,6 +173,8 @@ export class PetView {
         uSick: { value: 0 },
         uPulse: { value: 0 },
         uHatch: { value: 1 },
+        uLift: { value: 0 },
+        uBreath: { value: 0 },
         uTint: { value: [1, 1, 1] },
       },
       cullFace: gl.BACK,
@@ -205,6 +220,16 @@ export class PetView {
     this.pulse = Math.max(0, this.pulse - dt * 2.6)
     this.hatch = Math.min(1, this.hatch + dt * 0.9)
 
+    // A hop is a short arc followed by a long beat standing still, not a
+    // continuous bob: `abs(sin())` leaves the pet airborne almost always, which
+    // reads as floating now that there is ground under it.
+    const rate = 0.5 + this.smoothMood * 0.55
+    this.phase = (this.phase + dt * rate) % 1
+    const arc = Math.min(this.phase / HOP_WINDOW, 1)
+    const lift =
+      Math.sin(arc * Math.PI) * (0.05 + 0.13 * this.smoothMood) * (1 - this.smoothAsleep)
+    const breath = Math.sin(time * 1.4) * 0.014 * (1 - this.smoothAsleep * 0.5)
+
     const u = this.program.uniforms
     u.uTime.value = time
     u.uMood.value = this.smoothMood
@@ -212,15 +237,16 @@ export class PetView {
     u.uSick.value = this.smoothSick
     u.uPulse.value = this.pulse * this.pulse
     u.uHatch.value = this.hatch
+    u.uLift.value = lift
+    u.uBreath.value = breath
 
     // A slow idle turn keeps the silhouette from reading as a flat sprite.
-    this.root.rotation.y = Math.sin(time * 0.35) * 0.28
+    this.root.rotation.y = Math.sin(time * 0.22) * 0.09
 
-    // The shadow tightens as the pet hops, which is what sells the hop as a hop.
-    const hop = Math.abs(Math.sin(time * (1.5 + this.smoothMood * 1.7)))
-    const lift = hop * (0.02 + 0.09 * this.smoothMood) * (1 - this.smoothAsleep)
+    // Shadow and body read the same lift, so they can never disagree.
     const tighten = 1 - lift * 1.6
     this.shadow.scale.set(tighten, 1, tighten)
-    this.shadow.program.uniforms.uStrength.value = (0.5 - lift * 1.2) * (1 - this.smoothAsleep * 0.35)
+    this.shadow.program.uniforms.uStrength.value =
+      (0.55 - lift * 1.3) * (1 - this.smoothAsleep * 0.35)
   }
 }
