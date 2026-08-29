@@ -1,8 +1,15 @@
-import { Mesh, Plane, Program, Transform } from 'ogl'
+import { Geometry, Mesh, Plane, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT } from '../data/biome'
 import type { VoxelModel } from '../data/voxel-format'
-import { buildVoxelGeometry, type VoxelGeometry } from './voxel-mesh'
+import {
+  buildVoxelGeometry,
+  geometryFrom,
+  modelSource,
+  voxelArrays,
+  type VoxelGeometry,
+} from './voxel-mesh'
+import { buildFace, faceAnchors } from './face'
 
 const vertex = /* glsl */ `
   attribute vec3 position;
@@ -11,6 +18,9 @@ const vertex = /* glsl */ `
   attribute float ao;
   attribute float part;
   attribute float emissive;
+  attribute float faceKind;
+  attribute vec3 faceLocal;
+  attribute float faceParam;
 
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
@@ -27,6 +37,15 @@ const vertex = /* glsl */ `
   uniform float uHipY;
   uniform float uShoulderY;
   uniform float uHeight;
+  uniform vec2 uGaze;
+  uniform float uGazeRange;
+  uniform float uEyeOpen;
+  uniform float uSmile;
+  uniform float uBrow;
+  uniform float uBrowTilt;
+  uniform float uBrowLift;
+  uniform float uMouthHalf;
+  uniform float uDroop;
 
   varying vec3 vNormal;
   varying vec3 vColor;
@@ -36,6 +55,35 @@ const vertex = /* glsl */ `
 
   void main() {
     vec3 p = position;
+
+    // The face is part of this mesh, so it is posed here in model space and
+    // then carried through every body deformation below exactly as the head is.
+    if (faceKind > 0.5) {
+      vec3 centre = position - faceLocal;
+      vec3 offset = faceLocal;
+      if (faceKind < 1.5) {
+        // Whites: squashed toward the eye's middle to blink.
+        offset.y *= uEyeOpen;
+      } else if (faceKind < 2.5) {
+        // Pupils: blink with the whites, and travel with the gaze.
+        offset.y *= uEyeOpen;
+        centre.xy += uGaze * uGazeRange;
+      } else if (faceKind < 3.5) {
+        // Mouth: the corners lift for a smile and drop for a frown, so the
+        // run of blocks bends into a curve.
+        float k = clamp(faceParam, -1.0, 1.0);
+        centre.y += uSmile * k * k * uMouthHalf * 0.55;
+      } else {
+        // Brows: raised or knitted, and tilted in opposite directions so the
+        // pair reads as cross, worried or delighted rather than merely moved.
+        float a = uBrowTilt * faceParam;
+        float sa = sin(a);
+        float ca = cos(a);
+        offset.xy = mat2(ca, -sa, sa, ca) * offset.xy;
+        centre.y += uBrow * uBrowLift;
+      }
+      p = centre + offset;
+    }
 
     // Stretch on the way up, plus a slow breath while standing. Scaling about
     // the model's base keeps the feet planted.
@@ -103,6 +151,17 @@ const vertex = /* glsl */ `
     // Feet splay on an idle hop, which the walk cycle replaces while moving.
     if (part > 1.5 && part < 2.5) {
       p.z += uLift * 0.5 * sign(position.x + 0.0001);
+    }
+
+    // Sadness bows everything above the hips forward and down. The legs are
+    // left out of it so the feet stay where they were put.
+    if (uDroop > 0.001 && (part < 1.5 || part > 2.5)) {
+      float bow = uDroop * 0.3;
+      float cb = cos(bow);
+      float sb = sin(bow);
+      vec2 qb = vec2(p.y - uHipY, p.z);
+      p.y = uHipY + cb * qb.x - sb * qb.y;
+      p.z = sb * qb.x + cb * qb.y;
     }
 
     p.y += uLift;
@@ -277,6 +336,12 @@ export class PetView {
   private shelter: ShelterTarget | null = null
   /** Something in the yard worth walking over to, when there is one. */
   private plaything: { x: number; z: number } | null = null
+  private hasFace = false
+  /** Where the eyes are looking, and how far they have got there. */
+  private gaze = { x: 0, y: 0, toX: 0, toY: 0, timer: 0 }
+  private blink = { timer: 2, open: 1 }
+  private smile = 0
+  private brow = 0
   /** False until the first update, so a pet loaded asleep starts indoors. */
   private started = false
   private walk = {
@@ -313,6 +378,15 @@ export class PetView {
         uHipY: { value: 0 },
         uShoulderY: { value: 0 },
         uHeight: { value: PET_HEIGHT },
+        uGaze: { value: [0, 0] },
+        uGazeRange: { value: 0 },
+        uEyeOpen: { value: 1 },
+        uSmile: { value: 0 },
+        uBrow: { value: 0 },
+        uBrowTilt: { value: 0 },
+        uBrowLift: { value: 0 },
+        uMouthHalf: { value: 0 },
+        uDroop: { value: 0 },
         uLightDir: { value: [0.4, 0.8, 0.45] },
         uLightColour: { value: [1, 1, 1] },
         uLightIntensity: { value: 1 },
@@ -326,10 +400,12 @@ export class PetView {
       },
       cullFace: gl.BACK,
     })
-    const built = buildVoxelGeometry(gl, model, PET_HEIGHT)
-    this.mesh = new Mesh(gl, { geometry: built.geometry, program: this.program })
+    // An empty shell to begin with: setModel builds the real geometry, and it
+    // is the only place that knows to attach the face attributes the program
+    // declares. A geometry missing them cannot be drawn at all.
+    this.mesh = new Mesh(gl, { geometry: new Geometry(gl), program: this.program })
     this.mesh.setParent(this.root)
-    this.applyJoints(built)
+    this.setModel(model, false)
 
     this.shadow = new Mesh(gl, {
       geometry: new Plane(gl, { width: PET_HEIGHT * 1.15, height: PET_HEIGHT * 1.15 }),
@@ -359,8 +435,58 @@ export class PetView {
     // PET_HEIGHT is not optional here: without it this falls back to the
     // builder's default and every form after the egg comes out oversized.
     const built = buildVoxelGeometry(this.gl, model, PET_HEIGHT)
+    const source = modelSource(model)
+    const scale = PET_HEIGHT / source.h
+    const body = voxelArrays(source, {
+      scale,
+      origin: [(-source.w / 2) * scale, 0, (-source.d / 2) * scale],
+    })
+    // The face joins the body in one mesh, so the shader's stretching,
+    // settling, twisting and hopping carry it along with the head.
+    const anchors = faceAnchors(model, PET_HEIGHT)
+    const face = anchors ? buildFace(anchors) : null
+    const bodyVerts = body.position.length / 3
+
+    const merged = face
+      ? {
+          position: body.position.concat(face.arrays.position),
+          normal: body.normal.concat(face.arrays.normal),
+          color: body.color.concat(face.arrays.color),
+          ao: body.ao.concat(face.arrays.ao),
+          part: body.part.concat(face.arrays.part),
+          emissive: body.emissive.concat(face.arrays.emissive),
+          material: body.material.concat(face.arrays.material),
+          faces: body.faces + face.arrays.faces,
+        }
+      : body
+
+    const geometry = geometryFrom(this.gl, merged)
+    // Every pet carries these, faceless ones included: the program declares the
+    // attributes, and a geometry missing them cannot be drawn at all.
+    const zeros = (n: number) => new Array(n).fill(0)
+    geometry.addAttribute('faceKind', {
+      size: 1,
+      data: new Float32Array(zeros(bodyVerts).concat(face ? face.face.kind : [])),
+    })
+    geometry.addAttribute('faceLocal', {
+      size: 3,
+      data: new Float32Array(zeros(bodyVerts * 3).concat(face ? face.face.local : [])),
+    })
+    geometry.addAttribute('faceParam', {
+      size: 1,
+      data: new Float32Array(zeros(bodyVerts).concat(face ? face.face.param : [])),
+    })
+
     this.mesh.geometry.remove()
-    this.mesh.geometry = built.geometry
+    this.mesh.geometry = geometry
+    built.geometry.remove()
+
+    this.hasFace = face !== null
+    const u = this.program.uniforms
+    u.uGazeRange.value = face ? face.gazeRange : 0
+    u.uMouthHalf.value = face ? face.mouthHalf : 0
+    u.uBrowLift.value = face ? face.browLift : 0
+
     this.applyJoints(built)
     if (animate) this.hatch = 0
   }
@@ -385,6 +511,75 @@ export class PetView {
     u.uAmbientColour.value = lighting.ambientColour
     u.uAmbientIntensity.value = lighting.ambientIntensity
   }
+
+  /**
+   * Drives the face. Everything here is a mood read off the same numbers the
+   * rest of the pet uses, so the expression can never disagree with the pet.
+   */
+  private expression(dt: number): void {
+    if (!this.hasFace) return
+    const u = this.program.uniforms
+
+    // --- looking about ------------------------------------------------------
+    const g = this.gaze
+    g.timer -= dt
+    if (g.timer <= 0) {
+      // Mostly a glance somewhere, occasionally straight down the lens.
+      const outward = Math.random()
+      if (outward < 0.3) {
+        g.toX = 0
+        g.toY = 0
+      } else {
+        g.toX = (Math.random() * 2 - 1) * 0.9
+        g.toY = (Math.random() * 2 - 1) * 0.55
+      }
+      g.timer = 0.7 + Math.random() * 2.4
+    }
+    // A sad pet looks down and keeps looking down.
+    const low = (1 - this.smoothMood) * 0.9
+    const wantX = g.toX * (1 - this.smoothAsleep)
+    const wantY = g.toY * (1 - low) - low
+    g.x += (wantX - g.x) * Math.min(1, dt * 7)
+    g.y += (wantY - g.y) * Math.min(1, dt * 7)
+    u.uGaze.value = [g.x, g.y]
+
+    // --- blinking -----------------------------------------------------------
+    const b = this.blink
+    b.timer -= dt
+    if (b.timer <= 0) {
+      b.timer = 2.2 + Math.random() * 3.6
+      b.open = -0.18
+    }
+    // Held negative for a moment, which is the shut part of the blink.
+    b.open = Math.min(1, b.open + dt * 7)
+    const asleepShut = 1 - this.smoothAsleep
+    // Sickness leaves the eyes heavy.
+    const heavy = 1 - this.smoothSick * 0.45
+    u.uEyeOpen.value = Math.max(0, Math.min(1, b.open)) * asleepShut * heavy
+
+    // --- mouth and brows ----------------------------------------------------
+    // Mood runs 0..1; the mouth runs frown to smile across it.
+    const wantSmile = this.smoothAsleep > 0.5 ? 0.15 : this.smoothMood * 2 - 1
+    this.smile += (wantSmile - this.smile) * Math.min(1, dt * 3)
+    u.uSmile.value = this.smile
+
+    // Brows lift when happy, knit when unhappy or unwell.
+    const wantBrow = this.smoothMood * 2 - 1 - this.smoothSick * 0.5
+    this.brow += (wantBrow - this.brow) * Math.min(1, dt * 3)
+    u.uBrow.value = this.brow
+    // Knitted brows tilt inward; a delighted pet's tilt the other way.
+    u.uBrowTilt.value = -this.brow * 0.38
+
+    // And the whole pet stoops when it is miserable, which reads from across
+    // the yard in a way that an eyebrow never will.
+    u.uDroop.value = Math.max(0, 1 - this.smoothMood * 1.6) * (1 - this.smoothAsleep)
+  }
+
+  /** True while the pet is cheerful enough to be humming to itself. */
+  get cheerful(): boolean {
+    return this.smoothMood > 0.72 && this.smoothAsleep < 0.2
+  }
+
 
   /** The lanterns, as view-space positions packed xyz, and one shared strength. */
   setLamps(positions: Float32Array, intensity: number): void {
@@ -627,6 +822,7 @@ export class PetView {
     this.smoothSick = ease(this.smoothSick, state.sick ? 1 : 0, 2)
     this.pulse = Math.max(0, this.pulse - dt * 2.6)
     this.hatch = Math.min(1, this.hatch + dt * 0.9)
+    this.expression(dt)
 
     // A pet loaded from a save while asleep is already indoors.
     if (!this.started) {

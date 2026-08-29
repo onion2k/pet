@@ -13,6 +13,8 @@ import { createWeather } from './render/weather'
 import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
 import { createVisitors } from './render/visitors'
+import { createBubble } from './render/bubble'
+import { faceAnchors } from './render/face'
 import { createBloom } from './render/post'
 import { createShell, SCREEN_CORNER_POWER } from './render/shell'
 import { createStage, watchResize } from './render/core'
@@ -93,6 +95,11 @@ weather.root.setParent(screenScene)
 
 const visitors = createVisitors(gl, terrain.shape.groundY)
 visitors.root.setParent(screenScene)
+
+const bubble = createBubble(gl)
+bubble.root.setParent(screenScene)
+/** Counts down to the pet's next unprompted thought. */
+let museTimer = 6
 
 const petView = new PetView(gl, speciesOf('egg').model)
 petView.root.position.y = terrain.shape.groundY
@@ -254,6 +261,10 @@ function updateAnnouncement(dt: number): void {
 let last = performance.now()
 let elapsed = 0
 /** Shifts the world clock. Only ever non-zero when a test drives it. */
+/** Short enough to read in a 72-pixel bubble, and all in the pet's own voice. */
+const MUSINGS = ['hmm', 'hello', 'nice', 'ok', 'busy', 'sunny', 'oh', 'yes']
+const MUSINGS_SIGN = ['hi', 'feed me', 'play?', 'thanks', 'more', 'best day']
+
 let timeOffset = 0
 /** Lantern positions in view space, packed xyz, rewritten every frame. */
 const lampView = new Float32Array(LAMP_COUNT * 3)
@@ -384,6 +395,31 @@ function step(dt: number): void {
   })
   petView.setPlaything(visitors.playthingAt())
 
+  // What the pet has to say for itself. Needs come first, then the odd idle
+  // thought, so a hungry pet never stands there musing about clouds.
+  museTimer -= dt
+  const who = app.pet
+  if (who && !bubble.busy && museTimer <= 0) {
+    museTimer = 5 + Math.random() * 9
+    const stats = who.stats
+    if (who.asleep) bubble.show('thought', 'zzz', 4)
+    else if (who.sick) bubble.show('speech', 'cross', 3.6)
+    else if (stats.hunger < 35) bubble.show('speech', 'food', 3.6)
+    else if (stats.hygiene < 35) bubble.show('thought', 'bath', 3.4)
+    else if (stats.energy < 30) bubble.show('thought', 'zzz', 3.4)
+    else if (stats.happiness < 35) bubble.show('thought', 'ask', 3.4)
+    else if (petView.cheerful) {
+      // A cheerful pet hums, and sometimes holds up a sign about it.
+      const roll = Math.random()
+      if (roll < 0.35) {
+        bubble.show('thought', 'note', 3)
+        bubble.hum()
+      } else if (roll < 0.55) bubble.show('sign', MUSINGS_SIGN[(Math.random() * MUSINGS_SIGN.length) | 0]!, 3.8)
+      else bubble.show('thought', 'heart', 3)
+    } else bubble.show('thought', MUSINGS[(Math.random() * MUSINGS.length) | 0]!, 3.4)
+  }
+  bubble.update(dt, { x: petView.position.x, y: terrain.shape.groundY, z: petView.position.z }, cameraPan)
+
   renderer.render({ scene: screenScene, camera: screenCamera, target: sceneTarget })
   const glow = bloom.render(renderer, sceneTarget.texture)
 
@@ -422,7 +458,10 @@ if (import.meta.env.DEV) {
       petView,
       weather,
       visitors,
+      bubble,
       cameraPan: () => cameraPan,
+      faceAnchors: (id: string) => faceAnchors(speciesOf(id).model, 1.85),
+      setSpecies: (id: string) => petView.setModel(speciesOf(id).model, false),
       lampLevel: () => lampLevel,
       world: () => worldAt(app.worldNow()),
       setTimeOffset: (ms: number) => {

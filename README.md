@@ -153,6 +153,48 @@ pulling the camera back to fit more in would walk the pet and the ground under
 it into the fog; widening the lens leaves every distance, and so the haze,
 exactly where it was.
 
+### The face
+
+Every creature has eyes, brows, pupils and a mouth, and none of it is drawn by
+hand. The eyes of a pet are its darkest voxels, set in the front of its head, so
+the face is found by looking at the model rather than by keeping a table of
+twelve faces in step with twelve models. A creature whose darkest colour is not
+near-black has no face — which is how the egg, correctly, opts out.
+
+The face is built **into the pet's own mesh** rather than laid over it. The pet's
+vertex shader bends the whole body: it stretches, settles, twists to look about,
+bobs through a walk cycle, hops and hatches. A face on a separate mesh would
+have to repeat every one of those exactly, and would slide off the head the first
+time one of them changed. Sharing the mesh means it cannot come adrift. Each face
+vertex carries which feature it belongs to and its offset from that feature's
+centre, which is enough for the shader to blink the eyes, travel the pupils,
+curve the mouth and tilt the brows before the body deformation runs.
+
+Two things had to be got right for it to read at 192 pixels. The features sit a
+quarter of a voxel proud of the head — at a fiftieth they came out striped with
+z-fighting. And the whites are almost twice the painted eye they cover, with a
+dark rim behind them: several of these creatures are near-white themselves, and
+a pale sclera on a pale head simply disappears, leaving the eye reading as
+nothing but its pupil.
+
+What the face does comes off the same numbers as the rest of the pet, so it can
+never disagree with it. Mood curves the mouth and sets the brows; sadness also
+drops the gaze and bows the whole body forward from the hips, which reads from
+across the yard in a way an eyebrow never will. The eyes blink on their own
+timer, and glance about between longer looks straight at you.
+
+### Thoughts, signs and humming
+
+Above the pet is a bubble drawn on a small canvas: a thought with trailing puffs,
+a shout with a tail, or a placard on a stick held out at chest height. It shows
+either a large pixel symbol — a heart, a bowl, a note, a question — or a short
+word in the same font the HUD uses. Needs come first, so a hungry pet never
+stands there musing about the weather, and a cheerful one hums, with notes
+rising past its head.
+
+Both stand well in front of the pet and off to one side. Placed level with it and
+only a little aside, the quad sits inside the pet's own head and is never seen.
+
 ### Time, seasons and weather
 
 The world keeps its own clock, running far faster than real time. A day takes

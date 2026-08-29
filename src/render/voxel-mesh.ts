@@ -108,12 +108,33 @@ export interface BuildOptions {
   origin: [number, number, number]
 }
 
+/** The per-vertex arrays a voxel volume expands to, before they become a mesh. */
+export interface VoxelArrays {
+  position: number[]
+  normal: number[]
+  color: number[]
+  ao: number[]
+  part: number[]
+  emissive: number[]
+  material: number[]
+  faces: number
+}
+
 /** Builds a mesh from any voxel source, skipping faces buried inside the volume. */
 export function buildVoxels(
   gl: OGLRenderingContext,
   source: VoxelSource,
-  { scale, origin }: BuildOptions,
+  options: BuildOptions,
 ): VoxelBuild {
+  const arrays = voxelArrays(source, options)
+  return { geometry: geometryFrom(gl, arrays), faces: arrays.faces }
+}
+
+/** The same expansion, stopping short of the mesh so extra vertices can be added. */
+export function voxelArrays(
+  source: VoxelSource,
+  { scale, origin }: BuildOptions,
+): VoxelArrays {
   const position: number[] = []
   const normal: number[] = []
   const color: number[] = []
@@ -173,17 +194,20 @@ export function buildVoxels(
     }
   }
 
-  const geometry = new Geometry(gl, {
-    position: { size: 3, data: new Float32Array(position) },
-    normal: { size: 3, data: new Float32Array(normal) },
-    color: { size: 3, data: new Float32Array(color) },
-    ao: { size: 1, data: new Float32Array(ao) },
-    part: { size: 1, data: new Float32Array(part) },
-    emissive: { size: 1, data: new Float32Array(emissive) },
-    material: { size: 1, data: new Float32Array(material) },
-  })
+  return { position, normal, color, ao, part, emissive, material, faces }
+}
 
-  return { geometry, faces }
+/** Turns expanded arrays into a mesh. */
+export function geometryFrom(gl: OGLRenderingContext, arrays: VoxelArrays): Geometry {
+  return new Geometry(gl, {
+    position: { size: 3, data: new Float32Array(arrays.position) },
+    normal: { size: 3, data: new Float32Array(arrays.normal) },
+    color: { size: 3, data: new Float32Array(arrays.color) },
+    ao: { size: 1, data: new Float32Array(arrays.ao) },
+    part: { size: 1, data: new Float32Array(arrays.part) },
+    emissive: { size: 1, data: new Float32Array(arrays.emissive) },
+    material: { size: 1, data: new Float32Array(arrays.material) },
+  })
 }
 
 /** Wraps a creature's ASCII layers as a voxel source. */
