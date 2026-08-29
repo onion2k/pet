@@ -11,6 +11,7 @@ import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
 import { hoursUntilSunrise, isNight, seasonIdAt, worldAt, WORLD_HOUR_MS } from './world'
 import { findCurio, type Curio } from '../data/curios'
+import { SHELLS, shellById, type ShellColour } from '../data/shells'
 import type { PetState, SaveFile } from './types'
 
 export type Mode =
@@ -179,6 +180,25 @@ export class App {
 
   get streakDays(): number {
     return this.save.streak.days
+  }
+
+  /** The shells this lineage has earned, default first. */
+  get unlockedShells(): ShellColour[] {
+    return SHELLS.filter((shell) => shell.unlocked(this.save))
+  }
+
+  get currentShell(): ShellColour {
+    return shellById(this.save.shell)
+  }
+
+  /** Steps to the next earned shell colour and returns it. */
+  cycleShell(): ShellColour {
+    const unlocked = this.unlockedShells
+    const index = unlocked.findIndex((shell) => shell.id === this.save.shell)
+    const next = unlocked[(index + 1) % unlocked.length]!
+    this.save.shell = next.id
+    this.persist()
+    return next
   }
 
   get curioTally(): { kinds: number; total: number } {

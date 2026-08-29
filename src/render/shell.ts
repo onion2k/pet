@@ -234,6 +234,8 @@ export interface Shell {
   update(dt: number, time: number): void
   /** Turns the whole device. The idle drift is layered on top of this. */
   setOrbit(yaw: number, pitch: number): void
+  /** Recolours the moulded plastic of the case. */
+  setBodyColour(colour: [number, number, number]): void
   /** Swaps the textures the screen samples; the bloom target changes each frame. */
   setScreenTextures(scene: Texture, bloomGlow: Texture): void
   setPower(value: number): void
@@ -384,6 +386,9 @@ export function createShell(
     setOrbit(yaw, pitch) {
       orbitYaw = yaw
       orbitPitch = pitch
+    },
+    setBodyColour(colour) {
+      body.program.uniforms.uColor.value = colour
     },
     setScreenTextures(scene, bloomGlow) {
       screen.program.uniforms.tScene.value = scene

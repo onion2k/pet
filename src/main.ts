@@ -164,10 +164,29 @@ muteButton.addEventListener('click', () => {
 })
 syncMute()
 
+// Shell colours are earned by lineage milestones and cycled here.
+const shellButton = document.createElement('button')
+const syncShell = () => {
+  shell.setBodyColour(app.currentShell.colour)
+  const extra = app.unlockedShells.length - 1
+  shellButton.textContent = `SHELL: ${app.currentShell.name.toUpperCase()}`
+  shellButton.title = extra > 0 ? `${extra} earned colour${extra > 1 ? 's' : ''} unlocked` : 'Earn colours by playing'
+}
+shellButton.addEventListener('click', () => {
+  app.cycleShell()
+  syncShell()
+  beeper.play('confirm')
+})
+
 const resetButton = document.createElement('button')
 resetButton.textContent = 'NEW PET'
 resetButton.addEventListener('click', () => {
-  if (!window.confirm('Start over with a new egg? Your current pet will be lost.')) return
+  if (
+    !window.confirm(
+      'Start over completely? This erases your pet AND the whole lineage: album, curios and streak. To pass the torch instead, retire an adult from its status screen.',
+    )
+  )
+    return
   app.restart()
   petView.setModel(speciesOf('egg').model, true)
 })
@@ -185,7 +204,8 @@ function syncRecentre(): void {
   recentreButton.hidden = !wanted
 }
 
-chrome?.append(muteButton, resetButton, recentreButton, announce)
+syncShell()
+chrome?.append(muteButton, shellButton, resetButton, recentreButton, announce)
 
 // Keep the screen-reader summary current without spamming it every frame.
 let announceTimer = 0

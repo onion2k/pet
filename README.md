@@ -42,6 +42,27 @@ puts it back. Turning the shell rather than moving the camera is deliberate —
 the lights are fixed in view space, so the highlight travels across the plastic
 as it turns, and the mouldings catch it at a raking angle.
 
+## The long game
+
+Care keeps a pet well; the lineage is why you keep coming back.
+
+- **Retirement.** Hold B on an adult's status screen and it retires — a
+  farewell, a slow walk into the meadow haze, and a place in the album. The
+  next egg hatches with an heirloom: a small starting bonus per ancestor,
+  capped. NEW PET remains the hard reset; retirement is how a family grows.
+- **The collection.** FOUND x/12 counts species reached across every
+  generation. One form, Aurorix, exists only for a well-cared-for child
+  evolved while the world is in winter.
+- **Curios.** Left alone for twenty minutes or more, the pet usually finds
+  something — and most finds are gated by season or weather (a snowdrop needs
+  winter, a dewdrop needs rain), so completing CURIOS x/8 takes visits at
+  different times.
+- **The streak.** Days visited, shown on the status screen. Consecutive days
+  build it; missed days erode it one per day rather than wiping it out.
+- **Shell colours.** Earned by milestones — a streak, a retirement, curios,
+  discoveries — and cycled with the SHELL button. The device becomes a record
+  of what the family has done.
+
 ## How it works
 
 ### Time
