@@ -130,7 +130,11 @@ export function buildVoxels(
         if (!voxel) continue
 
         for (const n of FACES) {
-          if (source.at(x + n[0], y + n[1], z + n[2])) continue
+          const neighbour = source.at(x + n[0], y + n[1], z + n[2])
+          // A face between two different parts must be kept: parts move
+          // independently in the pet shader, and a culled interface becomes a
+          // see-through hole the moment a limb swings away from the body.
+          if (neighbour && neighbour.part === voxel.part) continue
           faces++
           const [u, v] = basis(n)
           const cx = origin[0] + (x + 0.5) * scale

@@ -25,6 +25,7 @@ const vertex = /* glsl */ `
   uniform float uWalkBlend;
   uniform float uHipY;
   uniform float uShoulderY;
+  uniform float uHeight;
 
   varying vec3 vNormal;
   varying vec3 vColor;
@@ -49,10 +50,23 @@ const vertex = /* glsl */ `
     p.xz *= 1.0 + settle * 0.7;
     p.x += uAsleep * p.y * 0.22;
 
-    // The head turns rather than sliding sideways. A rotation is rigid, so the
-    // model never shears apart the way a translation of one part does.
-    if (part > 0.5 && part < 1.5) {
-      float a = sin(uTime * 0.55) * 0.10 * (1.0 - uAsleep);
+    // The idle look-around is a twist, not a rigid head rotation: the turn
+    // ramps smoothly with height, so neighbouring voxels move all but
+    // identically and no seam can open — rigid head-vs-body rotation tore
+    // visible gaps around the eyes, where head and body parts interleave.
+    float turn = sin(uTime * 0.55) * 0.14 * (1.0 - uAsleep);
+    float span = max(uHeight - uHipY, 0.001);
+    if (part < 1.5) {
+      float w = clamp((p.y - uHipY) / span, 0.0, 1.0);
+      float a = turn * w * w;
+      float sa = sin(a);
+      float ca = cos(a);
+      p.xz = mat2(ca, -sa, sa, ca) * p.xz;
+    } else if (part > 2.5) {
+      // Arms follow the twist their shoulder socket makes, evaluated at the
+      // socket's own height, so the whole arm moves rigidly with its mount.
+      float w = clamp((uShoulderY - uHipY) / span, 0.0, 1.0);
+      float a = turn * w * w;
       float sa = sin(a);
       float ca = cos(a);
       p.xz = mat2(ca, -sa, sa, ca) * p.xz;
@@ -267,6 +281,7 @@ export class PetView {
         uWalkBlend: { value: 0 },
         uHipY: { value: 0 },
         uShoulderY: { value: 0 },
+        uHeight: { value: PET_HEIGHT },
         uLightDir: { value: [0.4, 0.8, 0.45] },
         uLightColour: { value: [1, 1, 1] },
         uLightIntensity: { value: 1 },
@@ -302,6 +317,7 @@ export class PetView {
   private applyJoints(built: VoxelGeometry): void {
     this.program.uniforms.uHipY.value = built.hipY
     this.program.uniforms.uShoulderY.value = built.shoulderY
+    this.program.uniforms.uHeight.value = built.height
   }
 
   setModel(model: VoxelModel, animate = true): void {
