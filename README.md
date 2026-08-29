@@ -86,6 +86,31 @@ is bounded well inside the level clearing so its feet never step onto ground
 that steps up or down beneath them. Eggs have nothing to walk with, and a
 sleeping pet stays where it is.
 
+### Time, seasons and weather
+
+The day follows the player's own local clock — the pet's world is dark when
+theirs is — and drives a sun that arcs across the sky, warms at dawn and dusk,
+and hands over to a moon at night. Night keeps a usable light floor: this is a
+pet you have to be able to see, so the mood comes from the light shifting cold
+rather than from darkness.
+
+The year runs on a much shorter loop, 47 minutes a season. That period is
+deliberately not a divisor of the day: on a round four-hour year the two lock in
+phase and a given time of day always falls in the same season, so you could
+never see a summer noon if summer landed on your nights. Each season holds, then
+turns over into the next across its last quarter.
+
+Weather is drawn from the season — rain and mist in spring and autumn, snow in
+winter, mostly clear in summer — and changes every eighteen minutes, dulling the
+sky, flattening the sun and lifting the fill light the way an overcast day does.
+Both the day and the year come from the wall clock, so they advance while the
+app is closed and nothing about them needs saving.
+
+Repainting the world for the season would mean rebuilding every mesh, so terrain
+and props store a **material index** instead of a colour and look it up in a
+one-row palette texture. Sixteen pixels are uploaded each frame, the geometry is
+never touched, and seasons can cross-fade rather than jump.
+
 ### The world
 
 The pet stands on a voxel terrain patch built from the same mesh path as the

@@ -1,5 +1,3 @@
-import type { PropKey } from './props'
-
 /**
  * A patch of ground for the pet to live on, and the scenery scattered over it.
  * Shelter will follow as further props on the same grid.
@@ -7,40 +5,13 @@ import type { PropKey } from './props'
 export interface Biome {
   id: string
   name: string
-  /** Two shades of surface, dithered by the same noise that shapes the ground. */
-  surface: [string, string]
-  /** Exposed at height steps and around the edges. */
-  soil: string
-  /** Deeper still, visible where the ground cuts away. */
-  rock: string
-  sky: { top: [number, number, number]; bottom: [number, number, number] }
-  /** Colour the terrain fades into at the horizon, matched to the sky's base. */
-  haze: [number, number, number]
-  /** Resolves the props' placeholder palette against this biome. */
-  props: Record<PropKey, string>
-  /** Chance a given scatter slot grows something. */
+  /** Chance a given scatter slot grows something. Colours come from the season. */
   propDensity: number
 }
 
 export const MEADOW: Biome = {
   id: 'meadow',
   name: 'Meadow',
-  surface: ['#6fbf4a', '#5da83c'],
-  soil: '#8a6242',
-  rock: '#5f5a54',
-  sky: { top: [0.10, 0.14, 0.28], bottom: [0.04, 0.06, 0.11] },
-  haze: [0.06, 0.09, 0.16],
-  props: {
-    // Plants read against the grass by being bluer and deeper, not just darker.
-    s: '#6b655c',
-    t: '#8c8478',
-    f: '#2f7d4a',
-    e: '#8ce06b',
-    w: '#6b5334',
-    p: '#ffe27a',
-    r: '#a8523a',
-    n: '#3f3227',
-  },
   propDensity: 0.66,
 }
 

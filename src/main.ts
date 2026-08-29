@@ -7,6 +7,9 @@ import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
 import { MEADOW, ROAM_INSET, TERRAIN_CLEARING } from './data/biome'
+import { worldAt, type Rgb } from './game/world'
+import { PaletteTexture } from './render/palette'
+import { createWeather } from './render/weather'
 import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
 import { createBloom } from './render/post'
@@ -54,11 +57,15 @@ function app0Seed(): string {
 }
 
 const biome = MEADOW
+const seasonPalette = new PaletteTexture(gl)
 // Seeded from the pet, so every life gets its own patch of ground and its own
 // arrangement of scenery.
 let terrainSeed = app0Seed()
-const terrain = createTerrain(gl, terrainSeed, biome)
+const terrain = createTerrain(gl, terrainSeed, biome, seasonPalette)
 terrain.root.setParent(screenScene)
+
+const weather = createWeather(gl)
+weather.root.setParent(screenScene)
 
 const petView = new PetView(gl, speciesOf('egg').model)
 petView.root.position.y = terrain.shape.groundY
@@ -193,6 +200,8 @@ function updateAnnouncement(dt: number): void {
 
 let last = performance.now()
 let elapsed = 0
+/** Shifts the world clock. Only ever non-zero when a test drives it. */
+let timeOffset = 0
 
 function step(dt: number): void {
   elapsed += dt
@@ -214,21 +223,50 @@ function step(dt: number): void {
   particles.update(dt)
   backdrop.update(elapsed)
 
-  // Sleep cools the whole scene down; illness drains it.
+  // --- the world's own clock ------------------------------------------------
+  const world = worldAt(Date.now() + timeOffset)
+  seasonPalette.update(world.palette)
+
+  // The sun's direction is in world space; the screen camera never moves, so it
+  // is cheaper to rotate it into view space here than in every shader.
+  const m = screenCamera.viewMatrix as unknown as number[]
+  const [dx, dy, dz] = world.light.direction
+  const lightDir: Rgb = [
+    m[0]! * dx + m[4]! * dy + m[8]! * dz,
+    m[1]! * dx + m[5]! * dy + m[9]! * dz,
+    m[2]! * dx + m[6]! * dy + m[10]! * dz,
+  ]
+
   const visual = app.visual
-  if (visual.asleep) {
-    backdrop.setPalette([0.05, 0.06, 0.14], [0.01, 0.01, 0.04])
-  } else if (visual.sick) {
-    backdrop.setPalette([0.12, 0.13, 0.10], [0.03, 0.04, 0.03])
-  } else {
-    backdrop.setPalette(biome.sky.top, biome.sky.bottom)
+  const lighting = {
+    direction: lightDir,
+    colour: world.light.colour,
+    intensity: world.light.intensity,
+    ambientColour: world.ambient.colour,
+    ambientIntensity: world.ambient.intensity,
   }
+  petView.setLighting(lighting)
+  terrain.setLighting({ ...lighting, haze: world.haze })
   terrain.setSick(visual.sick ? 1 : 0)
+
+  backdrop.setPalette(world.sky.top, world.sky.bottom)
+  // Place the sun on the same arc that lights the scene, so the shadows and the
+  // sky always agree. It sinks below the horizon and the moon takes over.
+  const nightside = world.sunHeight <= 0
+  backdrop.setSun(
+    [0.5 - world.light.direction[0] * 0.55, 0.12 + Math.abs(world.sunHeight) * 0.62],
+    nightside ? [0.55, 0.62, 0.85] : world.light.colour,
+    nightside ? 0.035 : 0.05,
+  )
+
+  weather.set(world.weather)
+  weather.setColour(nightside ? [0.5, 0.58, 0.8] : [0.85, 0.9, 1])
+  weather.update(dt, elapsed)
 
   renderer.render({ scene: screenScene, camera: screenCamera, target: sceneTarget })
   const glow = bloom.render(renderer, sceneTarget.texture)
 
-  drawScreen(hud, app)
+  drawScreen(hud, app, world)
 
   shell.setScreenTextures(sceneTarget.texture, glow)
 
@@ -261,6 +299,11 @@ if (import.meta.env.DEV) {
       terrain,
       biome,
       petView,
+      weather,
+      world: () => worldAt(Date.now() + timeOffset),
+      setTimeOffset: (ms: number) => {
+        timeOffset = ms
+      },
       screenCamera,
       step,
       advance: (frames: number, dt = 1 / 60) => {

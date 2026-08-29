@@ -13,8 +13,10 @@ import {
   type Biome,
 } from '../data/biome'
 import { PROPS, SHELTER, type Prop, type PropKey } from '../data/props'
+import { MATERIAL_INDEX, PROP_MATERIAL } from '../data/seasons'
 import { expandLayers } from '../data/voxel-format'
-import { buildVoxels, hexToLinear, PART_BODY, type Voxel, type VoxelSource } from './voxel-mesh'
+import type { PaletteTexture } from './palette'
+import { buildVoxels, PART_BODY, type Voxel, type VoxelSource } from './voxel-mesh'
 
 /** Deterministic hash in 0..1. The terrain must rebuild identically every load. */
 function hash2(x: number, y: number, seed: number): number {
@@ -167,7 +169,12 @@ function scatterProps(
   const colour = (key: PropKey): Voxel => {
     const cached = cache.get(`prop${key}`)
     if (cached) return cached
-    const made: Voxel = { color: hexToLinear(biome.props[key]), emissive: 0, part: PART_BODY }
+    const made: Voxel = {
+      color: [1, 0, 1],
+      emissive: 0,
+      part: PART_BODY,
+      material: MATERIAL_INDEX[PROP_MATERIAL[key] ?? 'rock'],
+    }
     cache.set(`prop${key}`, made)
     return made
   }
@@ -266,22 +273,22 @@ function scatterProps(
 const vertex = /* glsl */ `
   attribute vec3 position;
   attribute vec3 normal;
-  attribute vec3 color;
   attribute float ao;
+  attribute float material;
 
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
   uniform mat3 normalMatrix;
 
   varying vec3 vNormal;
-  varying vec3 vColor;
   varying float vAo;
+  varying float vMaterial;
   varying float vDepth;
 
   void main() {
     vNormal = normalMatrix * normal;
-    vColor = color;
     vAo = ao;
+    vMaterial = material;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     // Distance from the eye. Haze by depth rather than by distance from the
     // centre, so the near ground stays crisp right across the frame and only
@@ -294,22 +301,35 @@ const vertex = /* glsl */ `
 const fragment = /* glsl */ `
   precision highp float;
 
+  uniform sampler2D tPalette;
+  uniform float uPaletteStep;
   uniform vec3 uHaze;
   uniform vec2 uFog;
   uniform float uSick;
+  uniform vec3 uLightDir;
+  uniform vec3 uLightColour;
+  uniform float uLightIntensity;
+  uniform vec3 uAmbientColour;
+  uniform float uAmbientIntensity;
 
   varying vec3 vNormal;
-  varying vec3 vColor;
   varying float vAo;
+  varying float vMaterial;
   varying float vDepth;
 
   void main() {
-    vec3 N = normalize(vNormal);
-    float key = max(dot(N, normalize(vec3(0.55, 0.9, 0.6))), 0.0);
-    float fill = max(dot(N, normalize(vec3(-0.6, 0.15, -0.55))), 0.0);
+    // Sampled here rather than in the vertex stage: vertex texture units are
+    // not guaranteed on every device.
+    vec3 encoded = texture2D(tPalette, vec2((vMaterial + 0.5) * uPaletteStep, 0.5)).rgb;
+    vec3 base = pow(encoded, vec3(2.2));
 
-    vec3 lit = vColor * (0.34 + 0.72 * key);
-    lit += vColor * vec3(0.35, 0.45, 0.7) * fill * 0.3;
+    vec3 N = normalize(vNormal);
+    float key = max(dot(N, uLightDir), 0.0);
+    // A soft wrap keeps unlit faces from going flat black at night.
+    float fill = max(dot(N, vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5, 0.0);
+
+    vec3 lit = base * uLightColour * (key * uLightIntensity);
+    lit += base * uAmbientColour * (fill * uAmbientIntensity);
     lit *= vAo;
 
     // The ground sickens along with its occupant.
@@ -329,20 +349,43 @@ export interface Terrain {
   /** Rebuilds the patch for a different seed or biome. */
   rebuild(seed: string, biome: Biome): void
   setSick(amount: number): void
+  /** Applies the current sky and sun. */
+  setLighting(lighting: TerrainLighting): void
   faces: number
 }
 
-export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biome): Terrain {
+export interface TerrainLighting {
+  direction: [number, number, number]
+  colour: [number, number, number]
+  intensity: number
+  ambientColour: [number, number, number]
+  ambientIntensity: number
+  haze: [number, number, number]
+}
+
+export function createTerrain(
+  gl: OGLRenderingContext,
+  seed: string,
+  biome: Biome,
+  palette: PaletteTexture,
+): Terrain {
   const root = new Transform()
   const program = new Program(gl, {
     vertex,
     fragment,
     uniforms: {
-      uHaze: { value: biome.haze },
+      tPalette: { value: palette.texture },
+      uPaletteStep: { value: 1 / palette.width },
+      uHaze: { value: [0.06, 0.09, 0.16] },
       // In view depth. Pushed out far enough that the shelter and the scenery
       // around it stay crisp, while the patch's far edge is still fully hazed.
       uFog: { value: [11.0, 18.0] },
       uSick: { value: 0 },
+      uLightDir: { value: [0.4, 0.8, 0.45] },
+      uLightColour: { value: [1, 1, 1] },
+      uLightIntensity: { value: 1 },
+      uAmbientColour: { value: [0.5, 0.6, 0.8] },
+      uAmbientIntensity: { value: 0.3 },
     },
     cullFace: gl.BACK,
   })
@@ -355,14 +398,14 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
   const build = (nextSeed: string, nextBiome: Biome) => {
     shape = terrainShape(nextSeed)
     const s = seedFrom(nextSeed)
-    const surface = nextBiome.surface.map(hexToLinear)
-    const soil = hexToLinear(nextBiome.soil)
-    const rock = hexToLinear(nextBiome.rock)
     const cache = new Map<string, Voxel>()
-    const voxel = (color: [number, number, number], key: string): Voxel => {
+    // Terrain stores a material index; the colour comes from the season palette
+    // at draw time.
+    const voxel = (material: number): Voxel => {
+      const key = `m${material}`
       let found = cache.get(key)
       if (!found) {
-        found = { color, emissive: 0, part: PART_BODY }
+        found = { color: [1, 0, 1], emissive: 0, part: PART_BODY, material }
         cache.set(key, found)
       }
       return found
@@ -383,16 +426,16 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
       at(x, y, z) {
         if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) return null
         // Anything below the patch counts as solid so the underside is culled.
-        if (y < 0) return voxel(rock, 'rock')
+        if (y < 0) return voxel(MATERIAL_INDEX.rock)
         const height = shape.heightAt(x, z)
         if (y < height) {
           if (y === height - 1) {
             // Dither the two surface shades so the ground is not a flat colour.
-            const tint = hash2(x, z, s ^ 0x5bf0) > 0.62 ? 1 : 0
-            return voxel(surface[tint]!, `surface${tint}`)
+            const tint = hash2(x, z, s ^ 0x5bf0) > 0.62
+            return voxel(tint ? MATERIAL_INDEX.surfaceB : MATERIAL_INDEX.surfaceA)
           }
-          if (y >= height - 3) return voxel(soil, 'soil')
-          return voxel(rock, 'rock')
+          if (y >= height - 3) return voxel(MATERIAL_INDEX.soil)
+          return voxel(MATERIAL_INDEX.rock)
         }
         // Scenery lives in the same field as the ground, so it culls and
         // occludes against it rather than floating as a separate mesh.
@@ -417,7 +460,7 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
       mesh.frustumCulled = false
       mesh.setParent(root)
     }
-    program.uniforms.uHaze.value = nextBiome.haze
+
   }
 
   build(seed, biome)
@@ -436,6 +479,15 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
     rebuild: build,
     setSick(amount) {
       program.uniforms.uSick.value = amount
+    },
+    setLighting(lighting) {
+      const u = program.uniforms
+      u.uLightDir.value = lighting.direction
+      u.uLightColour.value = lighting.colour
+      u.uLightIntensity.value = lighting.intensity
+      u.uAmbientColour.value = lighting.ambientColour
+      u.uAmbientIntensity.value = lighting.ambientIntensity
+      u.uHaze.value = lighting.haze
     },
   }
 }

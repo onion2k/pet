@@ -1,3 +1,4 @@
+import { textWidth } from '../data/font'
 import { FOODS } from '../data/foods'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
 import { speciesOf, SPECIES_COUNT } from '../data/species'
@@ -6,6 +7,7 @@ import { NAMES, type App } from '../game/app'
 import { CRITICAL } from '../game/tuning'
 import type { Hud } from '../render/hud'
 import type { PetState } from '../game/types'
+import type { WorldState } from '../game/world'
 
 const INK = '#dfe7ff'
 const DIM = '#5a6180'
@@ -153,7 +155,7 @@ function drawGames(hud: Hud, app: App): void {
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B START', DIM)
 }
 
-function drawStatus(hud: Hud, app: App): void {
+function drawStatus(hud: Hud, app: App, world: WorldState): void {
   const pet = app.pet
   const m = app.metrics
   if (!pet || !m) return
@@ -161,6 +163,11 @@ function drawStatus(hud: Hud, app: App): void {
   hud.rect(0, 0, hud.width, hud.height, 'rgba(5,5,11,0.95)')
   const left = Math.round(hud.safeInset(10)) + 2
   hud.text(left, 10, pet.name, ACCENT, 2)
+  // The world's own clock, so the season and the weather are legible somewhere.
+  const clock = `${String(Math.floor(world.hour)).padStart(2, '0')}:${String(
+    Math.floor((world.hour % 1) * 60),
+  ).padStart(2, '0')}`
+  hud.text(hud.width - left - textWidth(clock), 11, clock, DIM)
   hud.text(left, 24, `${speciesOf(pet.speciesId).name.toUpperCase()} / ${pet.stage.toUpperCase()}`, COOL)
   hud.text(6, 32, `AGE ${duration(pet.ageMs)}`, DIM)
 
@@ -185,13 +192,14 @@ function drawStatus(hud: Hud, app: App): void {
     ['SLEEP', m.sleep],
   ]
   traits.forEach(([label, value], i) => {
-    const y = 98 + i * 9
+    const y = 96 + i * 8
     hud.text(6, y, label, DIM)
     hud.meter(40, y - 1, 40, value * 100, COOL, '#1c1c2c')
   })
 
-  hud.text(6, 126, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}`, DIM)
-  hud.text(6, 134, `FOUND ${pet.discovered.length}/${SPECIES_COUNT}`, DIM)
+  hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
+  hud.text(6, 132, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}`, DIM)
+  hud.text(6, 140, `FOUND ${pet.discovered.length}/${SPECIES_COUNT}`, DIM)
   hud.textCentered(hud.width / 2, hud.height - 10, 'ANY KEY TO CLOSE', '#3a4058')
 }
 
@@ -278,7 +286,7 @@ function drawBackPrompt(hud: Hud, app: App): void {
   hud.textCentered(hud.width / 2, y + 4, 'HOLD C TO GO BACK', '#96a0c8')
 }
 
-export function drawScreen(hud: Hud, app: App): void {
+export function drawScreen(hud: Hud, app: App, world: WorldState): void {
   hud.begin()
   switch (app.mode) {
     case 'boot':
@@ -302,7 +310,7 @@ export function drawScreen(hud: Hud, app: App): void {
       drawBackPrompt(hud, app)
       break
     case 'status':
-      drawStatus(hud, app)
+      drawStatus(hud, app, world)
       break
     case 'playing':
       app.session?.draw(hud)

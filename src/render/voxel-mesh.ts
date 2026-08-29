@@ -11,10 +11,16 @@ export const PART_ARM = 3
 const HEAD_FRACTION = 0.55
 
 export interface Voxel {
-  /** Linear-space colour. */
+  /** Linear-space colour. Used directly by the pets. */
   color: [number, number, number]
   emissive: number
   part: number
+  /**
+   * Material index into the season palette. The terrain stores this instead of
+   * a colour so the whole world can be repainted for the season without any
+   * geometry being rebuilt.
+   */
+  material?: number
 }
 
 /**
@@ -114,6 +120,7 @@ export function buildVoxels(
   const ao: number[] = []
   const part: number[] = []
   const emissive: number[] = []
+  const material: number[] = []
   let faces = 0
 
   for (let y = 0; y < source.h; y++) {
@@ -155,6 +162,7 @@ export function buildVoxels(
             ao.push(shades[i]!)
             part.push(voxel.part)
             emissive.push(voxel.emissive)
+            material.push(voxel.material ?? 0)
           }
         }
       }
@@ -168,6 +176,7 @@ export function buildVoxels(
     ao: { size: 1, data: new Float32Array(ao) },
     part: { size: 1, data: new Float32Array(part) },
     emissive: { size: 1, data: new Float32Array(emissive) },
+    material: { size: 1, data: new Float32Array(material) },
   })
 
   return { geometry, faces }

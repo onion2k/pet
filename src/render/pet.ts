@@ -117,6 +117,11 @@ const fragment = /* glsl */ `
   uniform float uSick;
   uniform float uPulse;
   uniform vec3 uTint;
+  uniform vec3 uLightDir;
+  uniform vec3 uLightColour;
+  uniform float uLightIntensity;
+  uniform vec3 uAmbientColour;
+  uniform float uAmbientIntensity;
 
   varying vec3 vNormal;
   varying vec3 vColor;
@@ -125,12 +130,13 @@ const fragment = /* glsl */ `
 
   void main() {
     vec3 N = normalize(vNormal);
-    // Key from above-right, cool fill from behind-left. Two lights is plenty for cubes.
-    float key = max(dot(N, normalize(vec3(0.55, 0.9, 0.6))), 0.0);
-    float fill = max(dot(N, normalize(vec3(-0.6, 0.15, -0.55))), 0.0);
+    // Sun or moon as the key, sky as the fill. Both come from the world clock,
+    // so the pet is lit by the same light as the ground it stands on.
+    float key = max(dot(N, uLightDir), 0.0);
+    float fill = max(dot(N, vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5, 0.0);
 
-    vec3 lit = vColor * (0.30 + 0.80 * key);
-    lit += vColor * vec3(0.35, 0.45, 0.7) * fill * 0.35;
+    vec3 lit = vColor * uLightColour * (key * uLightIntensity);
+    lit += vColor * uAmbientColour * (fill * uAmbientIntensity);
     lit *= vAo;
 
     // Illness drains the colour toward a sallow green.
@@ -261,6 +267,11 @@ export class PetView {
         uWalkBlend: { value: 0 },
         uHipY: { value: 0 },
         uShoulderY: { value: 0 },
+        uLightDir: { value: [0.4, 0.8, 0.45] },
+        uLightColour: { value: [1, 1, 1] },
+        uLightIntensity: { value: 1 },
+        uAmbientColour: { value: [0.5, 0.6, 0.8] },
+        uAmbientIntensity: { value: 0.3 },
         uTint: { value: [1, 1, 1] },
       },
       cullFace: gl.BACK,
@@ -306,6 +317,22 @@ export class PetView {
   /** Limits the roaming to the level ground of the clearing. */
   setBounds(radius: number): void {
     this.bounds = Math.max(0, radius)
+  }
+
+  /** Applies the current sky and sun, shared with the terrain. */
+  setLighting(lighting: {
+    direction: [number, number, number]
+    colour: [number, number, number]
+    intensity: number
+    ambientColour: [number, number, number]
+    ambientIntensity: number
+  }): void {
+    const u = this.program.uniforms
+    u.uLightDir.value = lighting.direction
+    u.uLightColour.value = lighting.colour
+    u.uLightIntensity.value = lighting.intensity
+    u.uAmbientColour.value = lighting.ambientColour
+    u.uAmbientIntensity.value = lighting.ambientIntensity
   }
 
   /** Tells the pet where its shelter is, so it can take itself to bed. */
