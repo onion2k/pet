@@ -289,6 +289,8 @@ export type PetMood = {
   sick: boolean
   /** False for an egg, which has nothing to walk with. */
   mobile: boolean
+  /** Out looking for something, which means genuinely out of the yard. */
+  foraging: boolean
 }
 
 /** World units per second at an amble. The meadow is wide, so this is a
@@ -354,7 +356,17 @@ export class PetView {
     timer: 1.5,
     phase: 0,
     blend: 0,
-    where: 'out' as 'out' | 'heading-in' | 'in' | 'heading-out' | 'leaving' | 'gone',
+    where: 'out' as
+      | 'out'
+      | 'heading-in'
+      | 'in'
+      | 'heading-out'
+      | 'leaving'
+      | 'gone'
+      // Walking off to forage, away over the hill, and walking back again.
+      | 'away-out'
+      | 'away'
+      | 'away-back',
   }
 
   constructor(
@@ -598,6 +610,11 @@ export class PetView {
     this.shelter = shelter
   }
 
+  /** True while the pet is out of the yard entirely, off foraging. */
+  get away(): boolean {
+    return this.walk.where === 'away'
+  }
+
   /** True while the pet is settled inside its shelter. */
   get sheltered(): boolean {
     return this.walk.where === 'in'
@@ -757,8 +774,37 @@ export class PetView {
       return
     }
 
+    // --- off foraging -------------------------------------------------------
+    // Sent out, the pet walks to the edge of the yard and over it. "Off it
+    // goes" ought to mean it went somewhere.
+    if (state.foraging && w.where !== 'away-out' && w.where !== 'away') {
+      w.where = 'away-out'
+      w.targetX = Math.sign(w.x || 1) * (this.bounds.x + 2.5)
+      w.targetZ = w.z
+      w.walking = true
+      this.mesh.visible = true
+      this.shadow.visible = true
+    } else if (!state.foraging && (w.where === 'away' || w.where === 'away-out')) {
+      // Back over the hill, from the side it left by.
+      w.where = 'away-back'
+      w.x = Math.sign(w.targetX || 1) * (this.bounds.x + 2.5)
+      const next = this.pickRoamTarget()
+      w.targetX = next?.x ?? 0
+      w.targetZ = next?.z ?? 0
+      w.walking = true
+      this.mesh.visible = true
+      this.shadow.visible = true
+    }
+
+    if (w.where === 'away') {
+      w.walking = false
+      w.blend += ((w.walking ? 1 : 0) - w.blend) * Math.min(1, dt * 6)
+      return
+    }
+
     // Going to bed, and getting up again, take priority over wandering.
-    if (sh) {
+    // An 'away' pet has already returned above, so only the two legs remain.
+    if (sh && w.where !== 'away-out' && w.where !== 'away-back') {
       if (state.asleep && w.where === 'out') {
         w.where = 'heading-in'
         w.targetX = sh.inside.x
@@ -782,6 +828,12 @@ export class PetView {
         w.timer = 2.5 + Math.random() * 4.5
         if (w.where === 'heading-in') w.where = 'in'
         else if (w.where === 'heading-out') w.where = 'out'
+        else if (w.where === 'away-out') {
+          // Over the hill and out of sight until it is due back.
+          w.where = 'away'
+          this.mesh.visible = false
+          this.shadow.visible = false
+        } else if (w.where === 'away-back') w.where = 'out'
       } else {
         const step = Math.min(distance, WALK_SPEED * dt)
         const [sx, sz] = this.steerRoundLamp(w.x, w.z, dx / distance, dz / distance)

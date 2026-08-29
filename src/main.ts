@@ -314,9 +314,13 @@ function step(dt: number): void {
   // Pan to keep the pet in view. Clamped, so once it strays past what the
   // swing can cover it drifts out toward the side of the screen on its own.
   const pet = petView.position
+  // A pet that has gone off foraging is over the hill, and following it there
+  // would leave the camera staring at an empty verge for three world hours.
+  const trackX = petView.away ? 0 : pet.x
+  const trackZ = petView.away ? 0 : pet.z
   const wanted = Math.max(
     -MAX_PAN,
-    Math.min(MAX_PAN, Math.atan2(pet.x - CAMERA_POS[0], CAMERA_POS[2] - pet.z)),
+    Math.min(MAX_PAN, Math.atan2(trackX - CAMERA_POS[0], CAMERA_POS[2] - trackZ)),
   )
   cameraPan += (wanted - cameraPan) * Math.min(1, dt * 1.8)
   screenCamera.position.set(...CAMERA_POS)
@@ -424,7 +428,7 @@ function step(dt: number): void {
   // thought, so a hungry pet never stands there musing about clouds.
   museTimer -= dt
   const who = app.pet
-  if (who && !bubble.busy && museTimer <= 0) {
+  if (who && !bubble.busy && !petView.away && museTimer <= 0) {
     // A symbol alone does not say much -- a bowl could be hunger or dinner, a
     // question mark could be anything. So the bubble never goes up on its own:
     // it comes with the words for it on the ticker, and stays up for exactly as
