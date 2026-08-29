@@ -379,9 +379,14 @@ raised for.
 Depth came from making the levers depend on one another rather than adding more
 of them. A tired or hungry pet is poor company: it gets half as much from a game
 and tires half again as fast for it, so there is a right *time* to play and not
-only a right amount. A hot meal is worth a third more in winter and a light one
+only a right amount. A hot dish is worth a third more in winter and a cold one
 a third more in summer, so the same food is a different thing depending on the
 day it is served.
+
+Which dish is which is stated on the food rather than inferred. Reading it off
+the energy a food happens to give made Fries summery and Cake warming, and
+handed Medicine a seasonal bonus for being a meal it is not — it was healing
+thirty percent better in July.
 
 ### Visitors
 

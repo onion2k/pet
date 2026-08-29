@@ -7,6 +7,13 @@ export interface Food {
   axis: DietAxis | null
   /** Stat deltas applied on eating. */
   effect: Partial<Stats>
+  /**
+   * Whether it is a hot dish or a cold one, which decides the weather it
+   * suits. Stated rather than inferred: reading it off the energy the food
+   * happens to give made Fries summery and Cake warming, and gave Medicine a
+   * seasonal bonus for being a meal it is not.
+   */
+  served?: 'hot' | 'cold'
   /** Palette for the food's voxel and its eating particles. */
   color: string
   /** Shown under the icon on the feed menu. */
@@ -16,6 +23,7 @@ export interface Food {
 export const FOODS: Food[] = [
   {
     id: 'berry',
+    served: 'cold',
     name: 'Berry',
     axis: 'sweet',
     effect: { hunger: 18, happiness: 10 },
@@ -24,6 +32,7 @@ export const FOODS: Food[] = [
   },
   {
     id: 'meat',
+    served: 'hot',
     name: 'Drumstick',
     axis: 'protein',
     effect: { hunger: 30, energy: 6 },
@@ -32,6 +41,7 @@ export const FOODS: Food[] = [
   },
   {
     id: 'salad',
+    served: 'cold',
     name: 'Greens',
     axis: 'veg',
     effect: { hunger: 14, health: 8 },
@@ -40,6 +50,7 @@ export const FOODS: Food[] = [
   },
   {
     id: 'fries',
+    served: 'hot',
     name: 'Fries',
     axis: 'junk',
     effect: { hunger: 26, happiness: 16, health: -7 },

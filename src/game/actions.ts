@@ -36,11 +36,13 @@ export function feed(pet: PetState, foodId: string, season: SeasonId): ActionRes
     return { ok: false, message: 'It is not poorly.' }
   }
 
-  // A hot meal is worth more in the cold, and a light one worth more in the
-  // heat. The same food is a different thing depending on the day it is served.
-  const warmth = food.effect.energy ?? 0
-  const seasonal =
-    (season === 'winter' && warmth > 0) || (season === 'summer' && warmth <= 0) ? 1.3 : 1
+  // A hot dish is worth more in the cold and a cold one worth more in the heat,
+  // so the same food is a different thing depending on the day it is served.
+  // Anything with no season to it -- cake, medicine -- is simply itself.
+  const suits =
+    (season === 'winter' && food.served === 'hot') ||
+    (season === 'summer' && food.served === 'cold')
+  const seasonal = suits ? 1.3 : 1
   const effect: Partial<Stats> = {}
   for (const [key, amount] of Object.entries(food.effect) as [StatKey, number][]) {
     effect[key] = amount * seasonal
