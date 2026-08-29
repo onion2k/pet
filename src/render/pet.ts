@@ -1,4 +1,4 @@
-import { Mesh, Program, Transform } from 'ogl'
+import { Mesh, Plane, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import type { VoxelModel } from '../data/voxel-format'
 import { buildVoxelGeometry } from './voxel-mesh'
@@ -108,6 +108,31 @@ const fragment = /* glsl */ `
 /** World height every form is normalised to, so framing never changes on evolution. */
 const PET_HEIGHT = 1.85
 
+const shadowVert = /* glsl */ `
+  attribute vec3 position;
+  attribute vec2 uv;
+  uniform mat4 modelViewMatrix;
+  uniform mat4 projectionMatrix;
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+const shadowFrag = /* glsl */ `
+  precision highp float;
+  uniform float uStrength;
+  varying vec2 vUv;
+  void main() {
+    // Soft round contact patch. Without it the pet reads as floating above the
+    // ground rather than standing on it.
+    float d = length(vUv - 0.5) * 2.0;
+    float a = (1.0 - smoothstep(0.35, 1.0, d)) * uStrength;
+    gl_FragColor = vec4(0.02, 0.03, 0.02, a);
+  }
+`
+
 export type PetMood = { mood: number; asleep: boolean; sick: boolean }
 
 export class PetView {
@@ -119,6 +144,7 @@ export class PetView {
   private smoothMood = 0.6
   private smoothAsleep = 0
   private smoothSick = 0
+  private shadow: Mesh
 
   constructor(
     private gl: OGLRenderingContext,
@@ -140,6 +166,21 @@ export class PetView {
     })
     this.mesh = new Mesh(gl, { geometry: buildVoxelGeometry(gl, model, PET_HEIGHT).geometry, program: this.program })
     this.mesh.setParent(this.root)
+
+    this.shadow = new Mesh(gl, {
+      geometry: new Plane(gl, { width: PET_HEIGHT * 1.15, height: PET_HEIGHT * 1.15 }),
+      program: new Program(gl, {
+        vertex: shadowVert,
+        fragment: shadowFrag,
+        uniforms: { uStrength: { value: 0.55 } },
+        transparent: true,
+        depthWrite: false,
+      }),
+    })
+    this.shadow.rotation.x = -Math.PI / 2
+    // Just clear of the ground, so it never z-fights with the terrain surface.
+    this.shadow.position.y = 0.012
+    this.shadow.setParent(this.root)
   }
 
   /** Swaps in a new form. Pass `animate` to play the reveal wipe. */
@@ -174,5 +215,12 @@ export class PetView {
 
     // A slow idle turn keeps the silhouette from reading as a flat sprite.
     this.root.rotation.y = Math.sin(time * 0.35) * 0.28
+
+    // The shadow tightens as the pet hops, which is what sells the hop as a hop.
+    const hop = Math.abs(Math.sin(time * (1.5 + this.smoothMood * 1.7)))
+    const lift = hop * (0.02 + 0.09 * this.smoothMood) * (1 - this.smoothAsleep)
+    const tighten = 1 - lift * 1.6
+    this.shadow.scale.set(tighten, 1, tighten)
+    this.shadow.program.uniforms.uStrength.value = (0.5 - lift * 1.2) * (1 - this.smoothAsleep * 0.35)
   }
 }

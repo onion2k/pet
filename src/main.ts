@@ -6,7 +6,9 @@ import { App } from './game/app'
 import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
+import { MEADOW } from './data/biome'
 import { createBackdrop } from './render/backdrop'
+import { createTerrain } from './render/terrain'
 import { createBloom } from './render/post'
 import { createShell, SCREEN_CORNER_POWER } from './render/shell'
 import { createStage, watchResize } from './render/core'
@@ -28,15 +30,25 @@ watchResize(stage)
 // --- the world inside the screen -------------------------------------------
 
 const screenScene = new Transform()
-// A long lens: at this size, perspective distortion just reads as a wobbly model.
-const screenCamera = new Camera(gl, { fov: 22, near: 0.1, far: 60, aspect: SCREEN_PX[0] / SCREEN_PX[1] })
-screenCamera.position.set(0, 1.5, 8.6)
-screenCamera.lookAt([0, 0.95, 0])
+/**
+ * A long lens, pulled back far enough to sit the pet in its surroundings rather
+ * than filling the frame with it. Framed against the clear band between the two
+ * icon strips, with the ground taking the lower third.
+ */
+const screenCamera = new Camera(gl, { fov: 24, near: 0.1, far: 60, aspect: SCREEN_PX[0] / SCREEN_PX[1] })
+screenCamera.position.set(0, 4.35, 10.5)
+screenCamera.lookAt([0, 1.53, 0])
 
 const backdrop = createBackdrop(gl)
 backdrop.root.setParent(screenScene)
 
+const biome = MEADOW
+// Seeded from the pet so every life gets its own patch of ground.
+const terrain = createTerrain(gl, 'petz', biome)
+terrain.root.setParent(screenScene)
+
 const petView = new PetView(gl, speciesOf('egg').model)
+petView.root.position.y = terrain.shape.groundY
 petView.root.setParent(screenScene)
 
 const particles = new Particles(gl)
@@ -73,7 +85,7 @@ const beeper = new Beeper(false)
 
 const app = new App({
   sound: (id) => beeper.play(id),
-  burst: (kind, count) => particles.emit(kind, [0, 1.25, 0], count),
+  burst: (kind, count) => particles.emit(kind, [0, terrain.shape.groundY + 1.1, 0], count),
   pop: (strength) => petView.pop(strength),
   form: (speciesId, animate) => petView.setModel(speciesOf(speciesId).model, animate),
 })
@@ -174,12 +186,13 @@ function step(dt: number): void {
   // Sleep cools the whole scene down; illness drains it.
   const visual = app.visual
   if (visual.asleep) {
-    backdrop.setPalette([0.05, 0.06, 0.14], [0.01, 0.01, 0.04], [0.16, 0.22, 0.5])
+    backdrop.setPalette([0.05, 0.06, 0.14], [0.01, 0.01, 0.04])
   } else if (visual.sick) {
-    backdrop.setPalette([0.12, 0.13, 0.10], [0.03, 0.04, 0.03], [0.34, 0.36, 0.22])
+    backdrop.setPalette([0.12, 0.13, 0.10], [0.03, 0.04, 0.03])
   } else {
-    backdrop.setPalette([0.10, 0.13, 0.26], [0.03, 0.04, 0.08], [0.28, 0.42, 0.85])
+    backdrop.setPalette(biome.sky.top, biome.sky.bottom)
   }
+  terrain.setSick(visual.sick ? 1 : 0)
 
   renderer.render({ scene: screenScene, camera: screenCamera, target: sceneTarget })
   const glow = bloom.render(renderer, sceneTarget.texture)
@@ -214,6 +227,8 @@ if (import.meta.env.DEV) {
       hud,
       shell,
       orbit,
+      terrain,
+      screenCamera,
       step,
       advance: (frames: number, dt = 1 / 60) => {
         for (let i = 0; i < frames; i++) step(dt)

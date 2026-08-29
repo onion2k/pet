@@ -1,6 +1,6 @@
 import { Geometry } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
-import type { VoxelModel } from '../data/voxel-format'
+import { expandLayers, type VoxelModel } from '../data/voxel-format'
 
 export const PART_BODY = 0
 export const PART_HEAD = 1
@@ -9,31 +9,26 @@ export const PART_LIMB = 2
 /** Layers at or above this fraction of the model's height animate as the head. */
 const HEAD_FRACTION = 0.55
 
-interface Grid {
+export interface Voxel {
+  /** Linear-space colour. */
+  color: [number, number, number]
+  emissive: number
+  part: number
+}
+
+/**
+ * Anything that can be turned into a mesh: a creature's ASCII layers, or a
+ * patch of terrain. Sharing this means terrain gets the same hidden-face
+ * culling and corner occlusion that makes the pets read at low resolution.
+ */
+export interface VoxelSource {
   w: number
   h: number
   d: number
-  /** Palette character at each cell, or null for air. */
-  at(x: number, y: number, z: number): string | null
+  at(x: number, y: number, z: number): Voxel | null
 }
 
-function toGrid(model: VoxelModel): Grid {
-  const h = model.layers.length
-  const d = Math.max(...model.layers.map((l) => l.length))
-  const w = Math.max(...model.layers.flatMap((l) => l.map((r) => r.length)))
-  return {
-    w,
-    h,
-    d,
-    at(x, y, z) {
-      if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) return null
-      const ch = model.layers[y]?.[z]?.[x]
-      return ch === undefined || ch === '.' ? null : ch
-    },
-  }
-}
-
-const hexToRgb = (hex: string): [number, number, number] => {
+export const hexToLinear = (hex: string): [number, number, number] => {
   const n = parseInt(hex.slice(1), 16)
   // Approximate sRGB -> linear so the lighting doesn't wash the palette out.
   const lin = (c: number) => Math.pow(c / 255, 2.2)
@@ -69,7 +64,7 @@ const CORNERS: [number, number][] = [
 
 /** Classic voxel corner occlusion: darker where two or three neighbours crowd a corner. */
 function cornerAo(
-  grid: Grid,
+  source: VoxelSource,
   x: number,
   y: number,
   z: number,
@@ -79,7 +74,7 @@ function cornerAo(
   du: number,
   dv: number,
 ): number {
-  const solid = (ax: number, ay: number, az: number) => (grid.at(ax, ay, az) ? 1 : 0)
+  const solid = (ax: number, ay: number, az: number) => (source.at(ax, ay, az) ? 1 : 0)
   const bx = x + n[0]!
   const by = y + n[1]!
   const bz = z + n[2]!
@@ -94,63 +89,45 @@ function cornerAo(
   return 0.55 + (level / 3) * 0.45
 }
 
-export interface VoxelGeometry {
+export interface VoxelBuild {
   geometry: Geometry
-  /** Height of the model in world units after the mesh is centred and scaled. */
-  height: number
-  /** Number of drawn faces, useful when budgeting for phones. */
   faces: number
 }
 
-/**
- * Builds a centred, unit-scaled mesh from a voxel model. Interior faces are
- * skipped, so a solid body costs only its surface.
- */
-export function buildVoxelGeometry(
-  gl: OGLRenderingContext,
-  model: VoxelModel,
-  targetHeight = 2.2,
-): VoxelGeometry {
-  const grid = toGrid(model)
-  const emissiveSet = new Set(model.emissive ?? [])
-  const headSet = new Set(model.head ?? [])
-  const limbSet = new Set(model.limbs ?? [])
-  const headStart = Math.floor(grid.h * HEAD_FRACTION)
+export interface BuildOptions {
+  /** World size of one voxel. */
+  scale: number
+  /** World position of the grid's (0, 0, 0) corner. */
+  origin: [number, number, number]
+}
 
+/** Builds a mesh from any voxel source, skipping faces buried inside the volume. */
+export function buildVoxels(
+  gl: OGLRenderingContext,
+  source: VoxelSource,
+  { scale, origin }: BuildOptions,
+): VoxelBuild {
   const position: number[] = []
   const normal: number[] = []
   const color: number[] = []
   const ao: number[] = []
   const part: number[] = []
   const emissive: number[] = []
-
-  const scale = targetHeight / grid.h
-  const ox = (grid.w - 1) / 2
-  const oz = (grid.d - 1) / 2
   let faces = 0
 
-  for (let y = 0; y < grid.h; y++) {
-    for (let z = 0; z < grid.d; z++) {
-      for (let x = 0; x < grid.w; x++) {
-        const ch = grid.at(x, y, z)
-        if (!ch) continue
-
-        const rgb = hexToRgb(model.palette[ch] ?? '#ff00ff')
-        const isEmissive = emissiveSet.has(ch) ? 1 : 0
-        const partId = limbSet.has(ch)
-          ? PART_LIMB
-          : headSet.has(ch) || y >= headStart
-            ? PART_HEAD
-            : PART_BODY
+  for (let y = 0; y < source.h; y++) {
+    for (let z = 0; z < source.d; z++) {
+      for (let x = 0; x < source.w; x++) {
+        const voxel = source.at(x, y, z)
+        if (!voxel) continue
 
         for (const n of FACES) {
-          if (grid.at(x + n[0], y + n[1], z + n[2])) continue
+          if (source.at(x + n[0], y + n[1], z + n[2])) continue
           faces++
           const [u, v] = basis(n)
-          // Voxel centre in world units: x/z centred, y sitting on the ground.
-          const cx = (x - ox) * scale
-          const cy = (y + 0.5) * scale
-          const cz = (z - oz) * scale
+          const cx = origin[0] + (x + 0.5) * scale
+          const cy = origin[1] + (y + 0.5) * scale
+          const cz = origin[2] + (z + 0.5) * scale
           const half = scale / 2
 
           const verts: number[][] = []
@@ -161,7 +138,7 @@ export function buildVoxelGeometry(
               cy + (n[1] + du * u[1]! + dv * v[1]!) * half,
               cz + (n[2] + du * u[2]! + dv * v[2]!) * half,
             ])
-            shades.push(cornerAo(grid, x, y, z, n, u, v, du, dv))
+            shades.push(cornerAo(source, x, y, z, n, u, v, du, dv))
           }
 
           // Flip the split so the AO gradient never creases across the quad.
@@ -173,10 +150,10 @@ export function buildVoxelGeometry(
           for (const i of order) {
             position.push(verts[i]![0]!, verts[i]![1]!, verts[i]![2]!)
             normal.push(n[0], n[1], n[2])
-            color.push(rgb[0], rgb[1], rgb[2])
+            color.push(voxel.color[0], voxel.color[1], voxel.color[2])
             ao.push(shades[i]!)
-            part.push(partId)
-            emissive.push(isEmissive)
+            part.push(voxel.part)
+            emissive.push(voxel.emissive)
           }
         }
       }
@@ -192,5 +169,71 @@ export function buildVoxelGeometry(
     emissive: { size: 1, data: new Float32Array(emissive) },
   })
 
-  return { geometry, height: grid.h * scale, faces }
+  return { geometry, faces }
+}
+
+/** Wraps a creature's ASCII layers as a voxel source. */
+export function modelSource(model: VoxelModel): VoxelSource {
+  const layers = expandLayers(model)
+  const h = layers.length
+  const d = Math.max(...layers.map((l) => l.length))
+  const w = Math.max(...layers.flatMap((l) => l.map((r) => r.length)))
+
+  const emissiveSet = new Set(model.emissive ?? [])
+  const headSet = new Set(model.head ?? [])
+  const limbSet = new Set(model.limbs ?? [])
+  const headStart = Math.floor(h * HEAD_FRACTION)
+  const cache = new Map<string, Voxel>()
+
+  return {
+    w,
+    h,
+    d,
+    at(x, y, z) {
+      if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) return null
+      const ch = layers[y]?.[z]?.[x]
+      if (ch === undefined || ch === '.') return null
+
+      const key = `${ch}:${y >= headStart ? 1 : 0}`
+      let voxel = cache.get(key)
+      if (!voxel) {
+        voxel = {
+          color: hexToLinear(model.palette[ch] ?? '#ff00ff'),
+          emissive: emissiveSet.has(ch) ? 1 : 0,
+          part: limbSet.has(ch)
+            ? PART_LIMB
+            : headSet.has(ch) || y >= headStart
+              ? PART_HEAD
+              : PART_BODY,
+        }
+        cache.set(key, voxel)
+      }
+      return voxel
+    },
+  }
+}
+
+export interface VoxelGeometry {
+  geometry: Geometry
+  /** Height of the model in world units after the mesh is centred and scaled. */
+  height: number
+  faces: number
+}
+
+/** Builds a centred, unit-scaled mesh from a voxel model. */
+export function buildVoxelGeometry(
+  gl: OGLRenderingContext,
+  model: VoxelModel,
+  targetHeight = 2.2,
+): VoxelGeometry {
+  const source = modelSource(model)
+  const scale = targetHeight / source.h
+  // Centred on x/z, sitting on the ground at y = 0.
+  const origin: [number, number, number] = [
+    (-source.w / 2) * scale,
+    0,
+    (-source.d / 2) * scale,
+  ]
+  const { geometry, faces } = buildVoxels(gl, source, { scale, origin })
+  return { geometry, height: source.h * scale, faces }
 }
