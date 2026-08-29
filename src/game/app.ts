@@ -329,7 +329,10 @@ export class App {
     this.forage.phase = 'leaving'
     this.applyStats({ energy: -8 })
     this.say('off it goes', 'confirm')
-    this.pushTicker(`${pet.name} has gone looking for something`)
+    // Said now, not queued. A queued line waits for whatever is scrolling to
+    // finish -- a quarter of a minute at worst -- and the whole forage is over
+    // in ten seconds, so it would have arrived long after the pet was home.
+    this.speakNow(`${pet.name} has gone looking`)
     this.persist()
   }
 
@@ -391,10 +394,10 @@ export class App {
     if (curio && Math.random() < FORAGE_LUCK) {
       this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
       this.found = curio
-      this.pushTicker(`${pet.name} came back with a ${curio.name.toLowerCase()}`)
+      this.speakNow(`${pet.name} came back with a ${curio.name.toLowerCase()}`)
       this.hooks.burst('sparkle', 12)
     } else {
-      this.pushTicker(`${pet.name} came back with nothing this time`)
+      this.speakNow(`${pet.name} came back with nothing`)
     }
     this.applyStats({ happiness: 6 })
     this.persist()
