@@ -353,6 +353,36 @@ is still time to steer it. What it becomes stays hidden, because knowing you are
 heading somewhere is the useful part and knowing exactly where would end the
 surprise.
 
+### Temperament
+
+The four raising metrics — care, diet, play and sleep — fed exactly one
+decision, which branch the pet took, and that decision is spent the moment it
+grows up. They carried on being computed for the rest of its life while nothing
+read them, which is why adulthood felt like the point where the game stopped
+having a memory.
+
+Growing up now settles a **temperament** from that same reading, kept for the
+rest of the pet's life. A lively pet burns through its spirits and its energy
+and gets more out of a game; a restful one holds both and keeps its own hours; a
+devoted one frets when left alone but stays clean. Two Mochimos raised
+differently are no longer the same pet.
+
+Nothing stands out unless it genuinely stands out, and the readings are not on
+the same scale — care sits high for anyone half attentive, while play wants
+twenty games and sleep wants punctual bedtimes. Compared raw, three pets in four
+came out devoted. Each is measured against what is typical for that axis
+instead, so an ordinary player gets a spread and a deliberate one gets what they
+raised for.
+
+### Systems that touch each other
+
+Depth came from making the levers depend on one another rather than adding more
+of them. A tired or hungry pet is poor company: it gets half as much from a game
+and tires half again as fast for it, so there is a right *time* to play and not
+only a right amount. A hot meal is worth a third more in winter and a light one
+a third more in summer, so the same food is a different thing depending on the
+day it is served.
+
 ### Visitors
 
 Some days there is something in the yard: a ball to knock about, a rabbit
