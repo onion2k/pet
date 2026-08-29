@@ -99,7 +99,11 @@ export class Hud {
   }
 
   icon(x: number, y: number, id: IconId, color: string, scale = 1): void {
-    const rows = iconRows(id)
+    this.glyph(x, y, iconRows(id), color, scale)
+  }
+
+  /** Draws 8x8 artwork from '#'-and-'.' rows. The menu icons and the curios share it. */
+  glyph(x: number, y: number, rows: string[], color: string, scale = 1): void {
     this.ctx.fillStyle = color
     for (let ry = 0; ry < ICON_SIZE; ry++) {
       const row = rows[ry] ?? ''

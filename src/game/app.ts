@@ -309,6 +309,11 @@ export class App {
     return next
   }
 
+  /** How many of each curio the lineage has found, for the collection board. */
+  get curioCounts(): Record<string, number> {
+    return this.save.curios
+  }
+
   get curioTally(): { kinds: number; total: number } {
     const counts = Object.values(this.save.curios)
     return { kinds: counts.length, total: counts.reduce((a, b) => a + b, 0) }

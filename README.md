@@ -80,7 +80,11 @@ Care keeps a pet well; the lineage is why you keep coming back.
 - **Curios.** Left alone for twenty minutes or more, the pet usually finds
   something — and most finds are gated by season or weather (a snowdrop needs
   winter, a dewdrop needs rain), so completing CURIOS x/8 takes visits at
-  different times.
+  different times. They are kept on a **collection board** filling the right of
+  the status screen: every curio has a slot, found ones in their own colour,
+  the rest as flat silhouettes, with a tally under any the pet has found more
+  than once. Showing the gaps is the point — the board says what is still out
+  there without saying when to come back for it.
 - **The streak.** Days visited, shown on the status screen. Consecutive days
   build it; missed days erode it one per day rather than wiping it out.
 - **Shell colours.** Earned by milestones — a streak, a retirement, curios,

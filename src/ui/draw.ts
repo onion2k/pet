@@ -1,4 +1,4 @@
-import { CURIO_COUNT } from '../data/curios'
+import { CURIOS, CURIO_COUNT } from '../data/curios'
 import { textWidth } from '../data/font'
 import { FOODS } from '../data/foods'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
@@ -200,7 +200,8 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
     hud.text(88, y, String(Math.round(value)), INK)
   })
 
-  hud.rect(6, 92, hud.width - 12, 1, '#22283c')
+  // Stops short of the curio board, which keeps its own column.
+  hud.rect(6, 92, 92, 1, '#22283c')
   const traits: [string, number][] = [
     ['CARE', m.care],
     ['PLAY', m.play],
@@ -213,9 +214,9 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   })
 
   hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
-  const curios = app.curioTally
   hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
-  hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}  CURIOS ${curios.kinds}/${CURIO_COUNT}`, DIM)
+  hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}`, DIM)
+  drawCurioBoard(hud, app)
   if (pet.stage === 'adult') {
     const progress = app.retireProgress
     if (progress > 0) {
@@ -229,6 +230,29 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   } else {
     hud.textCentered(hud.width / 2, hud.height - 10, 'ANY KEY TO CLOSE', '#3a4058')
   }
+}
+
+/**
+ * The curio collection, filling the empty right-hand column of the status
+ * screen. Everything the pet can find has a slot, so the gaps show what is
+ * still out there; unfound ones are drawn as flat silhouettes rather than
+ * hidden, because a board with holes in it is what makes the set worth
+ * finishing. Duplicates carry a small tally.
+ */
+function drawCurioBoard(hud: Hud, app: App): void {
+  const counts = app.curioCounts
+  const kinds = app.curioTally.kinds
+  const left = 104
+  hud.text(left, 40, `CURIOS ${kinds}/${CURIO_COUNT}`, DIM)
+  hud.rect(left, 48, 76, 1, '#22283c')
+
+  CURIOS.forEach((curio, i) => {
+    const x = left + (i % 3) * 26
+    const y = 54 + Math.floor(i / 3) * 26
+    const found = counts[curio.id] ?? 0
+    hud.glyph(x, y, curio.glyph.split('/'), found > 0 ? curio.colour : '#252b40', 2)
+    if (found > 1) hud.textCentered(x + 8, y + 17, `x${found}`, '#4a5170')
+  })
 }
 
 function drawEvolve(hud: Hud, app: App): void {

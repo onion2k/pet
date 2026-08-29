@@ -14,17 +14,21 @@ export interface Curio {
   /** Weather it needs; absent means any. */
   weather?: WeatherId[]
   weight: number
+  /** 8x8 artwork for the collection board, in the same format as the menu icons. */
+  glyph: string
+  /** What it looks like once found. Unfound ones are drawn as a flat silhouette. */
+  colour: string
 }
 
 export const CURIOS: Curio[] = [
-  { id: 'pebble', name: 'Smooth pebble', weight: 5 },
-  { id: 'feather', name: 'Stray feather', weight: 4 },
-  { id: 'blossom', name: 'Blossom', seasons: ['spring'], weight: 4 },
-  { id: 'sunpetal', name: 'Sunpetal', seasons: ['summer'], weight: 4 },
-  { id: 'toadstool', name: 'Toadstool', seasons: ['autumn'], weight: 4 },
-  { id: 'snowdrop', name: 'Snowdrop', seasons: ['winter'], weight: 4 },
-  { id: 'dewdrop', name: 'Perfect dewdrop', weather: ['rain', 'mist'], weight: 3 },
-  { id: 'geode', name: 'Tiny geode', weight: 1 },
+  { id: 'pebble', name: 'Smooth pebble', weight: 5, glyph: '......../......../..####../.######./########/.######./......../........', colour: '#9aa3bb' },
+  { id: 'feather', name: 'Stray feather', weight: 4, glyph: '.......#/......##/.....##./..#.##../.#####../.####.../.##...../#.......', colour: '#d9d2b6' },
+  { id: 'blossom', name: 'Blossom', seasons: ['spring'], weight: 4, glyph: '..#..#../.##..##./.######./.######./..####../...##.../...##.../...##...', colour: '#f2a0c4' },
+  { id: 'sunpetal', name: 'Sunpetal', seasons: ['summer'], weight: 4, glyph: '...##.../.#.##.#./..####../##.##.##/..####../.#.##.#./...##.../........', colour: '#f6c453' },
+  { id: 'toadstool', name: 'Toadstool', seasons: ['autumn'], weight: 4, glyph: '..####../.######./########/########/...##.../...##.../...##.../........', colour: '#e2604f' },
+  { id: 'snowdrop', name: 'Snowdrop', seasons: ['winter'], weight: 4, glyph: '...#..../.#.#.#../..###.../#######./..###.../.#.#.#../...#..../........', colour: '#bfe6ff' },
+  { id: 'dewdrop', name: 'Perfect dewdrop', weather: ['rain', 'mist'], weight: 3, glyph: '...##.../...##.../..####../.######./########/########/.######./..####..', colour: '#7fd8e8' },
+  { id: 'geode', name: 'Tiny geode', weight: 1, glyph: '......../.######./#.#..#.#/##....##/.#....#./..#..#../...##.../........', colour: '#b48ce8' },
 ]
 
 export const CURIO_COUNT = CURIOS.length
