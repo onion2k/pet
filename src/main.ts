@@ -311,6 +311,7 @@ function step(dt: number): void {
   }
 
   shell.setPower(app.mode === 'boot' ? 1 - app.bootTimer / 1.4 : 1)
+  shell.setDim(app.forageDim)
   // Pan to keep the pet in view. Clamped, so once it strays past what the
   // swing can cover it drifts out toward the side of the screen on its own.
   const pet = petView.position
@@ -338,6 +339,7 @@ function step(dt: number): void {
   // --- the world's own clock ------------------------------------------------
   // The pet has to be in bed before the night can be wound past.
   app.petSheltered = petView.sheltered
+  app.petAway = petView.away
   app.debugWorldOffset = timeOffset
   // One definition of what time it is in the pet's world, shared by the picture
   // and by the pet itself.

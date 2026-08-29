@@ -120,6 +120,7 @@ const screenFrag = /* glsl */ `
   uniform float uTime;
   uniform float uBloom;
   uniform float uPower;
+  uniform float uDim;
   uniform float uMotion;
   uniform float uLevels;
   uniform float uBarrel;
@@ -215,6 +216,10 @@ const screenFrag = /* glsl */ `
     col *= band;
     col += vec3(0.6, 0.9, 1.0) * (1.0 - band) * step(abs(centred.y), open + 0.02) * 0.4;
 
+    // A cut to black, for the pet going over the hill and coming back later.
+    // Applied after everything, so nothing shows through it.
+    col *= 1.0 - uDim;
+
     // The glass is slightly recessed into the plastic, so its rim falls into shadow.
     col *= mix(0.35, 1.0, smoothstep(1.0, 0.62, shape));
 
@@ -255,6 +260,8 @@ export interface Shell {
   /** Swaps the textures the screen samples; the bloom target changes each frame. */
   setScreenTextures(scene: Texture, bloomGlow: Texture): void
   setPower(value: number): void
+  /** Cuts the picture to black, 0..1, for a forage. */
+  setDim(value: number): void
   setBloom(value: number): void
   setMotion(enabled: boolean): void
 }
@@ -354,6 +361,7 @@ export function createShell(
         uTime: { value: 0 },
         uBloom: { value: 1 },
         uPower: { value: 0 },
+        uDim: { value: 0 },
         uMotion: { value: 1 },
         uLevels: { value: 24 },
         uBarrel: { value: BARREL },
@@ -413,6 +421,9 @@ export function createShell(
     },
     setPower(value) {
       screen.program.uniforms.uPower.value = value
+    },
+    setDim(value: number) {
+      screen.program.uniforms.uDim.value = value
     },
     setBloom(value) {
       screen.program.uniforms.uBloom.value = value

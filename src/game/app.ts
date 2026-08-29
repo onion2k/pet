@@ -39,10 +39,14 @@ const WELCOME_THRESHOLD_MS = 5 * 60_000
 const CURIO_AWAY_MS = 20 * 60_000
 /** Chance a long enough absence turns something up. */
 const CURIO_CHANCE = 0.65
-/** How long a forage takes. Three world hours, so the sky moves while it is out. */
-const FORAGE_MS = 3 * 60_000
 /** How often a forage comes back with something. Not always, or it is a button. */
 const FORAGE_LUCK = 0.7
+/** How long the picture holds on black while the pet is away. */
+const FORAGE_DARK_SECONDS = 3
+/** How quickly the picture cuts out and back. */
+const FORAGE_FADE_RATE = 3.5
+/** What the world clock gains while the pet is out of sight. */
+const FORAGE_WORLD_MS = 2 * 60_000
 
 /**
  * A sleep runs to sunrise, however far off that is. Bedded down at dusk that is
@@ -313,33 +317,76 @@ export class App {
    * knowledge the player has built up about the year becomes a thing they can
    * act on rather than wait for.
    */
-  private forage(): void {
+  private sendForaging(): void {
     const pet = this.pet
     if (!pet) return
     if (pet.stage !== 'adult') return this.say('not old enough', 'refuse')
     if (pet.asleep) return this.say(`${pet.name} is asleep`, 'refuse')
     if (pet.sick) return this.say('too poorly', 'refuse')
-    if (pet.foragingUntil) return this.say('already out', 'refuse')
+    if (this.forage.phase !== 'idle') return this.say('already out', 'refuse')
     if (pet.stats.energy < 25) return this.say('too tired', 'refuse')
 
-    pet.foragingUntil = this.worldNow() + FORAGE_MS
+    this.forage.phase = 'leaving'
     this.applyStats({ energy: -8 })
     this.say('off it goes', 'confirm')
     this.pushTicker(`${pet.name} has gone looking for something`)
     this.persist()
   }
 
-  /** Brings it home if it is due, with whatever the day had to offer. */
+  /**
+   * Runs the forage. The pet walks off, the picture cuts to black, and while
+   * nothing is on screen the world clock moves on -- which is why it comes home
+   * to a different afternoon than the one it left. Told as a cut rather than a
+   * wait, because a wait is three minutes of watching an empty yard.
+   */
+  private advanceForage(dt: number): void {
+    const f = this.forage
+    const to = (target: number) => {
+      f.dim += (target - f.dim) * Math.min(1, dt * FORAGE_FADE_RATE)
+    }
+    switch (f.phase) {
+      case 'idle':
+        to(0)
+        return
+      case 'leaving':
+        // Nothing happens until it is actually over the hill.
+        if (this.petAway) f.phase = 'fading'
+        return
+      case 'fading':
+        to(1)
+        if (f.dim > 0.985) {
+          f.dim = 1
+          f.phase = 'dark'
+          f.timer = FORAGE_DARK_SECONDS
+        }
+        return
+      case 'dark': {
+        f.dim = 1
+        f.timer -= dt
+        if (f.timer > 0) return
+        // The time it spent away, spent all at once.
+        this.save.worldOffset += FORAGE_WORLD_MS
+        this.settleForage()
+        f.phase = 'returning'
+        return
+      }
+      case 'returning':
+        to(0)
+        // Held until the pet is properly back in the yard, so the picture never
+        // opens on an empty one.
+        if (f.dim < 0.015 && !this.petAway) {
+          f.dim = 0
+          f.phase = 'idle'
+        }
+        return
+    }
+  }
+
+  /** What it found out there, judged on the world it has come back to. */
   private settleForage(): void {
     const pet = this.pet
-    if (!pet?.foragingUntil) return
-    const now = this.worldNow()
-    if (now < pet.foragingUntil) return
-    pet.foragingUntil = undefined
-
-    // Judged on the world it comes back to, which is the world the player
-    // chose by picking their moment.
-    const world = worldAt(now)
+    if (!pet) return
+    const world = worldAt(this.worldNow())
     const curio = findCurio(world.season.id, world.weather, Math.random())
     if (curio && Math.random() < FORAGE_LUCK) {
       this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
@@ -360,6 +407,24 @@ export class App {
     for (const [key, amount] of Object.entries(delta) as [StatKey, number][]) {
       pet.stats[key] = Math.max(0, Math.min(100, pet.stats[key] + amount))
     }
+  }
+
+  /**
+   * The forage, which is a short piece of theatre rather than saved state: if
+   * the app closes midway the pet is simply home again.
+   */
+  private forage: {
+    phase: 'idle' | 'leaving' | 'fading' | 'dark' | 'returning'
+    timer: number
+    dim: number
+  } = { phase: 'idle', timer: 0, dim: 0 }
+
+  /** Set each frame by the renderer: true while the pet is over the hill. */
+  petAway = false
+
+  /** How black the picture is, 0..1. */
+  get forageDim(): number {
+    return this.forage.dim
   }
 
   /** Which way the family leans, from the pets already seen off. */
@@ -687,7 +752,7 @@ export class App {
         return
       }
       case 'forage': {
-        this.forage()
+        this.sendForaging()
         return
       }
       case 'medicine': {
@@ -852,7 +917,7 @@ export class App {
       return
     }
 
-    this.settleForage()
+    this.advanceForage(dt)
     this.advanceTicker(dt)
 
     const pet = this.pet
@@ -922,7 +987,7 @@ export class App {
       mood: mood(pet),
       asleep: pet.asleep,
       sick: pet.sick,
-      foraging: pet.foragingUntil !== undefined,
+      foraging: this.forage.phase === 'leaving' || this.forage.phase === 'fading' || this.forage.phase === 'dark',
       // An egg has nothing to walk with, and a hatchling needs to finish
       // hatching before it wanders off.
       mobile: pet.stage !== 'egg',

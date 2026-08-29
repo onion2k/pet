@@ -62,11 +62,7 @@ export interface PetState {
    * on any pet saved before temperaments existed.
    */
   temperament?: TemperamentId
-  /**
-   * Wall-clock ms the pet is due back from a forage, if it is out on one.
-   * Only grown pets go: it is the one job the game asks an adult to do.
-   */
-  foragingUntil?: number
+
   /** Wall-clock ms the egg was laid. */
   bornAt: number
   /** Wall-clock ms of the last simulated tick. Drives offline decay. */

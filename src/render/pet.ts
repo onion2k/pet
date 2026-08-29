@@ -301,6 +301,8 @@ const STRIDE_RATE = 1.15
 
 /** Roughly the pet's half-width, used to keep it clear of the shelter walls. */
 const PET_RADIUS = 0.8
+/** How much faster the pet moves when it is on its way somewhere. */
+const FORAGE_TROT = 3
 /** The lantern post's footprint, for walking round rather than through. */
 const LAMP_RADIUS = 0.3
 
@@ -779,7 +781,9 @@ export class PetView {
     // goes" ought to mean it went somewhere.
     if (state.foraging && w.where !== 'away-out' && w.where !== 'away') {
       w.where = 'away-out'
-      w.targetX = Math.sign(w.x || 1) * (this.bounds.x + 2.5)
+      // Always off to the right, so the leaving and the coming back read as the
+      // same journey each time rather than depending on where it happened to be.
+      w.targetX = this.bounds.x + 1.5
       w.targetZ = w.z
       w.walking = true
       this.mesh.visible = true
@@ -787,7 +791,7 @@ export class PetView {
     } else if (!state.foraging && (w.where === 'away' || w.where === 'away-out')) {
       // Back over the hill, from the side it left by.
       w.where = 'away-back'
-      w.x = Math.sign(w.targetX || 1) * (this.bounds.x + 2.5)
+      w.x = this.bounds.x + 1.5
       const next = this.pickRoamTarget()
       w.targetX = next?.x ?? 0
       w.targetZ = next?.z ?? 0
@@ -835,7 +839,10 @@ export class PetView {
           this.shadow.visible = false
         } else if (w.where === 'away-back') w.where = 'out'
       } else {
-        const step = Math.min(distance, WALK_SPEED * dt)
+        // A pet with somewhere to be moves like it: the walk out of the yard
+        // and back is a trot, not the amble it uses to potter about.
+        const hurrying = w.where === 'away-out' || w.where === 'away-back'
+        const step = Math.min(distance, WALK_SPEED * (hurrying ? FORAGE_TROT : 1) * dt)
         const [sx, sz] = this.steerRoundLamp(w.x, w.z, dx / distance, dz / distance)
         w.x += sx * step
         w.z += sz * step
