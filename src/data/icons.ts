@@ -71,7 +71,7 @@ export const ICON_ORDER: IconId[] = ['feed', 'play', 'clean', 'medicine', 'sleep
 export const ICON_LABEL: Record<IconId, string> = {
   feed: 'FEED',
   play: 'PLAY',
-  sleep: 'LIGHT',
+  sleep: 'SLEEP',
   clean: 'CLEAN',
   medicine: 'MEDS',
   status: 'STATUS',

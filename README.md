@@ -24,8 +24,8 @@ you are tapping or typing:
 | B | `B`, `Enter`, `Space` | Select, confirm, act |
 | C | `C`, `→`, `Esc` | Next icon / back |
 
-Six icons ring the screen: feed, play, clean, medicine, light (sleep) and
-status. An icon blinks red when the matching stat is critical.
+Six icons ring the screen: feed, play, clean, medicine, sleep and status. An
+icon blinks red when the matching stat is critical.
 
 **Hold C** — press and hold the third button, or the C key — to back out of the
 feed menu, the game menu, or a game in progress:
