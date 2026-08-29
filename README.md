@@ -205,17 +205,23 @@ drops the gaze and bows the whole body forward from the hips, which reads from
 across the yard in a way an eyebrow never will. The eyes blink on their own
 timer, and glance about between longer looks straight at you.
 
-### Thoughts, signs and humming
+### Thoughts and humming
 
 Above the pet is a bubble drawn on a small canvas: a thought with trailing puffs,
-a shout with a tail, or a placard on a stick held out at chest height. It shows
-either a large pixel symbol — a heart, a bowl, a note, a question — or a short
-word in the same font the HUD uses. Needs come first, so a hungry pet never
-stands there musing about the weather, and a cheerful one hums, with notes
-rising past its head.
+or speech with a tail. It shows either a large pixel symbol — a heart, a bowl, a
+note, a question — or a short word in the same font the HUD uses. Needs come
+first, so a hungry pet never stands there musing about the weather, and a
+cheerful one hums, with notes rising past its head.
 
-Both stand well in front of the pet and off to one side. Placed level with it and
-only a little aside, the quad sits inside the pet's own head and is never seen.
+There was a held placard as well, and it did not work. A sign has to look held,
+and these creatures have no arm in view to hold one with, so it read as a
+rectangle floating beside them rather than as something the pet was doing.
+A bubble carries a tail back to the pet and needs no hands. Everything the sign
+used to say is simply said.
+
+The bubble stands well in front of the pet and off to one side. Placed level with
+it and only a little aside, the quad sits inside the pet's own head and is never
+seen.
 
 ### Time, seasons and weather
 

@@ -263,7 +263,8 @@ let elapsed = 0
 /** Shifts the world clock. Only ever non-zero when a test drives it. */
 /** Short enough to read in a 72-pixel bubble, and all in the pet's own voice. */
 const MUSINGS = ['hmm', 'hello', 'nice', 'ok', 'busy', 'sunny', 'oh', 'yes']
-const MUSINGS_SIGN = ['hi', 'feed me', 'play?', 'thanks', 'more', 'best day']
+/** Said out loud when the pet is in a good mood. */
+const CHEER = ['hi', 'play?', 'thanks', 'more', 'best day', 'yay']
 
 let timeOffset = 0
 /** Lantern positions in view space, packed xyz, rewritten every frame. */
@@ -409,13 +410,14 @@ function step(dt: number): void {
     else if (stats.energy < 30) bubble.show('thought', 'zzz', 3.4)
     else if (stats.happiness < 35) bubble.show('thought', 'ask', 3.4)
     else if (petView.cheerful) {
-      // A cheerful pet hums, and sometimes holds up a sign about it.
+      // A cheerful pet hums, and sometimes has something to say about it.
       const roll = Math.random()
       if (roll < 0.35) {
         bubble.show('thought', 'note', 3)
         bubble.hum()
-      } else if (roll < 0.55) bubble.show('sign', MUSINGS_SIGN[(Math.random() * MUSINGS_SIGN.length) | 0]!, 3.8)
-      else bubble.show('thought', 'heart', 3)
+      } else if (roll < 0.6) {
+        bubble.show('speech', CHEER[(Math.random() * CHEER.length) | 0]!, 3.6)
+      } else bubble.show('thought', 'heart', 3)
     } else bubble.show('thought', MUSINGS[(Math.random() * MUSINGS.length) | 0]!, 3.4)
   }
   bubble.update(dt, { x: petView.position.x, y: terrain.shape.groundY, z: petView.position.z }, cameraPan)

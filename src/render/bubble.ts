@@ -31,8 +31,13 @@ const fragment = /* glsl */ `
   }
 `
 
-/** What the pet is putting above its head. */
-export type BubbleKind = 'thought' | 'speech' | 'sign'
+/**
+ * What the pet is putting above its head. There was a held placard here too,
+ * but a sign has to look held, and these creatures have no arm in view to hold
+ * one with -- it read as a rectangle floating beside them. Anything it would
+ * have said is said instead.
+ */
+export type BubbleKind = 'thought' | 'speech'
 
 export interface Bubble {
   root: Transform
@@ -215,15 +220,7 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
     const ink = '#14121c'
     const paper = '#f6f2e6'
 
-    if (kind === 'sign') {
-      // A placard on a stick: squared off, and held rather than thought.
-      ctx.fillStyle = ink
-      ctx.fillRect(4, 2, W - 8, H - 14)
-      ctx.fillStyle = paper
-      ctx.fillRect(6, 4, W - 12, H - 18)
-      ctx.fillStyle = '#8a5a33'
-      ctx.fillRect(W / 2 - 2, H - 12, 4, 12)
-    } else {
+    {
       ctx.fillStyle = ink
       roundRect(2, 2, W - 4, H - 12, 8)
       ctx.fill()
@@ -259,7 +256,7 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
       }
     }
 
-    const midY = kind === 'sign' ? (H - 14) / 2 + 2 : (H - 16) / 2 + 4
+    const midY = (H - 16) / 2 + 4
     if (SYMBOLS[text]) drawSymbol(text, W / 2, midY, 3, ink)
     else pixelText(text.toUpperCase(), W / 2, midY - (GLYPH_H * 2) / 2, 2, ink)
     texture.needsUpdate = true
@@ -283,7 +280,6 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
 
   let timer = 0
   let fade = 0
-  let current: BubbleKind = 'thought'
 
   return {
     root,
@@ -291,7 +287,6 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
       return timer > 0
     },
     show(kind, text, seconds = 3.4) {
-      current = kind
       paint(kind, text)
       timer = seconds
     },
@@ -313,13 +308,10 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
       program.uniforms.uFade.value = fade
       panel.visible = fade > 0.02
 
-      // A sign is held; a bubble floats. Both stand off to one side and well
-      // in front of the pet: level with it and only a little aside, the quad
-      // simply sits inside the head and is never seen.
-      const sign = current === 'sign'
-      panel.scale.set(sign ? 0.8 : 0.95)
-      // A sign is held out at chest height; a bubble floats clear of the head.
-      panel.position.set(sign ? 1.12 : 0.9, sign ? 0.85 : 1.9, 0.75)
+      // Off to one side and well in front of the pet: level with it and only a
+      // little aside, the quad simply sits inside the head and is never seen.
+      panel.scale.set(0.95)
+      panel.position.set(0.9, 1.9, 0.75)
       root.position.set(at.x, at.y, at.z)
       // Turned to the viewer rather than with the pet, or it would be edge-on
       // half the time.
