@@ -363,6 +363,14 @@ the day number so it is settled for the day rather than flickering. Arrivals are
 announced on the ticker, which is the only reason a small thing on the far verge
 gets noticed at all.
 
+Each arrival is written out in full — *the leaves have blown into a pile*,
+*somebody has built a snowman* — rather than dropped into a shared sentence
+frame. One frame made every arrival read as the same message however many
+different things turned up, and it could not be made to agree with a plural
+name: *wildflowers is in the yard*. Only one arrival is announced per day, too,
+because a season turning brings several at once and a run of them buried
+everything else the ticker had to say.
+
 They are not scenery. Scenery is stamped into the terrain's voxel field, and
 that field is only meshed when the pet changes — a 40ms rebuild is far too much
 to spend on the year turning. Each visitor is its own small mesh instead, faded

@@ -34,8 +34,10 @@ export type VisitorSpot =
 
 export interface Visitor {
   id: VisitorId
-  /** Announced on the ticker when it turns up. */
-  name: string
+  /** Announced on the ticker when it turns up, written out in full. One shared
+   * sentence frame made every arrival read as the same message, and could not
+   * be made to agree with a plural name: "wildflowers is in the yard". */
+  arrival: string
   seasons: SeasonId[]
   /** Chance of being there on any given world day. */
   chance: number
@@ -360,7 +362,7 @@ const fireflies: VoxelModel = {
 export const VISITORS: Visitor[] = [
   {
     id: 'fireflies',
-    name: 'fireflies',
+    arrival: 'fireflies are out over the meadow',
     seasons: ['spring', 'summer'],
     chance: 0.5,
     hours: [20, 4],
@@ -370,12 +372,12 @@ export const VISITORS: Visitor[] = [
     motion: 'flutter',
     spot: 'roam',
   },
-  { id: 'ball', name: 'a ball', seasons: ['summer', 'autumn'], chance: 0.5, model: ball, height: 0.44, motion: 'roll', spot: 'roam' },
-  { id: 'rabbit', name: 'a rabbit', seasons: ['spring', 'summer'], chance: 0.4, model: rabbit, height: 0.74, motion: 'hop', spot: 'verge' },
-  { id: 'snowman', name: 'a snowman', seasons: ['winter'], chance: 0.55, model: snowman, height: 1.4, motion: 'still', spot: 'verge' },
-  { id: 'flowers', name: 'wildflowers', seasons: ['spring'], chance: 0.65, model: flowers, height: 0.64, motion: 'still', spot: 'verge' },
-  { id: 'pumpkin', name: 'a jack-o-lantern', seasons: ['autumn'], chance: 0.5, model: pumpkin, height: 0.64, motion: 'still', spot: 'door' },
-  { id: 'butterfly', name: 'a butterfly', seasons: ['spring', 'summer'], chance: 0.45, model: butterfly, height: 0.32, motion: 'flutter', spot: 'roam' },
-  { id: 'leafpile', name: 'a pile of leaves', seasons: ['autumn'], chance: 0.5, model: leafpile, height: 0.44, motion: 'still', spot: 'verge' },
-  { id: 'sled', name: 'a sled', seasons: ['winter'], chance: 0.4, model: sled, height: 0.42, motion: 'still', spot: 'verge' },
+  { id: 'ball', arrival: 'a ball has turned up in the yard', seasons: ['summer', 'autumn'], chance: 0.5, model: ball, height: 0.44, motion: 'roll', spot: 'roam' },
+  { id: 'rabbit', arrival: 'a rabbit is grazing on the verge', seasons: ['spring', 'summer'], chance: 0.4, model: rabbit, height: 0.74, motion: 'hop', spot: 'verge' },
+  { id: 'snowman', arrival: 'somebody has built a snowman', seasons: ['winter'], chance: 0.55, model: snowman, height: 1.4, motion: 'still', spot: 'verge' },
+  { id: 'flowers', arrival: 'wildflowers have come up', seasons: ['spring'], chance: 0.65, model: flowers, height: 0.64, motion: 'still', spot: 'verge' },
+  { id: 'pumpkin', arrival: 'a carved lantern sits by the door', seasons: ['autumn'], chance: 0.5, model: pumpkin, height: 0.64, motion: 'still', spot: 'door' },
+  { id: 'butterfly', arrival: 'a butterfly is doing the rounds', seasons: ['spring', 'summer'], chance: 0.45, model: butterfly, height: 0.32, motion: 'flutter', spot: 'roam' },
+  { id: 'leafpile', arrival: 'the leaves have blown into a pile', seasons: ['autumn'], chance: 0.5, model: leafpile, height: 0.44, motion: 'still', spot: 'verge' },
+  { id: 'sled', arrival: 'a sled has been left out', seasons: ['winter'], chance: 0.4, model: sled, height: 0.42, motion: 'still', spot: 'verge' },
 ]

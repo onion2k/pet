@@ -95,7 +95,6 @@ export interface VisitorLighting {
 /** A visitor that is currently in the yard. */
 export interface ActiveVisitor {
   id: VisitorId
-  name: string
   x: number
   z: number
 }
@@ -323,7 +322,6 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         .filter((e) => e.present)
         .map((e) => ({
           id: e.visitor.id,
-          name: e.visitor.name,
           x: e.node.position.x,
           z: e.node.position.z,
         }))
@@ -338,12 +336,13 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         // Only genuine arrivals are worth a line, and not the ones that were
         // already standing there when the app opened.
         if (!first) {
-          for (const entry of entries) {
-            if (entry.visitor.hours) continue
-            if (entry.present && !announced.has(entry.visitor.id)) {
-              context.announce(`${entry.visitor.name} is in the yard`)
-            }
-          }
+          // One a day at most. A season turning brings several at once, and
+          // announcing each of them buried everything else the ticker had to
+          // say under a run of arrivals.
+          const arrived = entries.find(
+            (e) => !e.visitor.hours && e.present && !announced.has(e.visitor.id),
+          )
+          if (arrived) context.announce(arrived.visitor.arrival)
         }
         announced = here
       }
@@ -357,12 +356,18 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
             from <= to
               ? context.hour >= from && context.hour < to
               : context.hour >= from || context.hour < to
+          const was = entry.present
           entry.present = entry.chosen && open
           // Foretold once, while it is still expected rather than here. That
           // gap is the whole point: it gives a reason to come back at a time.
           if (entry.chosen && !open && !entry.foretold && entry.visitor.expected) {
             entry.foretold = true
             context.announce(entry.visitor.expected)
+          }
+          // And said again when the window actually opens, so the forecast pays
+          // off rather than being the only word about it.
+          if (entry.present && !was && entry.foretold) {
+            context.announce(entry.visitor.arrival)
           }
         }
 
