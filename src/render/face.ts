@@ -124,7 +124,7 @@ export function faceAnchors(model: VoxelModel, targetHeight: number): FaceAnchor
     mouth: mouthAnchor(
       source,
       (eyeLeft.x + eyeRight.x) / 2,
-      (eyeLeft.y + eyeRight.y) / 2 - span(left, 'y') * 1.9,
+      (eyeLeft.y + eyeRight.y) / 2 - span(left, 'y') * 1.5,
       scale,
       originZ,
     ),

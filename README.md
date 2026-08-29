@@ -183,7 +183,7 @@ head simply disappears, leaving the eye reading as nothing but its pupil. The
 head colour for the patch is sampled from the voxel beside the eye, so it is
 right for every species without a table.
 
-The mouth is set well below the eyes to clear whatever muzzle the model has
+The mouth is set a good way below the eyes to clear whatever muzzle the model has
 painted between them, and by that height the body may have bulged out in front
 of the face — so the front surface is measured again at the mouth's own height
 rather than borrowing the eyes'. Two of the eleven need it; on the rest it
