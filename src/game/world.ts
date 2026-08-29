@@ -156,6 +156,15 @@ export function isNight(now: number): boolean {
   return sunArc(worldHour(now), point.daylightHours).height <= 0
 }
 
+/** World hours from `now` until the sun next comes up. */
+export function hoursUntilSunrise(now: number): number {
+  const { daylightHours } = seasonAt(now)
+  const sunrise = 12 - daylightHours
+  const delta = sunrise - worldHour(now)
+  // Past this morning's sunrise, the next one is tomorrow's.
+  return delta > 0 ? delta : delta + HOURS
+}
+
 export function worldAt(now: number): WorldState {
   // --- season -------------------------------------------------------------
   const { season, nextSeason, blend: seasonBlend, daylightHours } = seasonAt(now)

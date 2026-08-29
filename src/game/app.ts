@@ -9,7 +9,7 @@ import { MINIGAMES, type GameSession } from './minigames'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
-import { isNight, WORLD_HOUR_MS } from './world'
+import { hoursUntilSunrise, isNight, WORLD_HOUR_MS } from './world'
 import type { PetState, SaveFile } from './types'
 
 export type Mode = 'boot' | 'name' | 'welcome' | 'main' | 'feed' | 'status' | 'games' | 'playing' | 'evolve'
@@ -19,10 +19,16 @@ export const NAMES = ['PIP', 'BOB', 'ZED', 'MOSS', 'NIM', 'TOFU', 'KIRA', 'DUSK'
 /** Long absences get a summary screen rather than a silent stat drop. */
 const WELCOME_THRESHOLD_MS = 5 * 60_000
 
-/** How much of the night a sleep skips past. */
-const SLEEP_SKIP_HOURS = 8
-/** Real seconds the skip takes to play out. */
-const SLEEP_SKIP_SECONDS = 3.5
+/**
+ * A sleep runs to sunrise, however far off that is. Bedded down at dusk that is
+ * most of a night; bedded down at noon it is most of a day, and the pet wakes
+ * correspondingly ravenous.
+ */
+/** Real seconds a skip takes to play out, per world hour covered. */
+const SKIP_SECONDS_PER_HOUR = 0.44
+/** Bounds on that, so a short sleep does not flicker and a long one does not drag. */
+const SKIP_SECONDS_MIN = 1.2
+const SKIP_SECONDS_MAX = 6
 
 /** How long C must be held to back out of a submenu or a game. */
 export const HOLD_TO_BACK_SECONDS = 0.8
@@ -58,6 +64,9 @@ export class App {
   private heldSeconds = 0
   /** World-clock milliseconds still to be wound forward by the current sleep. */
   private skipRemaining = 0
+  /** How long this sleep is in total, for pacing and for the rest it grants. */
+  private skipTotal = 0
+  private skipSeconds = SKIP_SECONDS_MIN
   /** One skip per sleep, however long the pet stays in bed. */
   private skipSpent = false
   /** Set from the renderer once the pet has actually settled in its shelter. */
@@ -357,12 +366,19 @@ export class App {
     // is still ambling to the shelter.
     if (!this.skipSpent && this.petSheltered) {
       this.skipSpent = true
-      this.skipRemaining = SLEEP_SKIP_HOURS * WORLD_HOUR_MS
+      const hours = hoursUntilSunrise(this.worldNow())
+      this.skipTotal = hours * WORLD_HOUR_MS
+      this.skipRemaining = this.skipTotal
+      // Longer nights take longer to wind past, within reason.
+      this.skipSeconds = Math.min(
+        SKIP_SECONDS_MAX,
+        Math.max(SKIP_SECONDS_MIN, hours * SKIP_SECONDS_PER_HOUR),
+      )
     }
     if (this.skipRemaining <= 0) return
 
-    const total = SLEEP_SKIP_HOURS * WORLD_HOUR_MS
-    const step = Math.min(this.skipRemaining, (total / SLEEP_SKIP_SECONDS) * dt)
+    const total = this.skipTotal
+    const step = Math.min(this.skipRemaining, (total / this.skipSeconds) * dt)
     this.skipRemaining -= step
     this.save.worldOffset += step
 
@@ -371,9 +387,12 @@ export class App {
     // after that point charged it waking-rate hunger for the rest of the night.
     pet.asleep = true
     // The pet gets the rest it slept through, but not the age: see sleepThrough.
-    sleepThrough(pet, (step / total) * SLEEP_SKIP_HOURS)
+    sleepThrough(pet, step / WORLD_HOUR_MS)
     // Stays down for the next frame's tick too, so the night is not cut short.
+    // When it runs out the night is over, so the pet is up whether or not the
+    // sleep was long enough to fill its energy.
     if (this.skipRemaining > 0) pet.asleep = true
+    else pet.asleep = false
   }
 
   update(dt: number, now: number): void {

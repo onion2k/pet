@@ -108,16 +108,18 @@ sleep discipline against is the same one the player can see in the sky — and i
 moves with the season, since winter nights are longer.
 
 **Putting the pet to bed winds the night past.** Once it has settled in the
-shelter, the world clock runs forward eight hours over about three seconds: the
-sky turns, and the pet wakes rested and hungry.
+shelter the world clock runs forward to sunrise, however far off that is, taking
+a second or two per few hours covered. A sleep is therefore worth whatever the
+hour makes it: bedded down at dusk the pet gets most of a night and wakes rested
+and hungry; bedded down at noon it sleeps most of a day and wakes ravenous;
+bedded down just before dawn it gets barely any sleep at all and is up again
+almost at once, free to go back to bed. It wakes when the night ends whether or
+not that was long enough to fill its energy.
 
-**The pet wakes on its own in the morning.** Waking needs both a full energy bar
-and the sun to be up, so a night's sleep ends at dawn rather than in the small
-hours. The same rule applies while the app is closed, so a pet left asleep wakes
-at the dawn it would have woken at rather than sleeping through the whole
-absence and dodging its hunger. Bedded down in daylight, the eight hours can
-land after dusk and the pet will sleep on until the next morning — pressing
-SLEEP wakes it early, and costs nothing once it is rested. It gets the
+**It also wakes on its own the rest of the time**, once it is rested and the sun
+is up — so a nap never ends in the small hours. The same rule applies while the
+app is closed: a pet left asleep wakes at the dawn it would have woken at,
+rather than sleeping through the whole absence and dodging its hunger. It gets the
 rest it slept through — energy back, and a night's worth of hunger and grime —
 but it does not age, because a whole stage is shorter than a night and one sleep
 would otherwise carry a hatchling clean through to adult. The offset the sleep
