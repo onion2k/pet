@@ -98,8 +98,13 @@ visitors.root.setParent(screenScene)
 
 const bubble = createBubble(gl)
 bubble.root.setParent(screenScene)
-/** Counts down to the pet's next unprompted thought. */
-let museTimer = 6
+/**
+ * Counts down to the pet's next unprompted thought. Long on purpose: a bubble
+ * that turns up every half minute is wallpaper, and stops being worth looking
+ * up for. Needs come round more often than musings, because a need is
+ * something to act on and a musing is only ever a small surprise.
+ */
+let museTimer = 40 + Math.random() * 50
 
 const petView = new PetView(gl, speciesOf('egg').model)
 petView.root.position.y = terrain.shape.groundY
@@ -421,14 +426,27 @@ function step(dt: number): void {
     const stats = who.stats
     const name = who.name
     const pick = <T,>(list: readonly T[]): T => list[(Math.random() * list.length) | 0]!
-    let mood: { kind: 'thought' | 'speech'; face: string; line: string }
+    type Mood = { kind: 'thought' | 'speech'; face: string; line: string }
     let humming = false
-    if (who.asleep) mood = { kind: 'thought', face: 'zzz', line: `${name} is fast asleep` }
-    else if (who.sick) mood = { kind: 'speech', face: 'cross', line: `${name} feels poorly` }
-    else if (stats.hunger < 35) mood = { kind: 'speech', face: 'food', line: `${name} is hungry` }
-    else if (stats.hygiene < 35) mood = { kind: 'thought', face: 'bath', line: `${name} could do with a wash` }
-    else if (stats.energy < 30) mood = { kind: 'thought', face: 'zzz', line: `${name} is getting sleepy` }
-    else if (stats.happiness < 35) mood = { kind: 'thought', face: 'ask', line: `${name} is a bit down` }
+
+    // Anything the player could do something about. Those come round more often
+    // than idle musings, which are only ever meant as a small surprise.
+    const need: Mood | null = who.asleep
+      ? { kind: 'thought', face: 'zzz', line: `${name} is fast asleep` }
+      : who.sick
+        ? { kind: 'speech', face: 'cross', line: `${name} feels poorly` }
+        : stats.hunger < 35
+          ? { kind: 'speech', face: 'food', line: `${name} is hungry` }
+          : stats.hygiene < 35
+            ? { kind: 'thought', face: 'bath', line: `${name} could do with a wash` }
+            : stats.energy < 30
+              ? { kind: 'thought', face: 'zzz', line: `${name} is getting sleepy` }
+              : stats.happiness < 35
+                ? { kind: 'thought', face: 'ask', line: `${name} is a bit down` }
+                : null
+
+    let mood: Mood
+    if (need) mood = need
     else if (petView.cheerful) {
       const roll = Math.random()
       if (roll < 0.35) {
@@ -444,8 +462,9 @@ function step(dt: number): void {
     const seconds = app.speakNow(mood.line)
     bubble.show(mood.kind, mood.face, seconds)
     if (humming) bubble.hum()
-    // Long enough after the line finishes that the ticker gets the world back.
-    museTimer = seconds + 10 + Math.random() * 14
+    // Measured from when the line finishes, so the ticker gets the world back
+    // for a good stretch either way.
+    museTimer = seconds + (need ? 80 + Math.random() * 70 : 240 + Math.random() * 270)
   }
   bubble.update(dt, { x: petView.position.x, y: terrain.shape.groundY, z: petView.position.z }, cameraPan)
 
@@ -488,6 +507,7 @@ if (import.meta.env.DEV) {
       weather,
       visitors,
       bubble,
+      museTimer: () => museTimer,
       cameraPan: () => cameraPan,
       faceAnchors: (id: string) => faceAnchors(speciesOf(id).model, 1.85),
       setSpecies: (id: string) => petView.setModel(speciesOf(id).model, false),

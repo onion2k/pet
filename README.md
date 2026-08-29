@@ -224,8 +224,13 @@ one is paired with the words for it — "PIP IS HUNGRY" — which cut straight t
 the front of the ticker rather than joining the queue, where they would arrive a
 minute after the bubble they belong to had gone. The bubble then stays up for
 exactly as long as its line takes to scroll past, so the two begin and end
-together. The pet holds its tongue for a good while afterwards, so the ticker
-gets the world back.
+together.
+
+After that the pet holds its tongue for a long time. A bubble every half minute
+is wallpaper and stops being worth looking up for, so a need — something the
+player can actually do something about — comes round every two or three minutes
+while it goes unmet, and an idle musing only every four to nine. Most of the
+time the pet simply gets on with its day.
 
 There was a held placard as well, and it did not work. A sign has to look held,
 and these creatures have no arm in view to hold one with, so it read as a
