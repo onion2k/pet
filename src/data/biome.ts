@@ -1,7 +1,8 @@
+import type { PropKey } from './props'
+
 /**
- * A patch of ground for the pet to live on. This is the first stage of the
- * environment: terrain and sky only. Shelter, plants and rocks will be props
- * placed onto the same grid.
+ * A patch of ground for the pet to live on, and the scenery scattered over it.
+ * Shelter will follow as further props on the same grid.
  */
 export interface Biome {
   id: string
@@ -15,6 +16,10 @@ export interface Biome {
   sky: { top: [number, number, number]; bottom: [number, number, number] }
   /** Colour the terrain fades into at the horizon, matched to the sky's base. */
   haze: [number, number, number]
+  /** Resolves the props' placeholder palette against this biome. */
+  props: Record<PropKey, string>
+  /** Chance a given scatter slot grows something. */
+  propDensity: number
 }
 
 export const MEADOW: Biome = {
@@ -25,6 +30,16 @@ export const MEADOW: Biome = {
   rock: '#5f5a54',
   sky: { top: [0.10, 0.14, 0.28], bottom: [0.04, 0.06, 0.11] },
   haze: [0.06, 0.09, 0.16],
+  props: {
+    // Plants read against the grass by being bluer and deeper, not just darker.
+    s: '#6b655c',
+    t: '#8c8478',
+    f: '#2f7d4a',
+    e: '#8ce06b',
+    w: '#6b5334',
+    p: '#ffe27a',
+  },
+  propDensity: 0.66,
 }
 
 export const BIOMES: Biome[] = [MEADOW]
@@ -39,3 +54,7 @@ export const TERRAIN_BASE = 4
 export const TERRAIN_RELIEF = 3
 /** Radius, in world units, kept level for the pet to move around in. */
 export const TERRAIN_CLEARING = 1.5
+/** Columns between candidate scenery slots. */
+export const PROP_SPACING = 3
+/** Extra columns of clear ground kept around the pet's clearing. */
+export const PROP_CLEARING_MARGIN = 2

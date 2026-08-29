@@ -42,9 +42,22 @@ screenCamera.lookAt([0, 1.53, 0])
 const backdrop = createBackdrop(gl)
 backdrop.root.setParent(screenScene)
 
+/** The saved pet's id, read before the app exists so the ground can be seeded. */
+function app0Seed(): string {
+  try {
+    const raw = localStorage.getItem('petz9000.save')
+    const id = raw ? (JSON.parse(raw)?.pet?.id as string | undefined) : undefined
+    return id ?? 'meadow'
+  } catch {
+    return 'meadow'
+  }
+}
+
 const biome = MEADOW
-// Seeded from the pet so every life gets its own patch of ground.
-const terrain = createTerrain(gl, 'petz', biome)
+// Seeded from the pet, so every life gets its own patch of ground and its own
+// arrangement of scenery.
+let terrainSeed = app0Seed()
+const terrain = createTerrain(gl, terrainSeed, biome)
 terrain.root.setParent(screenScene)
 
 const petView = new PetView(gl, speciesOf('egg').model)
@@ -178,6 +191,13 @@ function step(dt: number): void {
   app.update(dt, Date.now())
   updateAnnouncement(dt)
 
+  // A new pet gets new ground. Evolution does not disturb it.
+  if (app.pet && app.pet.id !== terrainSeed) {
+    terrainSeed = app.pet.id
+    terrain.rebuild(terrainSeed, biome)
+    petView.root.position.y = terrain.shape.groundY
+  }
+
   shell.setPower(app.mode === 'boot' ? 1 - app.bootTimer / 1.4 : 1)
   petView.update(dt, elapsed, app.visual)
   particles.update(dt)
@@ -228,6 +248,7 @@ if (import.meta.env.DEV) {
       shell,
       orbit,
       terrain,
+      biome,
       screenCamera,
       step,
       advance: (frames: number, dt = 1 / 60) => {

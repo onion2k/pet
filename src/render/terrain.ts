@@ -1,6 +1,8 @@
 import { Mesh, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import {
+  PROP_CLEARING_MARGIN,
+  PROP_SPACING,
   TERRAIN_BASE,
   TERRAIN_CLEARING,
   TERRAIN_RELIEF,
@@ -8,6 +10,8 @@ import {
   TERRAIN_VOXEL,
   type Biome,
 } from '../data/biome'
+import { PROPS, type Prop, type PropKey } from '../data/props'
+import { expandLayers } from '../data/voxel-format'
 import { buildVoxels, hexToLinear, PART_BODY, type Voxel, type VoxelSource } from './voxel-mesh'
 
 /** Deterministic hash in 0..1. The terrain must rebuild identically every load. */
@@ -84,6 +88,111 @@ export function terrainShape(seed: string): TerrainShape {
   }
 }
 
+interface Scenery {
+  voxels: Map<number, Voxel>
+  /** Highest voxel any prop reaches, so the field can be sized to fit. */
+  top: number
+  count: number
+}
+
+/**
+ * Deterministic scatter over a coarse grid of candidate slots, jittered within
+ * each slot. Props keep clear of the pet's clearing and of each other, and only
+ * sit on ground level enough to stand on.
+ */
+function scatterProps(
+  shape: TerrainShape,
+  biome: Biome,
+  seed: number,
+  cache: Map<string, Voxel>,
+): Scenery {
+  const voxels = new Map<number, Voxel>()
+  const taken = new Set<number>()
+  const half = TERRAIN_SIZE / 2
+  const clearing = TERRAIN_CLEARING / TERRAIN_VOXEL + PROP_CLEARING_MARGIN
+  const totalWeight = PROPS.reduce((sum, prop) => sum + prop.weight, 0)
+  let top = 0
+  let count = 0
+
+  const colour = (key: PropKey): Voxel => {
+    const cached = cache.get(`prop${key}`)
+    if (cached) return cached
+    const made: Voxel = { color: hexToLinear(biome.props[key]), emissive: 0, part: PART_BODY }
+    cache.set(`prop${key}`, made)
+    return made
+  }
+
+  const pick = (roll: number): Prop => {
+    let remaining = roll * totalWeight
+    for (const prop of PROPS) {
+      remaining -= prop.weight
+      if (remaining <= 0) return prop
+    }
+    return PROPS[PROPS.length - 1]!
+  }
+
+  for (let cz = 0; cz < TERRAIN_SIZE; cz += PROP_SPACING) {
+    for (let cx = 0; cx < TERRAIN_SIZE; cx += PROP_SPACING) {
+      if (hash2(cx, cz, seed ^ 0x1111) > biome.propDensity) continue
+
+      const prop = pick(hash2(cx, cz, seed ^ 0x4444))
+      const layers = expandLayers(prop.model)
+      const depth = layers[0]!.length
+      const width = layers[0]![0]!.length
+      const ox = cx + Math.floor(hash2(cx, cz, seed ^ 0x2222) * PROP_SPACING) - (width >> 1)
+      const oz = cz + Math.floor(hash2(cx, cz, seed ^ 0x3333) * PROP_SPACING) - (depth >> 1)
+
+      // Must fit on the patch, clear of the pet's ground, on level enough footing.
+      if (ox < 1 || oz < 1 || ox + width >= TERRAIN_SIZE || oz + depth >= TERRAIN_SIZE) continue
+      let lowest = Infinity
+      let highest = -Infinity
+      let blocked = false
+      for (let z = oz; z < oz + depth && !blocked; z++) {
+        for (let x = ox; x < ox + width; x++) {
+          if (Math.hypot(x - half, z - half) < clearing) {
+            blocked = true
+            break
+          }
+          if (taken.has(z * TERRAIN_SIZE + x)) {
+            blocked = true
+            break
+          }
+          const h = shape.heightAt(x, z)
+          lowest = Math.min(lowest, h)
+          highest = Math.max(highest, h)
+        }
+      }
+      if (blocked || highest - lowest > 1) continue
+
+      for (let y = 0; y < layers.length; y++) {
+        const layer = layers[y]!
+        for (let z = 0; z < layer.length; z++) {
+          const row = layer[z]!
+          for (let x = 0; x < row.length; x++) {
+            const ch = row[x]
+            if (!ch || ch === '.') continue
+            const wy = lowest + y
+            voxels.set(((wy * TERRAIN_SIZE + (oz + z)) * TERRAIN_SIZE + (ox + x)), colour(ch as PropKey))
+            top = Math.max(top, wy)
+          }
+        }
+      }
+
+      // Reserve the footprint plus the prop's own breathing room.
+      const pad = prop.spacing
+      for (let z = oz - pad; z < oz + depth + pad; z++) {
+        for (let x = ox - pad; x < ox + width + pad; x++) {
+          if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) continue
+          taken.add(z * TERRAIN_SIZE + x)
+        }
+      }
+      count++
+    }
+  }
+
+  return { voxels, top, count }
+}
+
 const vertex = /* glsl */ `
   attribute vec3 position;
   attribute vec3 normal;
@@ -145,6 +254,8 @@ const fragment = /* glsl */ `
 export interface Terrain {
   root: Transform
   shape: TerrainShape
+  /** Number of scenery pieces on the patch. */
+  props: number
   /** Rebuilds the patch for a different seed or biome. */
   rebuild(seed: string, biome: Biome): void
   setSick(amount: number): void
@@ -169,6 +280,7 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
   let mesh: Mesh | null = null
   let shape = terrainShape(seed)
   let faces = 0
+  let props = 0
 
   const build = (nextSeed: string, nextBiome: Biome) => {
     shape = terrainShape(nextSeed)
@@ -191,23 +303,30 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
       for (let x = 0; x < TERRAIN_SIZE; x++) maxHeight = Math.max(maxHeight, shape.heightAt(x, z))
     }
 
+    const scenery = scatterProps(shape, nextBiome, s, cache)
+    const propKey = (x: number, y: number, z: number) => (y * TERRAIN_SIZE + z) * TERRAIN_SIZE + x
+
     const source: VoxelSource = {
       w: TERRAIN_SIZE,
-      h: maxHeight,
+      h: Math.max(maxHeight, scenery.top + 1),
       d: TERRAIN_SIZE,
       at(x, y, z) {
         if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) return null
         // Anything below the patch counts as solid so the underside is culled.
         if (y < 0) return voxel(rock, 'rock')
         const height = shape.heightAt(x, z)
-        if (y >= height) return null
-        if (y === height - 1) {
-          // Dither the two surface shades so the ground is not a flat colour.
-          const tint = hash2(x, z, s ^ 0x5bf0) > 0.62 ? 1 : 0
-          return voxel(surface[tint]!, `surface${tint}`)
+        if (y < height) {
+          if (y === height - 1) {
+            // Dither the two surface shades so the ground is not a flat colour.
+            const tint = hash2(x, z, s ^ 0x5bf0) > 0.62 ? 1 : 0
+            return voxel(surface[tint]!, `surface${tint}`)
+          }
+          if (y >= height - 3) return voxel(soil, 'soil')
+          return voxel(rock, 'rock')
         }
-        if (y >= height - 3) return voxel(soil, 'soil')
-        return voxel(rock, 'rock')
+        // Scenery lives in the same field as the ground, so it culls and
+        // occludes against it rather than floating as a separate mesh.
+        return scenery.voxels.get(propKey(x, y, z)) ?? null
       },
     }
 
@@ -218,6 +337,7 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
     ]
     const built = buildVoxels(gl, source, { scale: TERRAIN_VOXEL, origin })
     faces = built.faces
+    props = scenery.count
 
     if (mesh) {
       mesh.geometry.remove()
@@ -239,6 +359,9 @@ export function createTerrain(gl: OGLRenderingContext, seed: string, biome: Biom
     },
     get faces() {
       return faces
+    },
+    get props() {
+      return props
     },
     rebuild: build,
     setSick(amount) {

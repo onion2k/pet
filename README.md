@@ -70,14 +70,21 @@ playthroughs genuinely diverge.
 
 The pet stands on a voxel terrain patch built from the same mesh path as the
 pets themselves, so it gets identical hidden-face culling and baked corner
-occlusion. Heights come from two octaves of deterministic value noise, with the
-middle levelled into a clearing for the pet to stand in — that clearing is the
-area it will eventually move around in. The patch fades into the sky with
-depth-based haze, so its edge is never a visible boundary.
+occlusion. Heights come from two octaves of deterministic value noise, seeded
+from the pet's id — every life gets its own ground. The middle is levelled into
+a clearing for the pet to stand and eventually move around in. The patch fades
+into the sky with depth-based haze, so its edge is never a visible boundary.
 
-This is the first stage of the environment. Shelter, plants and rocks will be
-props placed onto the same column grid, and the clearing already reserves the
-space for them to sit around.
+Rocks and plants are scattered over it: pebbles, rocks and boulders, and tufts,
+ferns, shrubs and blooms. They are stamped **into the terrain's own voxel field**
+rather than added as separate meshes, which is what makes them sit convincingly
+in the grass — a rock occludes the ground it rests on and picks up real contact
+shading, and the buried faces are culled along with everything else. Placement
+is a deterministic jittered scatter that keeps props out of the pet's clearing,
+apart from each other, and off ground too uneven to stand on.
+
+Shelter is the remaining piece of the environment, and slots into the same
+system as another prop.
 
 ### Rendering
 
@@ -113,9 +120,14 @@ Register the form in `src/data/species.ts` with branch rules scoring against
 `Metrics`. The mesh builder culls interior faces and bakes corner ambient
 occlusion, which is what makes the cubes read at this resolution.
 
-**Terrain.** `src/data/biome.ts` holds the palette and the patch's dimensions;
-`src/render/terrain.ts` turns them into geometry. A biome is a surface pair, a
-soil and a rock colour, plus sky and haze tints.
+**Terrain and scenery.** `src/data/biome.ts` holds the palettes, the patch's
+dimensions and the scatter density; `src/render/terrain.ts` turns them into
+geometry. A biome is a surface pair, a soil and a rock colour, sky and haze
+tints, and the colours its props resolve to. `src/data/props.ts` holds the props
+themselves as small voxel models with a placeholder palette — `s`/`t` for stone,
+`f`/`e` for foliage, `w` for stems, `p` for flowers — resolved against the biome
+at build time, so one prop set can dress several biomes. Give each a `weight`
+for how often it appears and a `spacing` for how much room it needs.
 
 **A new food.** Add it to `src/data/foods.ts` with a `DietAxis` and stat deltas.
 Anything with an axis shows up on the feed menu and counts toward branching;
