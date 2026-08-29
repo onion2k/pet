@@ -172,7 +172,7 @@ curve the mouth and tilt the brows before the body deformation runs.
 
 Two things had to be got right for it to read at 192 pixels. The features sit a
 quarter of a voxel proud of the head — at a fiftieth they came out striped with
-z-fighting. And the whites are half again the painted eye they cover, with a
+z-fighting. And the whites are a fifth wider than the painted eye they cover, with a
 dark rim behind them: several of these creatures are near-white themselves, and
 a pale sclera on a pale head simply disappears, leaving the eye reading as
 nothing but its pupil. The rim has to stay wider than the painted eye or the

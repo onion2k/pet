@@ -194,16 +194,16 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
   // Comfortably wider than the painted eye it covers. At a shade over, the
   // white margin came out under a pixel wide and the pupil sat inside the
   // model's own dark voxels, so the whole eye just read as a black rectangle.
-  const scleraW = (anchors.eyeSize.w / 2) * 1.45
-  const scleraH = (anchors.eyeSize.h / 2) * 1.42
-  const pupilW = scleraW * 0.54
-  const pupilH = scleraH * 0.62
+  const scleraW = (anchors.eyeSize.w / 2) * 1.2
+  const scleraH = (anchors.eyeSize.h / 2) * 1.18
+  const pupilW = scleraW * 0.5
+  const pupilH = scleraH * 0.58
 
   for (const eye of [left, right]) {
     // A dark rim behind the white. Several of these creatures are near-white
     // themselves -- a pale sclera on a pale head simply disappears, and the eye
     // reads as nothing but its pupil. The rim gives it an edge on any body.
-    quad(eye.x, eye.y, eye.z, scleraW * 1.2, scleraH * 1.18, INK, FACE_SCLERA, 0)
+    quad(eye.x, eye.y, eye.z, scleraW * 1.14, scleraH * 1.13, INK, FACE_SCLERA, 0)
     quad(eye.x, eye.y, eye.z + anchors.voxel * 0.08, scleraW, scleraH, SCLERA, FACE_SCLERA, 0)
     // Pupils sit a hair proud of the whites, so they are never z-fought by them.
     quad(eye.x, eye.y, eye.z + anchors.voxel * 0.16, pupilW, pupilH, INK, FACE_PUPIL, 0)
