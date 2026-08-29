@@ -3,7 +3,12 @@ import type { OGLRenderingContext } from 'ogl'
 import { GLYPH_H, GLYPH_W, glyph, textWidth } from '../data/font'
 
 const W = 72
-const H = 40
+/**
+ * Tall enough to leave air around what is in it. At 40 the paper was exactly
+ * as tall as the symbol drawn on it, so every bubble read as crammed into its
+ * own frame.
+ */
+const H = 50
 const NOTE_W = 12
 const NOTE_H = 14
 
@@ -204,6 +209,11 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
     noteTexture.needsUpdate = true
   }
 
+  /** Characters that fit on one line at a size, leaving a margin either side. */
+  function lineBudget(scale: number): number {
+    return Math.max(1, Math.floor((W - 20) / ((GLYPH_W + 1) * scale)))
+  }
+
   /** Breaks a phrase to a character width, splitting a word only if it must. */
   function fitLines(text: string, width: number): string[] {
     const lines: string[] = []
@@ -303,9 +313,15 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
       // Words are broken to fit the bubble rather than run off the side of it:
       // the longest line in the game is twenty characters, which at this size
       // is over twice the width of the canvas on one line.
-      const scale = 2
-      const perLine = Math.max(1, Math.floor((W - 12) / ((GLYPH_W + 1) * scale)))
-      const lines = fitLines(text.toUpperCase(), perLine)
+      // Set as large as will fit, then a size down if the words need more lines
+      // than the paper has room for.
+      const paperH = H - 16
+      let scale = 2
+      let lines = fitLines(text.toUpperCase(), lineBudget(scale))
+      if (lines.length * (GLYPH_H * scale + 2) > paperH - 6) {
+        scale = 1
+        lines = fitLines(text.toUpperCase(), lineBudget(scale))
+      }
       const lineHeight = GLYPH_H * scale + 2
       const top = midY - (lines.length * lineHeight) / 2
       lines.forEach((line, i) => {
