@@ -40,9 +40,13 @@ const vertex = /* glsl */ `
     p.y *= stretch;
     p.xz *= 1.0 - (stretch - 1.0) * 0.45;
 
-    // Sleeping compresses and leans the pet. It must not translate downward:
-    // there is ground underneath now, and it would sink into it.
-    p.y *= 1.0 - uAsleep * 0.16;
+    // Sleeping settles the pet rather than shrinking it: it loses a little
+    // height but spreads to match, so its bulk is unchanged. Scaling height
+    // alone reads as the pet getting smaller. It must not translate downward
+    // either — there is ground underneath now, and it would sink into it.
+    float settle = uAsleep * 0.10;
+    p.y *= 1.0 - settle;
+    p.xz *= 1.0 + settle * 0.7;
     p.x += uAsleep * p.y * 0.22;
 
     // The head turns rather than sliding sideways. A rotation is rigid, so the
