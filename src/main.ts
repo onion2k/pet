@@ -308,6 +308,20 @@ function step(dt: number): void {
   terrain.setLighting({ ...lighting, haze: world.haze })
   terrain.setSick(visual.sick ? 1 : 0)
 
+  // The lantern comes up as the sun goes down. Its position is in world space
+  // and the camera turns, so it is transformed into view space here for the
+  // same reason the sun's direction is.
+  const lamp = terrain.shape.shelter.lamp
+  const lampWorld = [lamp.x, terrain.shape.groundY + lamp.y, lamp.z] as const
+  const lampView: Rgb = [
+    m[0]! * lampWorld[0] + m[4]! * lampWorld[1] + m[8]! * lampWorld[2] + m[12]!,
+    m[1]! * lampWorld[0] + m[5]! * lampWorld[1] + m[9]! * lampWorld[2] + m[13]!,
+    m[2]! * lampWorld[0] + m[6]! * lampWorld[1] + m[10]! * lampWorld[2] + m[14]!,
+  ]
+  const lampOn = 1 - world.daylight
+  petView.setLamp(lampView, lampOn)
+  terrain.setLamp(lampView, lampOn)
+
   backdrop.setPalette(world.sky.top, world.sky.bottom)
   // Place the sun on the same arc that lights the scene, so the shadows and the
   // sky always agree. It sinks below the horizon and the moon takes over.

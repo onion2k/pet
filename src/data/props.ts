@@ -28,10 +28,12 @@ const palette = {
   p: '#000006',
   r: '#000007',
   n: '#000008',
+  l: '#000009',
+  g: '#00000a',
 }
 
 /** Order matters: the resolver maps these characters onto biome colours. */
-export const PROP_KEYS = ['s', 't', 'f', 'e', 'w', 'p', 'r', 'n'] as const
+export const PROP_KEYS = ['s', 't', 'f', 'e', 'w', 'p', 'r', 'n', 'l', 'g'] as const
 export type PropKey = (typeof PROP_KEYS)[number]
 
 export const PROPS: Prop[] = [
@@ -232,6 +234,39 @@ export const PROPS: Prop[] = [
  * enough for the pet to stand up in. The roof is kept to two steps so its ridge
  * stays clear of the screen's upper icon strip.
  */
+/**
+ * The lantern that stands outside the shelter. Its glass is emissive, so it
+ * both glows and casts a small point light once the sun is down -- the yard
+ * stays legible at night without the night having to be lit like day.
+ */
+export const LANTERN: Prop = {
+  id: 'lantern',
+  weight: 0,
+  spacing: 1,
+  model: {
+    palette,
+    layers: [
+      // Post.
+      ...Array.from({ length: 5 }, () => ['...', '.l.', '...']),
+      // Glass.
+      rows(`
+        lgl
+        ggg
+        lgl`),
+      rows(`
+        lgl
+        ggg
+        lgl`),
+      // Cap.
+      rows(`
+        lll
+        lll
+        lll`),
+      ['...', '.l.', '...'],
+    ],
+  },
+}
+
 export const SHELTER: Prop = {
   id: 'shelter',
   weight: 0,

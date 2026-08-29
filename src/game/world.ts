@@ -227,13 +227,16 @@ export function worldAt(now: number): WorldState {
   colour = mixRgb(colour, warm, dusk * 0.55)
   // Night keeps a usable floor: this is a pet you have to be able to see, so
   // the mood comes from the colour shifting cold rather than from darkness.
-  const intensity = mix(0.5, 1.2, daylight) * mix(1, 0.45, dull)
+  // A wet day dims rather than darkens -- the toy should read as cheerful
+  // whatever the sky is doing.
+  const intensity = mix(0.55, 1.25, daylight) * mix(1, 0.6, dull)
 
-  const ambientColour: Rgb = mixRgb([0.28, 0.36, 0.62], [0.55, 0.62, 0.78], daylight)
+  const ambientColour: Rgb = mixRgb([0.30, 0.38, 0.64], [0.62, 0.70, 0.86], daylight)
   const ambient = {
     colour: ambientColour,
-    // Overcast skies light the shadows: less key, more fill.
-    intensity: mix(0.4, 0.5, daylight) * mix(1, 1.35, dull),
+    // A generous fill: it lifts the shadow side without flattening the key,
+    // which is what keeps the picture sunny rather than merely bright.
+    intensity: mix(0.5, 0.72, daylight) * mix(1, 1.3, dull),
   }
 
   return {

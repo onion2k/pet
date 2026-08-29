@@ -31,6 +31,7 @@ const vertex = /* glsl */ `
   varying vec3 vColor;
   varying float vAo;
   varying float vEmissive;
+  varying vec3 vViewPos;
 
   void main() {
     vec3 p = position;
@@ -121,7 +122,9 @@ const vertex = /* glsl */ `
     vColor = color;
     vAo = ao;
     vEmissive = emissive;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    vViewPos = mv.xyz;
+    gl_Position = projectionMatrix * mv;
   }
 `
 
@@ -136,11 +139,16 @@ const fragment = /* glsl */ `
   uniform float uLightIntensity;
   uniform vec3 uAmbientColour;
   uniform float uAmbientIntensity;
+  uniform vec3 uLampPos;
+  uniform vec3 uLampColour;
+  uniform float uLampIntensity;
+  uniform float uLampRadius;
 
   varying vec3 vNormal;
   varying vec3 vColor;
   varying float vAo;
   varying float vEmissive;
+  varying vec3 vViewPos;
 
   void main() {
     vec3 N = normalize(vNormal);
@@ -152,6 +160,15 @@ const fragment = /* glsl */ `
     vec3 lit = vColor * uLightColour * (key * uLightIntensity);
     lit += vColor * uAmbientColour * (fill * uAmbientIntensity);
     lit *= vAo;
+
+    // The pet is lit by the lantern too, so walking up to it after dark
+    // actually does something.
+    vec3 toLamp = uLampPos - vViewPos;
+    float lampDist = length(toLamp);
+    float falloff = clamp(1.0 - lampDist / uLampRadius, 0.0, 1.0);
+    falloff *= falloff;
+    float lampKey = max(dot(N, normalize(toLamp)), 0.0) * 0.75 + 0.25;
+    lit += vColor * uLampColour * (lampKey * falloff * uLampIntensity);
 
     // Illness drains the colour toward a sallow green.
     vec3 ill = mix(vec3(dot(lit, vec3(0.33))), vec3(0.42, 0.52, 0.34), 0.55) * 0.85;
@@ -216,12 +233,16 @@ const STRIDE_RATE = 1.15
 
 /** Roughly the pet's half-width, used to keep it clear of the shelter walls. */
 const PET_RADIUS = 0.8
+/** The lantern post's footprint, for walking round rather than through. */
+const LAMP_RADIUS = 0.3
 
 /** Where the shelter is, so the pet can walk into it. */
 export interface ShelterTarget {
   centre: { x: number; z: number }
   half: { x: number; z: number }
   inside: { x: number; z: number }
+  /** The lantern beside the door, which the pet has to walk around. */
+  lamp: { x: number; z: number }
 }
 
 /** Shortest-path approach between two angles. */
@@ -288,6 +309,10 @@ export class PetView {
         uLightIntensity: { value: 1 },
         uAmbientColour: { value: [0.5, 0.6, 0.8] },
         uAmbientIntensity: { value: 0.3 },
+        uLampPos: { value: [0, 0, 0] },
+        uLampColour: { value: [1, 0.82, 0.5] },
+        uLampIntensity: { value: 0 },
+        uLampRadius: { value: 4.5 },
         uTint: { value: [1, 1, 1] },
       },
       cullFace: gl.BACK,
@@ -352,6 +377,13 @@ export class PetView {
     u.uAmbientIntensity.value = lighting.ambientIntensity
   }
 
+  /** The lantern, as a view-space position and a strength that rises at dusk. */
+  setLamp(position: [number, number, number], intensity: number): void {
+    const u = this.program.uniforms
+    u.uLampPos.value = position
+    u.uLampIntensity.value = intensity
+  }
+
   /** Tells the pet where its shelter is, so it can take itself to bed. */
   setShelter(shelter: ShelterTarget | null): void {
     this.shelter = shelter
@@ -404,9 +436,31 @@ export class PetView {
    * than into it, so the pet spends most of its time showing its face.
    */
   /** A spot inside the shelter is off limits to ordinary wandering. */
+  /**
+   * Pushes the walk direction away from the lantern when the pet gets close to
+   * it. The pet steers rather than plans, so a straight line to the door that
+   * happens to run through the post becomes a curve around it.
+   */
+  private steerRoundLamp(x: number, z: number, dx: number, dz: number): [number, number] {
+    const sh = this.shelter
+    if (!sh) return [dx, dz]
+    const ox = x - sh.lamp.x
+    const oz = z - sh.lamp.z
+    const distance = Math.hypot(ox, oz)
+    const clear = LAMP_RADIUS + PET_RADIUS * 0.7
+    if (distance > clear || distance < 1e-4) return [dx, dz]
+    const push = ((clear - distance) / clear) * 3.2
+    const nx = dx + (ox / distance) * push
+    const nz = dz + (oz / distance) * push
+    const length = Math.hypot(nx, nz) || 1
+    return [nx / length, nz / length]
+  }
+
   private blockedByShelter(x: number, z: number): boolean {
     const sh = this.shelter
     if (!sh) return false
+    // The lantern is a solid post on the way in, so it is dodged like the walls.
+    if (Math.hypot(x - sh.lamp.x, z - sh.lamp.z) < LAMP_RADIUS + PET_RADIUS) return true
     return (
       Math.abs(x - sh.centre.x) < sh.half.x + PET_RADIUS &&
       Math.abs(z - sh.centre.z) < sh.half.z + PET_RADIUS
@@ -491,9 +545,10 @@ export class PetView {
         else if (w.where === 'heading-out') w.where = 'out'
       } else {
         const step = Math.min(distance, WALK_SPEED * dt)
-        w.x += (dx / distance) * step
-        w.z += (dz / distance) * step
-        w.facing = approachAngle(w.facing, Math.atan2(dx, dz), dt * 4)
+        const [sx, sz] = this.steerRoundLamp(w.x, w.z, dx / distance, dz / distance)
+        w.x += sx * step
+        w.z += sz * step
+        w.facing = approachAngle(w.facing, Math.atan2(sx, sz), dt * 4)
         w.phase = (w.phase + dt * STRIDE_RATE) % 1
       }
     } else {

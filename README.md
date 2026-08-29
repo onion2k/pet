@@ -208,6 +208,13 @@ almost its whole width, so the pet has somewhere to roam without ever meeting a
 step. The patch fades into the sky with depth-based haze, so its edge is never a
 visible boundary.
 
+A lantern stands beside the shelter door. Its glass is the one piece of scenery
+that makes its own light: it is emissive, it writes into the bloom mask so it
+glows rather than merely being bright, and it casts a real point light over the
+ground, the shelter and the pet, coming up as the sun goes down. The pet steers
+around the post rather than through it, since it walks by aiming rather than by
+planning a route.
+
 A shelter stands at the back of the yard, on its own levelled pad with a level
 path running forward to the clearing — the pet does not sample terrain height as
 it walks, so every surface it crosses has to be flat. Its front is left open so
@@ -230,6 +237,14 @@ not a filter. That buffer goes through a threshold-and-blur bloom chain, then
 gets sampled by the shell's screen shader, which applies barrel distortion,
 scanlines, an aperture grille, chromatic fringing, ordered dithering and a glass
 glare. Everything you see on the screen is genuinely 192 pixels wide.
+
+That shader is also where the frame is encoded for display. The scene is lit in
+linear light, so it has to be gamma-encoded once at the end or every midtone
+reads far darker than the colour it was picked as — the meadow looked permanently
+overcast until it was. The HUD is authored as sRGB hex and so is linearised on
+the way in, and a soft shoulder above 0.8 keeps the pale pets from clipping to
+white on their lit side. Anything multiplicative happens before the encode and
+anything cosmetic and additive after it.
 
 The shell and buttons are superellipsoids from the same generator at different
 exponents. The brand and speaker grille on the front are a height map generated

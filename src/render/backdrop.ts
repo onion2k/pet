@@ -33,7 +33,10 @@ const skyFrag = /* glsl */ `
     float d = length(offset);
     float disc = 1.0 - smoothstep(uSunSize * 0.85, uSunSize, d);
     float halo = 1.0 - smoothstep(uSunSize, uSunSize * 6.0, d);
-    col += uSunColour * (disc + halo * halo * 0.22);
+    // The halo is faint in linear terms because the frame is encoded for
+    // display afterwards, which lifts it a long way; tuned by eye against the
+    // sky it sits on rather than by the number.
+    col += uSunColour * (disc + halo * halo * 0.06);
 
     gl_FragColor = vec4(col, 0.0);
   }

@@ -14,7 +14,7 @@ import {
   TERRAIN_VOXEL,
   type Biome,
 } from '../data/biome'
-import { PROPS, SHELTER, type Prop, type PropKey } from '../data/props'
+import { LANTERN, PROPS, SHELTER, type Prop, type PropKey } from '../data/props'
 import { MATERIAL_INDEX, PROP_MATERIAL } from '../data/seasons'
 import { expandLayers } from '../data/voxel-format'
 import type { PaletteTexture } from './palette'
@@ -63,6 +63,8 @@ export interface ShelterPlacement {
   half: { x: number; z: number }
   /** Where the pet stands when it has gone inside. */
   inside: { x: number; z: number }
+  /** The lantern outside the front, in columns and in world units. */
+  lamp: { ox: number; oz: number; x: number; y: number; z: number }
 }
 
 export interface TerrainShape {
@@ -94,6 +96,27 @@ function placeShelter(seed: number): ShelterPlacement {
     half,
     // Standing just inside the open front, where it stays visible.
     inside: { x: centre.x, z: centre.z + half.z * 0.35 },
+    // Beside the doorway, on the side facing the middle of the yard, so it
+    // lights the way in without standing in it.
+    lamp: lampAt(centre, half, flip),
+  }
+}
+
+/** The lantern's spot: clear of the doorway, a little in front of the wall. */
+function lampAt(
+  centre: { x: number; z: number },
+  half: { x: number; z: number },
+  flip: number,
+): ShelterPlacement['lamp'] {
+  const x = centre.x - (half.x + 0.34) * flip
+  const z = centre.z + half.z + 0.16
+  return {
+    ox: Math.round(TERRAIN_COLS / 2 + x / TERRAIN_VOXEL) - 1,
+    oz: Math.round(TERRAIN_ROWS / 2 + z / TERRAIN_VOXEL) - 1,
+    x,
+    // The glass sits six voxels up the post.
+    y: 6.5 * TERRAIN_VOXEL,
+    z,
   }
 }
 
@@ -126,11 +149,11 @@ export function terrainShape(seed: string): TerrainShape {
       // would push all the scenery out of the foreground. The pad runs forward
       // to meet the clearing, so the walk to bed is over flat ground the whole
       // way — the pet does not sample terrain height as it moves.
-      const onPad =
-        x >= shelter.ox - 1 &&
-        x < shelter.ox + shelter.w + 1 &&
-        z >= shelter.oz - 1 &&
-        z < halfZ + 2
+      // Wide enough to take in the lantern standing beside the doorway, which
+      // sits a little outside the wall and needs the same level footing.
+      const padMinX = Math.min(shelter.ox - 1, shelter.lamp.ox - 1)
+      const padMaxX = Math.max(shelter.ox + shelter.w + 1, shelter.lamp.ox + 4)
+      const onPad = x >= padMinX && x < padMaxX && z >= shelter.oz - 1 && z < halfZ + 2
       if (onPad) value = 0.5
 
       const height = Math.round(TERRAIN_BASE + (value - 0.5) * 2 * TERRAIN_RELIEF)
@@ -182,7 +205,8 @@ function scatterProps(
     if (cached) return cached
     const made: Voxel = {
       color: [1, 0, 1],
-      emissive: 0,
+      // The lantern's glass is the one piece of scenery that makes its own light.
+      emissive: key === 'g' ? 1 : 0,
       part: PART_BODY,
       material: MATERIAL_INDEX[PROP_MATERIAL[key] ?? 'rock'],
     }
@@ -221,11 +245,14 @@ function scatterProps(
   // are reserved so nothing is scattered against its walls or in its doorway.
   const sh = shape.shelter
   stamp(SHELTER, sh.ox, sh.oz, TERRAIN_BASE)
+  stamp(LANTERN, sh.lamp.ox, sh.lamp.oz, TERRAIN_BASE)
   count++
   // Reserve the shelter and the path back to the clearing, so nothing is
   // scattered against its walls or left standing in the pet's way.
+  const reserveMinX = Math.min(sh.ox - 2, sh.lamp.ox - 2)
+  const reserveMaxX = Math.max(sh.ox + sh.w + 2, sh.lamp.ox + 5)
   for (let z = sh.oz - 2; z < halfZ + 2; z++) {
-    for (let x = sh.ox - 2; x < sh.ox + sh.w + 2; x++) {
+    for (let x = reserveMinX; x < reserveMaxX; x++) {
       if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
       taken.add(z * TERRAIN_COLS + x)
     }
@@ -286,6 +313,7 @@ const vertex = /* glsl */ `
   attribute vec3 normal;
   attribute float ao;
   attribute float material;
+  attribute float emissive;
 
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
@@ -295,12 +323,16 @@ const vertex = /* glsl */ `
   varying float vAo;
   varying float vMaterial;
   varying float vDepth;
+  varying float vEmissive;
+  varying vec3 vViewPos;
 
   void main() {
     vNormal = normalMatrix * normal;
     vAo = ao;
     vMaterial = material;
+    vEmissive = emissive;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vViewPos = mv.xyz;
     // Distance from the eye. Haze by depth rather than by distance from the
     // centre, so the near ground stays crisp right across the frame and only
     // the far ground melts into the sky.
@@ -322,11 +354,17 @@ const fragment = /* glsl */ `
   uniform float uLightIntensity;
   uniform vec3 uAmbientColour;
   uniform float uAmbientIntensity;
+  uniform vec3 uLampPos;
+  uniform vec3 uLampColour;
+  uniform float uLampIntensity;
+  uniform float uLampRadius;
 
   varying vec3 vNormal;
   varying float vAo;
   varying float vMaterial;
   varying float vDepth;
+  varying float vEmissive;
+  varying vec3 vViewPos;
 
   void main() {
     // Sampled here rather than in the vertex stage: vertex texture units are
@@ -343,12 +381,29 @@ const fragment = /* glsl */ `
     lit += base * uAmbientColour * (fill * uAmbientIntensity);
     lit *= vAo;
 
+    // The lantern. A point light with a smooth radius falloff, so the ground
+    // and the shelter around it pick up a pool of warm light after dark.
+    vec3 toLamp = uLampPos - vViewPos;
+    float lampDist = length(toLamp);
+    float falloff = clamp(1.0 - lampDist / uLampRadius, 0.0, 1.0);
+    falloff *= falloff;
+    float lampKey = max(dot(N, normalize(toLamp)), 0.0) * 0.75 + 0.25;
+    lit += base * uLampColour * (lampKey * falloff * uLampIntensity);
+
+    // The glass itself is the source, so it ignores all of the above. The lift
+    // is gentle on purpose: pushed harder it saturates to white and the lantern
+    // stops reading as a warm light and starts reading as a hole.
+    lit = mix(lit, base * (1.0 + uLampIntensity * 0.35), vEmissive);
+
     // The ground sickens along with its occupant.
     lit = mix(lit, mix(vec3(dot(lit, vec3(0.33))), vec3(0.40, 0.44, 0.30), 0.5) * 0.8, uSick);
 
     // Fade into the sky so the patch's edge is never a visible boundary.
     float haze = smoothstep(uFog.x, uFog.y, vDepth);
-    gl_FragColor = vec4(mix(lit, uHaze, haze), 0.0);
+    // Alpha is the bloom mask, so the lit lantern glows rather than just being
+    // a bright square. It fades out with the haze along with everything else.
+    float glow = vEmissive * clamp(uLampIntensity, 0.0, 1.0) * (1.0 - haze);
+    gl_FragColor = vec4(mix(lit, uHaze, haze), glow);
   }
 `
 
@@ -362,6 +417,8 @@ export interface Terrain {
   setSick(amount: number): void
   /** Applies the current sky and sun. */
   setLighting(lighting: TerrainLighting): void
+  /** The lantern, as a view-space position and a strength that rises at dusk. */
+  setLamp(position: [number, number, number], intensity: number): void
   faces: number
 }
 
@@ -397,6 +454,10 @@ export function createTerrain(
       uLightIntensity: { value: 1 },
       uAmbientColour: { value: [0.5, 0.6, 0.8] },
       uAmbientIntensity: { value: 0.3 },
+      uLampPos: { value: [0, 0, 0] },
+      uLampColour: { value: [1, 0.82, 0.5] },
+      uLampIntensity: { value: 0 },
+      uLampRadius: { value: 4.5 },
     },
     cullFace: gl.BACK,
   })
@@ -499,6 +560,11 @@ export function createTerrain(
       u.uAmbientColour.value = lighting.ambientColour
       u.uAmbientIntensity.value = lighting.ambientIntensity
       u.uHaze.value = lighting.haze
+    },
+    setLamp(position, intensity) {
+      const u = program.uniforms
+      u.uLampPos.value = position
+      u.uLampIntensity.value = intensity
     },
   }
 }

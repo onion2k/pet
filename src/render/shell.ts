@@ -171,8 +171,12 @@ const screenFrag = /* glsl */ `
     vec3 bloom = texture2D(tBloom, uv).rgb;
     vec4 hud = texture2D(tHud, uv);
 
+    // The scene is lit in linear light. The HUD is authored as sRGB hex, so it
+    // is linearised on the way in and the whole frame is encoded once at the
+    // end -- without that encode every midtone reads far darker than the
+    // colour it was picked as, which is what made the meadow look overcast.
     vec3 col = scene + bloom * uBloom;
-    col = mix(col, hud.rgb, hud.a);
+    col = mix(col, pow(max(hud.rgb, 0.0), vec3(2.2)), hud.a);
     col += bloom * hud.a * 0.25;
 
     // Scanlines and an aperture grille, both tied to the source resolution so
@@ -186,6 +190,18 @@ const screenFrag = /* glsl */ `
     col *= 1.0 + roll;
 
     col *= 1.0 - r2 * 0.22;
+
+    // A soft shoulder above 0.8. The pastel pets sit near the top of the range
+    // before the sun has touched them, so without this their lit side clips to
+    // flat white; midtones pass through untouched.
+    col = max(col, 0.0);
+    col = col / (1.0 + max(col - 0.8, 0.0));
+
+    // Into display space. Everything above is light being added up; everything
+    // below is applied to the picture as the eye will see it, and the dither
+    // quantises where the banding actually lands.
+    col = pow(col, vec3(1.0 / 2.2));
+
     col = floor(col * uLevels + bayer(gl_FragCoord.xy)) / uLevels;
 
     // A hard diagonal glare across the plastic window.
