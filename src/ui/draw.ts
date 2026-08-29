@@ -2,7 +2,7 @@ import { CURIOS, CURIO_COUNT } from '../data/curios'
 import { textWidth } from '../data/font'
 import { FOODS } from '../data/foods'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
-import { speciesOf, SPECIES_COUNT } from '../data/species'
+import { speciesOf } from '../data/species'
 import { MINIGAMES } from '../game/minigames'
 import { NAMES, type App } from '../game/app'
 import { CRITICAL } from '../game/tuning'
@@ -215,7 +215,6 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
 
   hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
   hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
-  hud.text(6, 138, `FOUND ${app.discoveredCount}/${SPECIES_COUNT}`, DIM)
   drawCurioBoard(hud, app)
   if (pet.stage === 'adult') {
     const progress = app.retireProgress
