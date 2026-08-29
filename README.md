@@ -147,6 +147,12 @@ and the pet walks on out towards the side of the screen, which is what makes the
 yard feel wider than the window onto it. The sun is shifted by the same angle,
 so it stays put in the world instead of riding along with the view.
 
+The framing is set by the field of view rather than by where the camera stands.
+The terrain's haze begins at a depth of 11 and the pet stands at about 9, so
+pulling the camera back to fit more in would walk the pet and the ground under
+it into the fog; widening the lens leaves every distance, and so the haze,
+exactly where it was.
+
 ### Time, seasons and weather
 
 The world keeps its own clock, running far faster than real time. A day takes

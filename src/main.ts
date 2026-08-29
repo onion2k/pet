@@ -45,11 +45,22 @@ const screenScene = new Transform()
  */
 const CAMERA_POS: [number, number, number] = [0, 3.9, 9.0]
 const CAMERA_TARGET_Y = 1.35
+/**
+ * Framing is widened rather than dollied back: the terrain's haze starts at a
+ * depth of 11 and the pet stands at about 9, so pulling the camera away would
+ * walk the pet and the ground it stands on into the fog.
+ */
+const SCREEN_FOV = 33
 /** How far the pan may swing either way. Beyond it the pet leaves the middle
  *  of the frame and walks out toward the edge, which is the point. */
 const MAX_PAN = (40 * Math.PI) / 180
 
-const screenCamera = new Camera(gl, { fov: 28, near: 0.1, far: 60, aspect: SCREEN_PX[0] / SCREEN_PX[1] })
+const screenCamera = new Camera(gl, {
+  fov: SCREEN_FOV,
+  near: 0.1,
+  far: 60,
+  aspect: SCREEN_PX[0] / SCREEN_PX[1],
+})
 screenCamera.position.set(...CAMERA_POS)
 screenCamera.lookAt([0, CAMERA_TARGET_Y, 0])
 /** Eased pan angle, so the camera never snaps to a new heading. */
@@ -346,7 +357,7 @@ function step(dt: number): void {
   const nightside = world.sunHeight <= 0
   // Shift the sun by the pan, or it would sit welded to the screen while the
   // world turned underneath it.
-  const halfFovH = Math.atan(Math.tan((28 * Math.PI) / 360) * (SCREEN_PX[0] / SCREEN_PX[1]))
+  const halfFovH = Math.atan(Math.tan((SCREEN_FOV * Math.PI) / 360) * (SCREEN_PX[0] / SCREEN_PX[1]))
   backdrop.setSun(
     [
       0.5 - world.light.direction[0] * 0.55 - cameraPan / (2 * halfFovH),
