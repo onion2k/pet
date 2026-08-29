@@ -308,12 +308,50 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
     faces++
   }
 
+  /**
+   * A filled ellipse, as a fan. Recorded exactly like a quad -- each vertex
+   * keeps its offset from the centre -- so the shader blinks and steers these
+   * without knowing they are round.
+   */
+  const disc = (
+    cx: number,
+    cy: number,
+    cz: number,
+    hw: number,
+    hh: number,
+    rgb: [number, number, number],
+    featureKind: number,
+    featureParam: number,
+  ): void => {
+    const SEGMENTS = 16
+    const push = (dx: number, dy: number): void => {
+      position.push(cx + dx, cy + dy, cz)
+      normal.push(0, 0, 1)
+      color.push(rgb[0], rgb[1], rgb[2])
+      ao.push(1)
+      part.push(PART_HEAD)
+      emissive.push(0)
+      material.push(0)
+      kind.push(featureKind)
+      local.push(dx, dy, 0)
+      param.push(featureParam)
+    }
+    for (let i = 0; i < SEGMENTS; i++) {
+      const a = (i / SEGMENTS) * Math.PI * 2
+      const b = ((i + 1) / SEGMENTS) * Math.PI * 2
+      push(0, 0)
+      push(Math.cos(a) * hw, Math.sin(a) * hh)
+      push(Math.cos(b) * hw, Math.sin(b) * hh)
+      faces++
+    }
+  }
+
   const nose = anchors.nose
   if (nose) {
     // The painted muzzle is covered over and redrawn smaller, the same trick
     // the eyes use. A big blunt nose is the least cute thing on the face.
     quad(nose.x, nose.y, nose.z, nose.halfW * 1.25, nose.halfH * 1.4, anchors.skin, FACE_NONE, 0)
-    quad(
+    disc(
       nose.x,
       nose.y,
       nose.z + anchors.voxel * 0.06,
@@ -332,10 +370,13 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
   // in. Both are only possible because the painted eye is covered over first:
   // while the drawn eye had to hide the old one, it could never be smaller
   // than it, nor sit anywhere but on top of it.
-  const scleraW = eyeHalfW * 0.78
-  const scleraH = eyeHalfH * 0.76
-  const pupilW = scleraW * 0.5
-  const pupilH = scleraH * 0.56
+  // Round, so one radius rather than two: a painted eye is not always square,
+  // and taking the smaller side keeps the circle inside the patch that hides it.
+  const eyeR = Math.min(eyeHalfW, eyeHalfH) * 0.8
+  const scleraW = eyeR
+  const scleraH = eyeR
+  const pupilW = eyeR * 0.52
+  const pupilH = eyeR * 0.52
   const inset = 0.78
 
   for (const eye of [left, right]) {
@@ -345,10 +386,10 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
     // A dark rim behind the white. Several of these creatures are near-white
     // themselves -- a pale sclera on a pale head simply disappears, and the eye
     // reads as nothing but its pupil. The rim gives it an edge on any body.
-    quad(x, eye.y, eye.z + anchors.voxel * 0.06, scleraW * 1.22, scleraH * 1.22, INK, FACE_SCLERA, 0)
-    quad(x, eye.y, eye.z + anchors.voxel * 0.12, scleraW, scleraH, SCLERA, FACE_SCLERA, 0)
+    disc(x, eye.y, eye.z + anchors.voxel * 0.06, scleraW * 1.22, scleraH * 1.22, INK, FACE_SCLERA, 0)
+    disc(x, eye.y, eye.z + anchors.voxel * 0.12, scleraW, scleraH, SCLERA, FACE_SCLERA, 0)
     // Pupils sit a hair proud of the whites, so they are never z-fought by them.
-    quad(x, eye.y, eye.z + anchors.voxel * 0.2, pupilW, pupilH, INK, FACE_PUPIL, 0)
+    disc(x, eye.y, eye.z + anchors.voxel * 0.2, pupilW, pupilH, INK, FACE_PUPIL, 0)
   }
 
   // The mouth is a run of small blocks, curved by the shader into a smile or a

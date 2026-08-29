@@ -176,6 +176,12 @@ the old one, it could never be smaller than it, nor sit anywhere but exactly on
 top of it — and the models' eyes are large and wide-set. Painted out, the eye can
 be drawn at whatever size and spacing suits, and it is drawn small and close.
 
+The eyes are round — a fan of triangles rather than a quad, and the nose with
+them. The shader is untouched by that: it poses each feature from the offset
+every vertex carries from its own centre, so it blinks and steers a disc without
+knowing it is not a rectangle. The patches that hide the painted features stay
+rectangles, because what they cover is rectangular.
+
 The features sit a quarter of a voxel proud of the head; at a fiftieth they came
 out striped with z-fighting. The whites carry a dark rim behind them, because
 several of these creatures are near-white themselves and a pale sclera on a pale
