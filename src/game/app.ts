@@ -13,9 +13,9 @@ import { hoursUntilSunrise, isNight, seasonIdAt, worldAt, WORLD_HOUR_MS } from '
 import { CURIO_COUNT, findCurio, type Curio } from '../data/curios'
 import { textWidth } from '../data/font'
 import { SPECIES_COUNT } from '../data/species'
-import type { StatKey } from './types'
 import type { SeasonId, WeatherId } from '../data/seasons'
 import { SHELLS, shellById, type ShellColour } from '../data/shells'
+import { NEED_LINES, SICK_LINE, voice } from '../data/voice'
 import type { PetState, SaveFile } from './types'
 
 export type Mode =
@@ -100,6 +100,11 @@ export class App {
   tickerOffset = 0
   private tickerRotation = 0
   private tickerQueue: string[] = []
+  /**
+   * A single slot rather than a queue: rapid actions replace the pending line
+   * instead of backing up, so five quick meals thank you once, not five times.
+   */
+  private pendingVoice: string | null = null
   private lastSeasonId: SeasonId | null = null
   message = ''
   messageTimer = 0
@@ -140,6 +145,11 @@ export class App {
       this.awayMs = result.awayMs
       this.syncDiscovered()
       this.rollCurio()
+      // The pet is pleased to see you, and says so — more pleased the longer
+      // you were gone.
+      if (this.pet.stage !== 'egg' && this.awayMs >= WELCOME_THRESHOLD_MS) {
+        this.sayAsPet(voice.welcome(this.awayMs >= 3 * 3_600_000))
+      }
     }
     saveSoon(this.save)
   }
@@ -198,6 +208,12 @@ export class App {
     this.tickerQueue.push(text.toUpperCase())
   }
 
+  /** The pet says something, in its own voice, after the current line. */
+  private sayAsPet(text: string): void {
+    if (!this.pet) return
+    this.pendingVoice = `${this.pet.name}: ${text}`
+  }
+
   /**
    * The ambient news rotation: the sky, the pet, the lineage's standing goals.
    * Rebuilt fresh each time a line is needed, so everything reads current.
@@ -216,20 +232,19 @@ export class App {
     }
     out.push(weatherLines[world.weather])
 
-    if (pet && pet.stage !== 'egg' && !pet.asleep) {
+    const night = isNight(this.worldNow())
+    if (pet && pet.stage === 'egg') {
+      out.push(voice.egg())
+    } else if (pet && !pet.asleep) {
+      // Needs and musings come from the pet itself, in the first person.
       if (pet.sick) {
-        out.push(`${pet.name} NEEDS MEDICINE`)
+        out.push(`${pet.name}: ${SICK_LINE}`)
       } else {
         const need = urgentNeeds(pet)[0]
-        const needLines: Partial<Record<StatKey, string>> = {
-          hunger: `${pet.name} IS HUNGRY`,
-          hygiene: `${pet.name} COULD USE A BATH`,
-          energy: `${pet.name} IS SLEEPY`,
-          happiness: `${pet.name} IS FEELING GLUM`,
-        }
-        if (need && needLines[need]) out.push(needLines[need]!)
+        if (need && NEED_LINES[need]) out.push(`${pet.name}: ${NEED_LINES[need]}`)
       }
-      if (isNight(this.worldNow())) out.push('THE SUN IS DOWN... BEDTIME?')
+      out.push(`${pet.name}: ${voice.monologue(night, world.weather)}`)
+      if (night) out.push('THE SUN IS DOWN... BEDTIME?')
     }
 
     if (this.save.streak.days > 1) out.push(`CARE STREAK: ${this.save.streak.days} DAYS`)
@@ -254,8 +269,9 @@ export class App {
       this.tickerOffset += dt * TICKER_SPEED
       if (this.tickerOffset <= TICKER_VIEW_PX + textWidth(this.tickerText)) return
     }
-    const queued = this.tickerQueue.shift()
+    const queued = this.tickerQueue.shift() ?? this.pendingVoice
     if (queued) {
+      if (queued === this.pendingVoice) this.pendingVoice = null
       this.tickerText = queued
     } else {
       const candidates = this.tickerCandidates()
@@ -539,6 +555,7 @@ export class App {
         if (result.ok) {
           this.hooks.burst('bubble', 14)
           this.hooks.pop(0.6)
+          this.sayAsPet(voice.cleaned())
         }
         this.persist()
         return
@@ -549,6 +566,7 @@ export class App {
         if (result.ok) {
           this.hooks.burst('sparkle', 12)
           this.hooks.pop(0.8)
+          this.sayAsPet(voice.medicine())
         }
         this.persist()
         return
@@ -556,7 +574,10 @@ export class App {
       case 'sleep': {
         const result = toggleSleep(pet, this.worldNow())
         this.say(result.message, result.ok ? 'sleep' : 'refuse')
-        if (result.ok && pet.asleep) this.hooks.burst('zzz', 5)
+        if (result.ok && pet.asleep) {
+          this.hooks.burst('zzz', 5)
+          this.sayAsPet(voice.goodnight())
+        }
         this.persist()
         return
       }
@@ -589,6 +610,7 @@ export class App {
     if (result.ok) {
       this.hooks.burst('crumb', 12)
       this.hooks.pop(1)
+      this.sayAsPet(voice.fed(food.name))
       this.mode = 'main'
     }
     this.persist()
@@ -712,6 +734,7 @@ export class App {
     // see it — a pet that woke while the app was closed already did so above.
     if (wasAsleep && !pet.asleep && !this.skipping) {
       this.say(`${pet.name} wakes up`, 'confirm')
+      this.sayAsPet(voice.morning())
     }
 
     if (this.mode === 'playing' && this.session) {
@@ -724,6 +747,7 @@ export class App {
       if (this.session.done) {
         recordPlay(pet, this.session.won, this.session.streak)
         this.say(this.session.won ? `${pet.name} won!` : 'better luck next time', this.session.won ? 'win' : 'lose')
+        this.sayAsPet(voice.game(this.session.won))
         if (this.session.won) {
           this.hooks.burst('heart', 18)
           this.hooks.pop(1)

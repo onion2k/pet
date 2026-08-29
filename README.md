@@ -29,10 +29,18 @@ Six icons ring the screen: feed, play, clean, medicine, sleep and status. An
 icon blinks red when the matching stat is critical.
 
 A news ticker crawls along the bottom of the screen, above the lower icons: the
-weather, a season on its way, what the pet needs, the lineage's standing goals,
-and breaking news — an evolution, a curio found, a season arriving. Any system
-can push a line onto it (`app.pushTicker`), so it is the game's ambient
-messaging channel; the toast remains for immediate feedback.
+weather, a season on its way, the lineage's standing goals, and breaking news —
+an evolution, a curio found, a season arriving. Any system can push a line onto
+it (`app.pushTicker`), so it is the game's ambient messaging channel; the toast
+remains for immediate feedback.
+
+The pet talks through it too, in its own voice: it welcomes you back (more
+effusively the longer you were gone), thanks you for meals and baths and
+medicine, says goodnight on its way to bed, asks for what it needs in the first
+person, and mutters idle thoughts — some only at night or in particular weather.
+The egg has lines of its own. Pet-voice lines occupy a single slot rather than a
+queue, so five quick meals thank you once, not five times; breaking news still
+outranks them.
 
 **Hold C** — press and hold the third button, or the C key — to back out of the
 feed menu, the game menu, or a game in progress:
