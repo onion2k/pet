@@ -242,6 +242,13 @@ The bubble stands well in front of the pet and off to one side. Placed level wit
 it and only a little aside, the quad sits inside the pet's own head and is never
 seen.
 
+It is billboarded about its own position rather than the pet's. A quad with a
++z normal turned by *t* has the normal (sin *t*, 0, cos *t*), so *t* is the
+bearing from the quad **to** the camera — not the camera's own pan, which is the
+bearing the other way and turns the quad away by twice the error as the pet
+moves off centre. Turning the parent instead of the quad would swing the bubble
+around the pet on an arc rather than turning it where it stands.
+
 The weather falls through a volume far wider than it is deep. The yard runs the
 whole width of the meadow and the camera turns forty degrees to follow the pet
 across it, so a volume square in plan — which is what it was — left the rain
@@ -343,17 +350,6 @@ names the branch the pet is currently earning, in those same words, while there
 is still time to steer it. What it becomes stays hidden, because knowing you are
 heading somewhere is the useful part and knowing exactly where would end the
 surprise.
-
-### Keepsakes
-
-The yard keeps what has happened in it. Every kind of curio found puts a trinket
-out in the foreground row, tinted from the curio it stands for so one shape
-serves for all of them. Visitors come and go with the seasons; these stay, so
-the meadow slowly becomes a record rather than a backdrop that resets.
-
-Retired ancestors briefly had cairns out here too, and they did not read as
-anything in particular — a small grey stack among the scenery says nothing about
-who it stands for. The lineage still wants showing somewhere; this was not it.
 
 ### Visitors
 

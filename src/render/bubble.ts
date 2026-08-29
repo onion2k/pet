@@ -45,7 +45,11 @@ export interface Bubble {
   show(kind: BubbleKind, text: string, seconds?: number): void
   /** True while something is already up, so nothing talks over itself. */
   get busy(): boolean
-  update(dt: number, at: { x: number; y: number; z: number }, facing: number): void
+  update(
+    dt: number,
+    at: { x: number; y: number; z: number },
+    camera: { x: number; z: number },
+  ): void
   /** Starts a little run of notes rising from the pet. */
   hum(): void
 }
@@ -119,6 +123,23 @@ const SYMBOLS: Record<string, string[]> = {
     '..#.#..',
     '.#...#.',
   ],
+}
+
+/**
+ * Turns a quad to face the camera, about its own position rather than the
+ * pet's. A quad with a +z normal turned by t has the normal (sin t, 0, cos t),
+ * so t is the bearing from the quad to the camera -- not the camera's own pan,
+ * which is the bearing the other way and turns the quad away by twice the error
+ * as the pet moves off centre.
+ */
+function faceCamera(
+  mesh: Mesh,
+  origin: { x: number; z: number },
+  camera: { x: number; z: number },
+): void {
+  const x = origin.x + mesh.position.x
+  const z = origin.z + mesh.position.z
+  mesh.rotation.y = Math.atan2(camera.x - x, camera.z - z)
 }
 
 export function createBubble(gl: OGLRenderingContext): Bubble {
@@ -302,7 +323,7 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
         if (delay > 0.9) break
       }
     },
-    update(dt, at, facing) {
+    update(dt, at, camera) {
       timer = Math.max(0, timer - dt)
       fade += ((timer > 0 ? 1 : 0) - fade) * Math.min(1, dt * 6)
       program.uniforms.uFade.value = fade
@@ -312,10 +333,11 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
       // little aside, the quad simply sits inside the head and is never seen.
       panel.scale.set(0.95)
       panel.position.set(0.9, 1.9, 0.75)
+      // The root carries position only. Turning it would swing the panel around
+      // the pet on an arc rather than turning it where it stands.
       root.position.set(at.x, at.y, at.z)
-      // Turned to the viewer rather than with the pet, or it would be edge-on
-      // half the time.
-      root.rotation.y = facing
+      root.rotation.y = 0
+      faceCamera(panel, at, camera)
 
       let anyNote = false
       for (const note of notes) {
@@ -337,6 +359,7 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
           1.45 + t * 0.85,
           0.75,
         )
+        faceCamera(note.mesh, at, camera)
         note.mesh.rotation.z = Math.sin(t * 7) * 0.3
       }
       noteProgram.uniforms.uFade.value = anyNote ? 1 : 0

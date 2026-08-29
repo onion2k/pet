@@ -14,9 +14,6 @@ import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
 import { createVisitors } from './render/visitors'
 import { createBubble } from './render/bubble'
-import { createKeepsakes, type Placed } from './render/keepsakes'
-import { curioById } from './data/curios'
-import { hexToLinear } from './render/voxel-mesh'
 import { faceAnchors } from './render/face'
 import { createBloom } from './render/post'
 import { createShell, SCREEN_CORNER_POWER } from './render/shell'
@@ -101,9 +98,6 @@ visitors.root.setParent(screenScene)
 
 const bubble = createBubble(gl)
 bubble.root.setParent(screenScene)
-
-const keepsakes = createKeepsakes(gl)
-keepsakes.root.setParent(screenScene)
 /**
  * Counts down to the pet's next unprompted thought. Long on purpose: a bubble
  * that turns up every half minute is wallpaper, and stops being worth looking
@@ -386,17 +380,6 @@ function step(dt: number): void {
   terrain.setLamps(lampView, lampLevel)
   visitors.setLighting(lighting)
   visitors.setLamps(lampView, lampLevel)
-  keepsakes.setLighting(lighting)
-  keepsakes.setLamps(lampView, lampLevel)
-
-  // What the yard has to show for itself: one trinket for each kind of curio
-  // found, in the colour of the curio it stands for.
-  keepsakes.set(
-    Object.keys(app.curioCounts).map((id) => ({
-      tint: hexToLinear(curioById(id)?.colour ?? '#ffffff'),
-    })) satisfies Placed[],
-    terrain.shape.groundY,
-  )
 
   backdrop.setPalette(world.sky.top, world.sky.bottom)
   // Place the sun on the same arc that lights the scene, so the shadows and the
@@ -484,7 +467,11 @@ function step(dt: number): void {
     // for a good stretch either way.
     museTimer = seconds + (need ? 80 + Math.random() * 70 : 240 + Math.random() * 270)
   }
-  bubble.update(dt, { x: petView.position.x, y: terrain.shape.groundY, z: petView.position.z }, cameraPan)
+  bubble.update(
+    dt,
+    { x: petView.position.x, y: terrain.shape.groundY, z: petView.position.z },
+    { x: CAMERA_POS[0], z: CAMERA_POS[2] },
+  )
 
   renderer.render({ scene: screenScene, camera: screenCamera, target: sceneTarget })
   const glow = bloom.render(renderer, sceneTarget.texture)
