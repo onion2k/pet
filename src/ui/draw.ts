@@ -63,11 +63,19 @@ function drawRing(hud: Hud, app: App): void {
     hud.safeHalfWidth(hud.height - BOTTOM_BAND + ICON_TOP_Y + 7) - ICON_HALF - 1,
   )
 
+  // Split across two rows, the top one taking the odd icon. Written for any
+  // count rather than for three a row, so adding one does not silently push it
+  // off the end of the strip.
+  const topCount = Math.ceil(ICON_ORDER.length / 2)
   ICON_ORDER.forEach((id, i) => {
-    const top = i < 3
-    const column = i % 3
+    const top = i < topCount
+    const column = top ? i : i - topCount
+    const inRow = top ? topCount : ICON_ORDER.length - topCount
     const spread = top ? topSpread : bottomSpread
-    const centreX = hud.width / 2 + (column - 1) * spread
+    // The outermost icon of any row sits at the full spread, so both rows reach
+    // the same width however many they hold.
+    const step = inRow > 1 ? (spread * 2) / (inRow - 1) : 0
+    const centreX = hud.width / 2 + (column - (inRow - 1) / 2) * step
     const x = Math.round(centreX - 4)
     const y = top ? ICON_TOP_Y : hud.height - BOTTOM_BAND + ICON_TOP_Y
     const selected = app.iconIndex === i

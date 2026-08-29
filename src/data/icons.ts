@@ -1,5 +1,5 @@
 /** 8x8 menu glyphs, printed around the screen bezel like a real handheld. */
-export type IconId = 'feed' | 'play' | 'sleep' | 'clean' | 'medicine' | 'status'
+export type IconId = 'feed' | 'play' | 'sleep' | 'clean' | 'medicine' | 'forage' | 'status'
 
 const I: Record<IconId, string> = {
   feed: [
@@ -52,6 +52,16 @@ const I: Record<IconId, string> = {
     '........',
     '........',
   ].join('/'),
+  forage: [
+    '...##...',
+    '..####..',
+    '.##..##.',
+    '##....##',
+    '##....##',
+    '.##..##.',
+    '..####..',
+    '........',
+  ].join('/'),
   status: [
     '.##..##.',
     '########',
@@ -66,7 +76,7 @@ const I: Record<IconId, string> = {
 
 export const ICON_SIZE = 8
 
-export const ICON_ORDER: IconId[] = ['feed', 'play', 'clean', 'medicine', 'sleep', 'status']
+export const ICON_ORDER: IconId[] = ['feed', 'play', 'clean', 'forage', 'medicine', 'sleep', 'status']
 
 export const ICON_LABEL: Record<IconId, string> = {
   feed: 'FEED',
@@ -74,6 +84,7 @@ export const ICON_LABEL: Record<IconId, string> = {
   sleep: 'SLEEP',
   clean: 'CLEAN',
   medicine: 'MEDS',
+  forage: 'FORAGE',
   status: 'STATUS',
 }
 

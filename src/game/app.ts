@@ -6,7 +6,7 @@ import type { ButtonId } from '../render/shell'
 import type { SoundId } from '../engine/audio'
 import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution } from './actions'
 import { MINIGAMES, type GameSession } from './minigames'
-import { legacyOf, temperamentOf } from './temperament'
+import { legacyOf, lineageOf, temperamentOf, type TemperamentId } from './temperament'
 import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
@@ -17,7 +17,7 @@ import { SPECIES_COUNT } from '../data/species'
 import type { SeasonId, WeatherId } from '../data/seasons'
 import { SHELLS, shellById, type ShellColour } from '../data/shells'
 import { SICK_LINE, voice } from '../data/voice'
-import type { PetState, SaveFile } from './types'
+import type { PetState, SaveFile, StatKey, Stats } from './types'
 
 export type Mode =
   | 'boot'
@@ -39,6 +39,10 @@ const WELCOME_THRESHOLD_MS = 5 * 60_000
 const CURIO_AWAY_MS = 20 * 60_000
 /** Chance a long enough absence turns something up. */
 const CURIO_CHANCE = 0.65
+/** How long a forage takes. Three world hours, so the sky moves while it is out. */
+const FORAGE_MS = 3 * 60_000
+/** How often a forage comes back with something. Not always, or it is a button. */
+const FORAGE_LUCK = 0.7
 
 /**
  * A sleep runs to sunrise, however far off that is. Bedded down at dusk that is
@@ -303,6 +307,66 @@ export class App {
    * The destination is deliberately withheld -- knowing you are heading
    * somewhere is the useful part, knowing exactly where would end the surprise.
    */
+  /**
+   * Sends a grown pet off to look for something. The whole decision is when to
+   * send it: what can be found is gated on the season and the weather, so the
+   * knowledge the player has built up about the year becomes a thing they can
+   * act on rather than wait for.
+   */
+  private forage(): void {
+    const pet = this.pet
+    if (!pet) return
+    if (pet.stage !== 'adult') return this.say('not old enough', 'refuse')
+    if (pet.asleep) return this.say(`${pet.name} is asleep`, 'refuse')
+    if (pet.sick) return this.say('too poorly', 'refuse')
+    if (pet.foragingUntil) return this.say('already out', 'refuse')
+    if (pet.stats.energy < 25) return this.say('too tired', 'refuse')
+
+    pet.foragingUntil = this.worldNow() + FORAGE_MS
+    this.applyStats({ energy: -8 })
+    this.say('off it goes', 'confirm')
+    this.pushTicker(`${pet.name} has gone looking for something`)
+    this.persist()
+  }
+
+  /** Brings it home if it is due, with whatever the day had to offer. */
+  private settleForage(): void {
+    const pet = this.pet
+    if (!pet?.foragingUntil) return
+    const now = this.worldNow()
+    if (now < pet.foragingUntil) return
+    pet.foragingUntil = undefined
+
+    // Judged on the world it comes back to, which is the world the player
+    // chose by picking their moment.
+    const world = worldAt(now)
+    const curio = findCurio(world.season.id, world.weather, Math.random())
+    if (curio && Math.random() < FORAGE_LUCK) {
+      this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
+      this.found = curio
+      this.pushTicker(`${pet.name} came back with a ${curio.name.toLowerCase()}`)
+      this.hooks.burst('sparkle', 12)
+    } else {
+      this.pushTicker(`${pet.name} came back with nothing this time`)
+    }
+    this.applyStats({ happiness: 6 })
+    this.persist()
+  }
+
+  /** Adds stat deltas, clamped, the same way the actions do. */
+  private applyStats(delta: Partial<Stats>): void {
+    const pet = this.pet
+    if (!pet) return
+    for (const [key, amount] of Object.entries(delta) as [StatKey, number][]) {
+      pet.stats[key] = Math.max(0, Math.min(100, pet.stats[key] + amount))
+    }
+  }
+
+  /** Which way the family leans, from the pets already seen off. */
+  get lineage(): TemperamentId | null {
+    return lineageOf(this.save.album)
+  }
+
   /** How the grown pet turned out, or null while it is still growing. */
   get temperament(): { name: string; blurb: string } | null {
     const pet = this.pet
@@ -312,7 +376,7 @@ export class App {
   get leaning(): string | null {
     const pet = this.pet
     if (!pet || pet.stage === 'egg') return null
-    const branch = chooseBranch(pet, metrics(pet), { season: seasonIdAt(this.worldNow()) })
+    const branch = chooseBranch(pet, metrics(pet), { season: seasonIdAt(this.worldNow()), lineage: this.lineage })
     return branch ? branch.because : null
   }
 
@@ -504,6 +568,7 @@ export class App {
       name: pet.name,
       retiredAt: Date.now(),
       legacy: legacyOf(pet),
+      temperament: pet.temperament,
     })
     this.save.counters.retirements += 1
     this.syncDiscovered()
@@ -619,6 +684,10 @@ export class App {
           this.sayAsPet(voice.cleaned(pet.speciesId))
         }
         this.persist()
+        return
+      }
+      case 'forage': {
+        this.forage()
         return
       }
       case 'medicine': {
@@ -783,6 +852,7 @@ export class App {
       return
     }
 
+    this.settleForage()
     this.advanceTicker(dt)
 
     const pet = this.pet
@@ -821,7 +891,7 @@ export class App {
 
     // Evolution interrupts whatever screen is up; it is the payoff of the whole loop.
     if (readyToEvolve(pet) && this.mode !== 'evolve' && this.mode !== 'playing') {
-      const result = evolve(pet, { season: seasonIdAt(this.worldNow()) })
+      const result = evolve(pet, { season: seasonIdAt(this.worldNow()), lineage: this.lineage })
       if (result) {
         this.evolution = result
         this.syncDiscovered()

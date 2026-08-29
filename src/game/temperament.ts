@@ -1,6 +1,6 @@
 import { metrics, type Metrics } from './metrics'
 import { STAGE_DURATION } from './tuning'
-import type { PetState } from './types'
+import type { AlbumEntry, PetState } from './types'
 
 /**
  * What a pet turns out like, settled when it grows up.
@@ -82,4 +82,52 @@ export function legacyOf(pet: PetState): number {
   // No bonus for being an elder: reaching one already requires a full grown
   // life, so such a pet scores the maximum on the time alone.
   return Math.min(1, lived * 0.6 + kept * lived * 0.4)
+}
+
+/**
+ * Which way a family leans, weighted by how much each life was worth. A line of
+ * restful pets makes it a little easier for the next one to turn out restful
+ * too -- not enough to decide anything on its own, but enough that raising a
+ * family with an eye to what came before is a strategy rather than a story you
+ * tell afterwards.
+ */
+export function lineageOf(album: AlbumEntry[]): TemperamentId | null {
+  const weights = new Map<TemperamentId, number>()
+  for (const entry of album) {
+    if (!entry.temperament) continue
+    weights.set(entry.temperament, (weights.get(entry.temperament) ?? 0) + (entry.legacy ?? 0.4))
+  }
+  let best: TemperamentId | null = null
+  let bestWeight = 0
+  for (const [id, weight] of weights) {
+    if (weight > bestWeight) {
+      best = id
+      bestWeight = weight
+    }
+  }
+  // A single half-lived ancestor is a coincidence, not a family trait.
+  return bestWeight >= 1 ? best : null
+}
+
+/** How much a forebear's leaning is worth to the metric it favours. */
+export const LINEAGE_NUDGE = 0.12
+
+/**
+ * The raising as the branch rules should see it, with the family's leaning
+ * folded in. Applied where branches are chosen rather than in `metrics` itself,
+ * so what the status screen reports about this pet stays about this pet.
+ */
+export function withLineage(m: Metrics, lineage: TemperamentId | null): Metrics {
+  if (!lineage) return m
+  const bump = (v: number) => Math.min(1, v + LINEAGE_NUDGE)
+  switch (lineage) {
+    case 'devoted':
+      return { ...m, care: bump(m.care) }
+    case 'lively':
+      return { ...m, play: bump(m.play) }
+    case 'restful':
+      return { ...m, sleep: bump(m.sleep) }
+    default:
+      return m
+  }
 }

@@ -10,6 +10,8 @@ import type { VoxelModel } from './voxel-format'
 /** The world the evolution happens in, for season-gated branches. */
 export interface BranchContext {
   season: SeasonId
+  /** Which way the family leans, from the pets already seen off. */
+  lineage: TemperamentId | null
 }
 
 export interface Branch {

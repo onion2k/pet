@@ -2,7 +2,7 @@ import { foodById, type Food } from '../data/foods'
 import { chooseBranch, speciesOf, type BranchContext } from '../data/species'
 import type { SeasonId } from '../data/seasons'
 import { metrics } from './metrics'
-import { temperamentFrom, temperamentOf } from './temperament'
+import { temperamentFrom, temperamentOf, withLineage } from './temperament'
 import type { PetState, Stats, StatKey } from './types'
 import { HEALTH_FLOOR, STAGE_DURATION } from './tuning'
 import { isNight } from './world'
@@ -140,7 +140,7 @@ function stageStartAge(pet: PetState): number {
 
 /** Applies the earned branch, if any. Returns what happened so the UI can celebrate it. */
 export function evolve(pet: PetState, ctx: BranchContext): Evolution | null {
-  const branch = chooseBranch(pet, metrics(pet), ctx)
+  const branch = chooseBranch(pet, withLineage(metrics(pet), ctx.lineage), ctx)
   if (!branch) return null
 
   const from = speciesOf(pet.speciesId)
@@ -151,7 +151,7 @@ export function evolve(pet: PetState, ctx: BranchContext): Evolution | null {
 
   // Growing up settles the character. Read once, from the raising that has just
   // finished, and kept for the rest of the pet's life.
-  if (to.stage === 'adult') pet.temperament = temperamentFrom(metrics(pet))
+  if (to.stage === 'adult') pet.temperament = temperamentFrom(withLineage(metrics(pet), ctx.lineage))
 
   // A fresh form arrives alert and in a good mood.
   apply(pet.stats, { happiness: 25, energy: 25 })

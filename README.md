@@ -400,6 +400,32 @@ were. A life is scored on how long it was allowed to be grown up and how well it
 was kept, so a pet retired the instant it came of age passes on nothing at all,
 and a full one passes on the lot.
 
+### Foraging
+
+A grown pet can be sent out to look for something. The whole decision is *when*:
+what can be found is gated on the season and the weather, so a snowdrop wants a
+winter afternoon and a toadstool an autumn one, and the knowledge the player has
+built up about the year becomes something to act on rather than wait for. It is
+gone three world hours, comes back with something about three times in four, and
+is judged on the world it comes home to — which is the world the player chose by
+picking their moment.
+
+It is the one job the game asks of an adult, and the icon strip grew a seventh
+button for it. That strip was written for three icons a row; it now lays out
+whatever it is given, so the extra one did not quietly fall off the end.
+
+### Inheritance
+
+A family leans the way its forebears did. Retired ancestors are weighed by what
+their lives were worth, and if one temperament carries the weight it nudges the
+matching reading when the next pet's branch is chosen — enough that raising a
+family with an eye to what came before is a strategy, not enough to decide
+anything on its own. A single half-lived ancestor is a coincidence rather than a
+trait, and old saves with no temperaments recorded lean nowhere.
+
+The nudge is applied where branches are chosen rather than inside `metrics`, so
+what the status screen reports about a pet stays about that pet.
+
 ### Systems that touch each other
 
 Depth came from making the levers depend on one another rather than adding more
