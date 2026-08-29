@@ -59,76 +59,8 @@ export interface Bubble {
   hum(): void
 }
 
-/**
- * Big pixel symbols, drawn at bubble size rather than font size so they read at
- * this resolution. A word in five-pixel type is legible; a heart is not.
- */
-const SYMBOLS: Record<string, string[]> = {
-  heart: [
-    '.##.##.',
-    '#######',
-    '#######',
-    '.#####.',
-    '..###..',
-    '...#...',
-  ],
-  food: [
-    '...#...',
-    '..###..',
-    '.#####.',
-    '#######',
-    '.#####.',
-    '..###..',
-  ],
-  note: [
-    '....##.',
-    '....##.',
-    '...###.',
-    '.#####.',
-    '###..#.',
-    '.#.....',
-  ],
-  zzz: [
-    '#####..',
-    '...##..',
-    '..##...',
-    '.##....',
-    '#####..',
-    '.......',
-  ],
-  ask: [
-    '.###...',
-    '#...#..',
-    '...##..',
-    '..##...',
-    '.......',
-    '..##...',
-  ],
-  bang: [
-    '..##...',
-    '..##...',
-    '..##...',
-    '..##...',
-    '.......',
-    '..##...',
-  ],
-  bath: [
-    '..#....',
-    '..#....',
-    '.###...',
-    '#####..',
-    '#####..',
-    '.###...',
-  ],
-  cross: [
-    '#.....#',
-    '.#...#.',
-    '..#.#..',
-    '...#...',
-    '..#.#..',
-    '.#...#.',
-  ],
-}
+/** The one bit of pixel art left: a quaver, for the notes a hum sends up. */
+const NOTE_ART = ['....##.', '....##.', '...###.', '.#####.', '###..#.', '.#.....']
 
 /**
  * Turns a quad to face the camera, about its own position rather than the
@@ -198,7 +130,7 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
   function drawNote(): void {
     noteCtx.clearRect(0, 0, NOTE_W, NOTE_H)
     noteCtx.fillStyle = '#fff0c0'
-    const art = SYMBOLS.note!
+    const art = NOTE_ART
     const s = 2
     for (let y = 0; y < art.length; y++) {
       const row = art[y]!
@@ -249,21 +181,6 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
     }
   }
 
-  function drawSymbol(name: string, cx: number, cy: number, scale: number, colour: string): void {
-    const art = SYMBOLS[name]
-    if (!art) return
-    ctx.fillStyle = colour
-    const w = art[0]!.length
-    for (let y = 0; y < art.length; y++) {
-      const row = art[y]!
-      for (let x = 0; x < w; x++) {
-        if (row[x] === '#') {
-          ctx.fillRect(cx + (x - w / 2) * scale, cy + (y - art.length / 2) * scale, scale, scale)
-        }
-      }
-    }
-  }
-
   /** Paints the frame and its contents. */
   function paint(kind: BubbleKind, text: string): void {
     ctx.clearRect(0, 0, W, H)
@@ -307,27 +224,21 @@ export function createBubble(gl: OGLRenderingContext): Bubble {
     }
 
     const midY = (H - 16) / 2 + 4
-    if (SYMBOLS[text]) {
-      drawSymbol(text, W / 2, midY, 4, ink)
-    } else {
-      // Words are broken to fit the bubble rather than run off the side of it:
-      // the longest line in the game is twenty characters, which at this size
-      // is over twice the width of the canvas on one line.
-      // Set as large as will fit, then a size down if the words need more lines
-      // than the paper has room for.
-      const paperH = H - 16
-      let scale = 2
-      let lines = fitLines(text.toUpperCase(), lineBudget(scale))
-      if (lines.length * (GLYPH_H * scale + 2) > paperH - 6) {
-        scale = 1
-        lines = fitLines(text.toUpperCase(), lineBudget(scale))
-      }
-      const lineHeight = GLYPH_H * scale + 2
-      const top = midY - (lines.length * lineHeight) / 2
-      lines.forEach((line, i) => {
-        pixelText(line, W / 2, top + i * lineHeight, scale, ink)
-      })
+    // Broken to fit rather than run off the side, set as large as will fit, and
+    // a size down again if the words need more lines than the paper has room
+    // for: "this is the best day" wants four lines at the larger size.
+    const paperH = H - 16
+    let scale = 2
+    let lines = fitLines(text.toUpperCase(), lineBudget(scale))
+    if (lines.length * (GLYPH_H * scale + 2) > paperH - 6) {
+      scale = 1
+      lines = fitLines(text.toUpperCase(), lineBudget(scale))
     }
+    const lineHeight = GLYPH_H * scale + 2
+    const top = midY - (lines.length * lineHeight) / 2
+    lines.forEach((line, i) => {
+      pixelText(line, W / 2, top + i * lineHeight, scale, ink)
+    })
     texture.needsUpdate = true
   }
 

@@ -267,22 +267,25 @@ let last = performance.now()
 let elapsed = 0
 /** Shifts the world clock. Only ever non-zero when a test drives it. */
 /**
- * Idle thoughts. Each pairs what goes in the bubble with the words that explain
- * it, because the two are shown together and have to agree.
+ * Idle thoughts. Each pairs what the pet says with what the ticker says about
+ * it, because the two are shown together and have to agree without repeating.
  */
 const MUSINGS = [
-  { face: 'ask', line: 'wonders what is over the hill' },
-  { face: 'heart', line: 'is glad you came back' },
-  { face: 'note', line: 'has a tune stuck in its head' },
-  { face: 'food', line: 'is thinking about snacks' },
-  { face: 'bang', line: 'has had an idea' },
-  { face: 'ask', line: 'is counting the clouds' },
+  { say: 'hmm', line: 'wonders what is over the hill' },
+  { say: 'you came', line: 'is glad you came back' },
+  { say: 'la la', line: 'has a tune stuck in its head' },
+  { say: 'snacks', line: 'is thinking about snacks' },
+  { say: 'aha!', line: 'has had an idea' },
+  { say: 'clouds', line: 'is counting the clouds' },
 ] as const
 /** Said out loud when the pet is in a good mood. */
-const CHEER = {
-  faces: ['heart', 'bang', 'note'],
-  lines: ['hello!', 'this is the best day', 'thank you', 'again! again!', 'hooray'],
-} as const
+const CHEER = [
+  { say: 'hello!', line: 'hello' },
+  { say: 'best day', line: 'this is the best day' },
+  { say: 'thanks', line: 'thank you' },
+  { say: 'again!', line: 'again, again' },
+  { say: 'hooray', line: 'hooray' },
+] as const
 
 let timeOffset = 0
 /** Lantern positions in view space, packed xyz, rewritten every frame. */
@@ -427,23 +430,25 @@ function step(dt: number): void {
     const stats = who.stats
     const name = who.name
     const pick = <T,>(list: readonly T[]): T => list[(Math.random() * list.length) | 0]!
-    type Mood = { kind: 'thought' | 'speech'; face: string; line: string }
+    // The bubble is what the pet says; the ticker is what the game says about
+    // it. Keeping those apart is what stops the two repeating each other.
+    type Mood = { kind: 'thought' | 'speech'; say: string; line: string }
     let humming = false
 
     // Anything the player could do something about. Those come round more often
     // than idle musings, which are only ever meant as a small surprise.
     const need: Mood | null = who.asleep
-      ? { kind: 'thought', face: 'zzz', line: `${name} is fast asleep` }
+      ? { kind: 'thought', say: 'zzz', line: `${name} is fast asleep` }
       : who.sick
-        ? { kind: 'speech', face: 'cross', line: `${name} feels poorly` }
+        ? { kind: 'speech', say: 'ow', line: `${name} feels poorly` }
         : stats.hunger < 35
-          ? { kind: 'speech', face: 'food', line: `${name} is hungry` }
+          ? { kind: 'speech', say: 'feed me', line: `${name} is hungry` }
           : stats.hygiene < 35
-            ? { kind: 'thought', face: 'bath', line: `${name} could do with a wash` }
+            ? { kind: 'thought', say: 'a bath?', line: `${name} could do with a wash` }
             : stats.energy < 30
-              ? { kind: 'thought', face: 'zzz', line: `${name} is getting sleepy` }
+              ? { kind: 'thought', say: 'so tired', line: `${name} is getting sleepy` }
               : stats.happiness < 35
-                ? { kind: 'thought', face: 'ask', line: `${name} is a bit down` }
+                ? { kind: 'thought', say: 'oh dear', line: `${name} is a bit down` }
                 : null
 
     let mood: Mood
@@ -451,17 +456,18 @@ function step(dt: number): void {
     else if (petView.cheerful) {
       const roll = Math.random()
       if (roll < 0.35) {
-        mood = { kind: 'thought', face: 'note', line: `${name} is humming to itself` }
+        mood = { kind: 'thought', say: 'la la la', line: `${name} is humming to itself` }
         humming = true
       } else if (roll < 0.6) {
-        mood = { kind: 'speech', face: pick(CHEER.faces), line: `${name} says ${pick(CHEER.lines)}` }
-      } else mood = { kind: 'thought', face: 'heart', line: `${name} is happy` }
+        const cheer = pick(CHEER)
+        mood = { kind: 'speech', say: cheer.say, line: `${name} says ${cheer.line}` }
+      } else mood = { kind: 'thought', say: 'love you', line: `${name} is happy` }
     } else {
       const musing = pick(MUSINGS)
-      mood = { kind: 'thought', face: musing.face, line: `${name} ${musing.line}` }
+      mood = { kind: 'thought', say: musing.say, line: `${name} ${musing.line}` }
     }
     const seconds = app.speakNow(mood.line)
-    bubble.show(mood.kind, mood.face, seconds)
+    bubble.show(mood.kind, mood.say, seconds)
     if (humming) bubble.hum()
     // Measured from when the line finishes, so the ticker gets the world back
     // for a good stretch either way.

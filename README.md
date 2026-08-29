@@ -214,8 +214,10 @@ timer, and glance about between longer looks straight at you.
 ### Thoughts and humming
 
 Above the pet is a bubble drawn on a small canvas: a thought with trailing puffs,
-or speech with a tail, showing a large pixel symbol — a heart, a bowl, a note, a
-question. Needs come first, so a hungry pet never stands there musing about the
+or speech with a tail, carrying a few words in the same font the HUD uses. It
+holds what the *pet* says — "FEED ME", "SO TIRED", "LA LA LA" — while the ticker
+carries what the game says about it, "PIP IS HUNGRY". Keeping those apart is
+what stops the two repeating each other. Needs come first, so a hungry pet never stands there musing about the
 weather, and a cheerful one hums, with notes rising past its head.
 
 A symbol on its own says very little: a bowl could be hunger or dinner, and a
