@@ -66,6 +66,22 @@ measures of how the pet was raised, and the highest score wins:
 Egg → Blobbit → one of three children → one of six adults. Eleven forms, and two
 playthroughs genuinely diverge.
 
+### Moving about
+
+Pets have short arms and legs. Both are swung about their joint — the hip and
+the shoulder, whose heights the mesh builder measures from the model — rather
+than translated, because translating one part of a rigid voxel model shears it
+apart. Arms counter-swing against the legs, which is what makes a walk read as
+a walk, and the body rises and falls with each stride while the feet stay
+planted.
+
+The pet ambles around its clearing: it picks somewhere to go, walks there,
+pauses, then turns back to face the viewer. Targets are flattened along the
+view axis, so it mostly moves across the frame rather than into it, and roaming
+is bounded well inside the level clearing so its feet never step onto ground
+that steps up or down beneath them. Eggs have nothing to walk with, and a
+sleeping pet stays where it is.
+
 ### The world
 
 The pet stands on a voxel terrain patch built from the same mesh path as the
@@ -111,7 +127,9 @@ are not the brightest thing in frame.
 
 **A new pet form.** Add a `VoxelModel` to `src/data/models.ts`: a stack of ASCII
 layers, bottom first, where the last row of each layer is the pet's face and `.`
-is air. Pets are authored on an 11-wide, 9-deep grid. Set `mirror` and give only
+is air. Pets are authored on an 11-wide, 9-deep grid. Mark leg characters in
+`legs` and arm characters in `arms` and the walk cycle picks them up; joints are
+derived from wherever those voxels reach, so nothing needs measuring by hand. Set `mirror` and give only
 the left half plus the centre column — six characters per row — and the model is
 mirrored on build, so symmetry is structural rather than something to get right
 by hand. Mark characters as `emissive` to make them bloom, but sparingly: a

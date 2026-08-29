@@ -3,19 +3,23 @@ import { rows, type VoxelModel } from './voxel-format'
 /** Adult forms. Two per child branch, chosen by how the pet was actually raised. */
 
 export const MOCHI: VoxelModel = {
-  palette: {
-    b: '#ffd9ec',
-    d: '#ffaad4',
-    k: '#14121a',
-    m: '#ff6fae',
-    g: '#fff3a0',
-    l: '#ffaad4',
-  },
+  palette: { b: '#ffd9ec', d: '#ffaad4', k: '#14121a', m: '#ff6fae', g: '#fff3a0', l: '#ffaad4', a: '#ffaad4' },
   emissive: ['g'],
   head: ['k', 'm'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      .lll..
+      .lll..
+      .lll..
+      .lll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -50,9 +54,9 @@ export const MOCHI: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -60,9 +64,9 @@ export const MOCHI: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -128,14 +132,34 @@ export const MOCHI: VoxelModel = {
       ......`),
   ],
 }
-
 export const GLOOP: VoxelModel = {
-  palette: { b: '#a89ac9', d: '#6f628f', k: '#14121a', o: '#c9ff6b', l: '#6f628f' },
+  palette: { b: '#a89ac9', d: '#6f628f', k: '#14121a', o: '#c9ff6b', l: '#6f628f', a: '#6f628f' },
   emissive: ['o'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......
+      ......`),
+    rows(`
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......
+      ......`),
     rows(`
       ..dddd
       .ddddd
@@ -160,9 +184,9 @@ export const GLOOP: VoxelModel = {
       ..dddd
       .ddddd
       .ddddd
-      .ddddd
-      dddddd
-      .ddddd
+      addddd
+      addddd
+      addddd
       .ddddd
       .ddddd
       ..dddd`),
@@ -170,9 +194,9 @@ export const GLOOP: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -228,14 +252,24 @@ export const GLOOP: VoxelModel = {
       ......`),
   ],
 }
-
 export const BLAZE: VoxelModel = {
-  palette: { b: '#ff5a3c', d: '#b52a18', k: '#14121a', s: '#ffcf3d', l: '#b52a18' },
+  palette: { b: '#ff5a3c', d: '#b52a18', k: '#14121a', s: '#ffcf3d', l: '#b52a18', a: '#b52a18' },
   emissive: ['s'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -270,9 +304,9 @@ export const BLAZE: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      sbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -280,9 +314,9 @@ export const BLAZE: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      sbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -348,13 +382,23 @@ export const BLAZE: VoxelModel = {
       ......`),
   ],
 }
-
 export const GRUMP: VoxelModel = {
-  palette: { b: '#b8563c', d: '#7a3324', k: '#14121a', s: '#8c7a55', l: '#7a3324' },
+  palette: { b: '#b8563c', d: '#7a3324', k: '#14121a', s: '#8c7a55', l: '#7a3324', a: '#7a3324' },
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      .lll..
+      .lll..
+      .lll..
+      .lll..
+      .lll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -379,9 +423,9 @@ export const GRUMP: VoxelModel = {
       ..dddd
       .ddddd
       .ddddd
-      .ddddd
-      dddddd
-      .ddddd
+      addddd
+      addddd
+      addddd
       .ddddd
       .ddddd
       ..dddd`),
@@ -389,9 +433,9 @@ export const GRUMP: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      sbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -447,21 +491,24 @@ export const GRUMP: VoxelModel = {
       ......`),
   ],
 }
-
 export const VERDANT: VoxelModel = {
-  palette: {
-    b: '#9be870',
-    d: '#3f8f2f',
-    k: '#14121a',
-    v: '#6fe04a',
-    f: '#ffd166',
-    l: '#3f8f2f',
-  },
+  palette: { b: '#9be870', d: '#3f8f2f', k: '#14121a', v: '#6fe04a', f: '#ffd166', l: '#3f8f2f', a: '#3f8f2f' },
   emissive: ['f'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -506,9 +553,9 @@ export const VERDANT: VoxelModel = {
       ....bb
       ..bbbb
       ..bbbb
-      .bbbbb
-      .bbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       ..bbbb
       ..bbbb
       ....bb`),
@@ -516,9 +563,9 @@ export const VERDANT: VoxelModel = {
       ....bb
       ..bbbb
       ..bbbb
-      .bbbbb
-      .bbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       ..bbbb
       ..kkbb
       ....bb`),
@@ -584,12 +631,12 @@ export const VERDANT: VoxelModel = {
       ......`),
   ],
 }
-
 export const LUMEN: VoxelModel = {
-  palette: { b: '#7fd6ff', d: '#3a86b8', k: '#14121a', g: '#e6fbff', l: '#3a86b8' },
+  palette: { b: '#7fd6ff', d: '#3a86b8', k: '#14121a', g: '#e6fbff', l: '#3a86b8', a: '#3a86b8' },
   emissive: ['g'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
     rows(`
@@ -605,6 +652,16 @@ export const LUMEN: VoxelModel = {
     rows(`
       ......
       ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
+    rows(`
+      ......
+      ......
       ....dd
       ...ddd
       ...ddd
@@ -636,9 +693,9 @@ export const LUMEN: VoxelModel = {
       ....bb
       ..bbbb
       ..bbbb
-      .bbgbb
-      .bgggb
-      .bbgbb
+      abbgbb
+      abgggb
+      abbgbb
       ..bbbb
       ..bbbb
       ....bb`),
@@ -646,9 +703,9 @@ export const LUMEN: VoxelModel = {
       ....bb
       ..bbbb
       ..bbbb
-      .bbbbb
-      .bbgbb
-      .bbbbb
+      abbbbb
+      abbgbb
+      abbbbb
       ..bbbb
       ..bbbb
       ....bb`),

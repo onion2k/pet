@@ -6,7 +6,7 @@ import { App } from './game/app'
 import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
-import { MEADOW } from './data/biome'
+import { MEADOW, ROAM_INSET, TERRAIN_CLEARING } from './data/biome'
 import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
 import { createBloom } from './render/post'
@@ -62,6 +62,9 @@ terrain.root.setParent(screenScene)
 
 const petView = new PetView(gl, speciesOf('egg').model)
 petView.root.position.y = terrain.shape.groundY
+// Roaming stays inside the level clearing, so the pet's feet never step onto
+// terrain that steps up or down beneath them.
+petView.setBounds(TERRAIN_CLEARING - ROAM_INSET)
 petView.root.setParent(screenScene)
 
 const particles = new Particles(gl)
@@ -98,7 +101,12 @@ const beeper = new Beeper(false)
 
 const app = new App({
   sound: (id) => beeper.play(id),
-  burst: (kind, count) => particles.emit(kind, [0, terrain.shape.groundY + 1.1, 0], count),
+  burst: (kind, count) =>
+    particles.emit(
+      kind,
+      [petView.position.x, terrain.shape.groundY + 1.1, petView.position.z],
+      count,
+    ),
   pop: (strength) => petView.pop(strength),
   form: (speciesId, animate) => petView.setModel(speciesOf(speciesId).model, animate),
 })
@@ -249,6 +257,7 @@ if (import.meta.env.DEV) {
       orbit,
       terrain,
       biome,
+      petView,
       screenCamera,
       step,
       advance: (frames: number, dt = 1 / 60) => {

@@ -53,7 +53,9 @@ export const TERRAIN_BASE = 4
 /** How far the ground rises and falls either side of the base. */
 export const TERRAIN_RELIEF = 3
 /** Radius, in world units, kept level for the pet to move around in. */
-export const TERRAIN_CLEARING = 1.5
+export const TERRAIN_CLEARING = 2.2
+/** How far in from the clearing's edge the pet keeps, so its feet stay level. */
+export const ROAM_INSET = 0.95
 /** Columns between candidate scenery slots. */
 export const PROP_SPACING = 3
 /** Extra columns of clear ground kept around the pet's clearing. */

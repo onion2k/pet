@@ -5,6 +5,9 @@ import { rows, type VoxelModel } from './voxel-format'
  * the centre column and are mirrored, so each row is six characters and
  * symmetry is structural. Layers run bottom to top; the last row of each layer
  * is the pet's face.
+ *
+ * `l` voxels are legs and `a` voxels are arms; both are swung from their joint
+ * by the walk cycle rather than translated, so the model never shears.
  */
 
 export const EGG: VoxelModel = {
@@ -143,21 +146,24 @@ export const EGG: VoxelModel = {
       ......`),
   ],
 }
-
 export const BLOB: VoxelModel = {
-  palette: {
-    b: '#8fe36a',
-    d: '#57a844',
-    k: '#14121a',
-    m: '#3d7a2f',
-    l: '#57a844',
-    g: '#ffe066',
-  },
+  palette: { b: '#8fe36a', d: '#57a844', k: '#14121a', m: '#3d7a2f', l: '#57a844', g: '#ffe066', a: '#57a844' },
   emissive: ['g'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -202,9 +208,9 @@ export const BLOB: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbmm`),
@@ -212,9 +218,9 @@ export const BLOB: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..kkbb`),
@@ -280,13 +286,23 @@ export const BLOB: VoxelModel = {
       ......`),
   ],
 }
-
 export const PUDGE: VoxelModel = {
-  palette: { b: '#ffb3d9', d: '#e07aa9', k: '#14121a', m: '#ff6fae', l: '#e07aa9' },
+  palette: { b: '#ffb3d9', d: '#e07aa9', k: '#14121a', m: '#ff6fae', l: '#e07aa9', a: '#e07aa9' },
   head: ['k', 'm'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      .lll..
+      .lll..
+      .lll..
+      .lll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -321,9 +337,9 @@ export const PUDGE: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -331,9 +347,9 @@ export const PUDGE: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -399,14 +415,24 @@ export const PUDGE: VoxelModel = {
       ......`),
   ],
 }
-
 export const SPIKE: VoxelModel = {
-  palette: { b: '#ff7a4a', d: '#c4402a', k: '#14121a', s: '#ffd93d', l: '#c4402a' },
+  palette: { b: '#ff7a4a', d: '#c4402a', k: '#14121a', s: '#ffd93d', l: '#c4402a', a: '#c4402a' },
   emissive: ['s'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -441,9 +467,9 @@ export const SPIKE: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      sbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -451,9 +477,9 @@ export const SPIKE: VoxelModel = {
       ..bbbb
       .bbbbb
       .bbbbb
-      .bbbbb
-      bbbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       .bbbbb
       .bbbbb
       ..bbbb`),
@@ -519,14 +545,24 @@ export const SPIKE: VoxelModel = {
       ......`),
   ],
 }
-
 export const SPROUT: VoxelModel = {
-  palette: { b: '#a8ef7c', d: '#4f9e3a', k: '#14121a', v: '#6fe04a', l: '#4f9e3a' },
+  palette: { b: '#a8ef7c', d: '#4f9e3a', k: '#14121a', v: '#6fe04a', l: '#4f9e3a', a: '#4f9e3a' },
   emissive: ['v'],
   head: ['k'],
-  limbs: ['l'],
+  legs: ['l'],
+  arms: ['a'],
   mirror: true,
   layers: [
+    rows(`
+      ......
+      ......
+      ......
+      ..ll..
+      ..ll..
+      ..ll..
+      ..ll..
+      ......
+      ......`),
     rows(`
       ......
       ......
@@ -571,9 +607,9 @@ export const SPROUT: VoxelModel = {
       ....bb
       ..bbbb
       ..bbbb
-      .bbbbb
-      .bbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       ..bbbb
       ..bbbb
       ....bb`),
@@ -581,9 +617,9 @@ export const SPROUT: VoxelModel = {
       ....bb
       ..bbbb
       ..bbbb
-      .bbbbb
-      .bbbbb
-      .bbbbb
+      abbbbb
+      abbbbb
+      abbbbb
       ..bbbb
       ..kkbb
       ....bb`),

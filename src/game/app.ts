@@ -367,10 +367,17 @@ export class App {
   }
 
   /** Everything the renderer needs to reflect the pet's condition. */
-  get visual(): { mood: number; asleep: boolean; sick: boolean } {
+  get visual(): { mood: number; asleep: boolean; sick: boolean; mobile: boolean } {
     const pet = this.pet
-    if (!pet) return { mood: 0.5, asleep: false, sick: false }
-    return { mood: mood(pet), asleep: pet.asleep, sick: pet.sick }
+    if (!pet) return { mood: 0.5, asleep: false, sick: false, mobile: false }
+    return {
+      mood: mood(pet),
+      asleep: pet.asleep,
+      sick: pet.sick,
+      // An egg has nothing to walk with, and a hatchling needs to finish
+      // hatching before it wanders off.
+      mobile: pet.stage !== 'egg',
+    }
   }
 
   get needs(): string[] {

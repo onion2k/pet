@@ -4,7 +4,8 @@ import { expandLayers, type VoxelModel } from '../data/voxel-format'
 
 export const PART_BODY = 0
 export const PART_HEAD = 1
-export const PART_LIMB = 2
+export const PART_LEG = 2
+export const PART_ARM = 3
 
 /** Layers at or above this fraction of the model's height animate as the head. */
 const HEAD_FRACTION = 0.55
@@ -181,7 +182,8 @@ export function modelSource(model: VoxelModel): VoxelSource {
 
   const emissiveSet = new Set(model.emissive ?? [])
   const headSet = new Set(model.head ?? [])
-  const limbSet = new Set(model.limbs ?? [])
+  const legSet = new Set(model.legs ?? [])
+  const armSet = new Set(model.arms ?? [])
   const headStart = Math.floor(h * HEAD_FRACTION)
   const cache = new Map<string, Voxel>()
 
@@ -197,14 +199,19 @@ export function modelSource(model: VoxelModel): VoxelSource {
       const key = `${ch}:${y >= headStart ? 1 : 0}`
       let voxel = cache.get(key)
       if (!voxel) {
+        // Limbs are tested first: an arm high on the body must not be swept up
+        // by the head-height rule.
+        const part = legSet.has(ch)
+          ? PART_LEG
+          : armSet.has(ch)
+            ? PART_ARM
+            : headSet.has(ch) || y >= headStart
+              ? PART_HEAD
+              : PART_BODY
         voxel = {
           color: hexToLinear(model.palette[ch] ?? '#ff00ff'),
           emissive: emissiveSet.has(ch) ? 1 : 0,
-          part: limbSet.has(ch)
-            ? PART_LIMB
-            : headSet.has(ch) || y >= headStart
-              ? PART_HEAD
-              : PART_BODY,
+          part,
         }
         cache.set(key, voxel)
       }
@@ -217,6 +224,10 @@ export interface VoxelGeometry {
   geometry: Geometry
   /** Height of the model in world units after the mesh is centred and scaled. */
   height: number
+  /** Height of the hip joint, so legs can be swung about it rather than slid. */
+  hipY: number
+  /** Height of the shoulder joint. */
+  shoulderY: number
   faces: number
 }
 
@@ -234,6 +245,26 @@ export function buildVoxelGeometry(
     0,
     (-source.d / 2) * scale,
   ]
+  // Joints sit at the top of the topmost limb voxel, so a swing pivots from
+  // where the limb meets the body.
+  let topLeg = -1
+  let topArm = -1
+  for (let y = 0; y < source.h; y++) {
+    for (let z = 0; z < source.d; z++) {
+      for (let x = 0; x < source.w; x++) {
+        const part = source.at(x, y, z)?.part
+        if (part === PART_LEG) topLeg = Math.max(topLeg, y)
+        else if (part === PART_ARM) topArm = Math.max(topArm, y)
+      }
+    }
+  }
+
   const { geometry, faces } = buildVoxels(gl, source, { scale, origin })
-  return { geometry, height: source.h * scale, faces }
+  return {
+    geometry,
+    height: source.h * scale,
+    hipY: (topLeg + 1) * scale,
+    shoulderY: (topArm + 1) * scale,
+    faces,
+  }
 }

@@ -16,8 +16,10 @@ export interface VoxelModel {
   emissive?: string[]
   /** Characters belonging to the head, which animates independently of the body. */
   head?: string[]
-  /** Characters belonging to limbs, which get the walk cycle. */
-  limbs?: string[]
+  /** Characters belonging to legs, which swing from the hip. */
+  legs?: string[]
+  /** Characters belonging to arms, which swing from the shoulder, opposite the legs. */
+  arms?: string[]
   /** Rows hold the left half plus the centre column, mirrored to full width. */
   mirror?: boolean
   layers: string[][]
