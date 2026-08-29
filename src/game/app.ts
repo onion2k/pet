@@ -208,6 +208,18 @@ export class App {
     this.tickerQueue.push(text.toUpperCase())
   }
 
+  /**
+   * Says something now, cutting whatever is scrolling. Returns how long the
+   * line will take to cross, so a thought bubble can stay up for exactly as
+   * long as the words explaining it -- queued, the line would arrive a minute
+   * after the bubble it belongs to had gone.
+   */
+  speakNow(text: string): number {
+    this.tickerText = text.toUpperCase()
+    this.tickerOffset = 0
+    return (TICKER_VIEW_PX + textWidth(this.tickerText)) / TICKER_SPEED
+  }
+
   /** The pet says something, in its own voice, after the current line. */
   private sayAsPet(text: string): void {
     if (!this.pet) return

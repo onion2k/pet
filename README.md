@@ -208,10 +208,18 @@ timer, and glance about between longer looks straight at you.
 ### Thoughts and humming
 
 Above the pet is a bubble drawn on a small canvas: a thought with trailing puffs,
-or speech with a tail. It shows either a large pixel symbol — a heart, a bowl, a
-note, a question — or a short word in the same font the HUD uses. Needs come
-first, so a hungry pet never stands there musing about the weather, and a
-cheerful one hums, with notes rising past its head.
+or speech with a tail, showing a large pixel symbol — a heart, a bowl, a note, a
+question. Needs come first, so a hungry pet never stands there musing about the
+weather, and a cheerful one hums, with notes rising past its head.
+
+A symbol on its own says very little: a bowl could be hunger or dinner, and a
+question mark could be anything at all. So the bubble never goes up alone. Each
+one is paired with the words for it — "PIP IS HUNGRY" — which cut straight to
+the front of the ticker rather than joining the queue, where they would arrive a
+minute after the bubble they belong to had gone. The bubble then stays up for
+exactly as long as its line takes to scroll past, so the two begin and end
+together. The pet holds its tongue for a good while afterwards, so the ticker
+gets the world back.
 
 There was a held placard as well, and it did not work. A sign has to look held,
 and these creatures have no arm in view to hold one with, so it read as a

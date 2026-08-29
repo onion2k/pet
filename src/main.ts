@@ -261,10 +261,23 @@ function updateAnnouncement(dt: number): void {
 let last = performance.now()
 let elapsed = 0
 /** Shifts the world clock. Only ever non-zero when a test drives it. */
-/** Short enough to read in a 72-pixel bubble, and all in the pet's own voice. */
-const MUSINGS = ['hmm', 'hello', 'nice', 'ok', 'busy', 'sunny', 'oh', 'yes']
+/**
+ * Idle thoughts. Each pairs what goes in the bubble with the words that explain
+ * it, because the two are shown together and have to agree.
+ */
+const MUSINGS = [
+  { face: 'ask', line: 'wonders what is over the hill' },
+  { face: 'heart', line: 'is glad you came back' },
+  { face: 'note', line: 'has a tune stuck in its head' },
+  { face: 'food', line: 'is thinking about snacks' },
+  { face: 'bang', line: 'has had an idea' },
+  { face: 'ask', line: 'is counting the clouds' },
+] as const
 /** Said out loud when the pet is in a good mood. */
-const CHEER = ['hi', 'play?', 'thanks', 'more', 'best day', 'yay']
+const CHEER = {
+  faces: ['heart', 'bang', 'note'],
+  lines: ['hello!', 'this is the best day', 'thank you', 'again! again!', 'hooray'],
+} as const
 
 let timeOffset = 0
 /** Lantern positions in view space, packed xyz, rewritten every frame. */
@@ -401,24 +414,38 @@ function step(dt: number): void {
   museTimer -= dt
   const who = app.pet
   if (who && !bubble.busy && museTimer <= 0) {
-    museTimer = 5 + Math.random() * 9
+    // A symbol alone does not say much -- a bowl could be hunger or dinner, a
+    // question mark could be anything. So the bubble never goes up on its own:
+    // it comes with the words for it on the ticker, and stays up for exactly as
+    // long as they take to scroll past.
     const stats = who.stats
-    if (who.asleep) bubble.show('thought', 'zzz', 4)
-    else if (who.sick) bubble.show('speech', 'cross', 3.6)
-    else if (stats.hunger < 35) bubble.show('speech', 'food', 3.6)
-    else if (stats.hygiene < 35) bubble.show('thought', 'bath', 3.4)
-    else if (stats.energy < 30) bubble.show('thought', 'zzz', 3.4)
-    else if (stats.happiness < 35) bubble.show('thought', 'ask', 3.4)
+    const name = who.name
+    const pick = <T,>(list: readonly T[]): T => list[(Math.random() * list.length) | 0]!
+    let mood: { kind: 'thought' | 'speech'; face: string; line: string }
+    let humming = false
+    if (who.asleep) mood = { kind: 'thought', face: 'zzz', line: `${name} is fast asleep` }
+    else if (who.sick) mood = { kind: 'speech', face: 'cross', line: `${name} feels poorly` }
+    else if (stats.hunger < 35) mood = { kind: 'speech', face: 'food', line: `${name} is hungry` }
+    else if (stats.hygiene < 35) mood = { kind: 'thought', face: 'bath', line: `${name} could do with a wash` }
+    else if (stats.energy < 30) mood = { kind: 'thought', face: 'zzz', line: `${name} is getting sleepy` }
+    else if (stats.happiness < 35) mood = { kind: 'thought', face: 'ask', line: `${name} is a bit down` }
     else if (petView.cheerful) {
-      // A cheerful pet hums, and sometimes has something to say about it.
       const roll = Math.random()
       if (roll < 0.35) {
-        bubble.show('thought', 'note', 3)
-        bubble.hum()
+        mood = { kind: 'thought', face: 'note', line: `${name} is humming to itself` }
+        humming = true
       } else if (roll < 0.6) {
-        bubble.show('speech', CHEER[(Math.random() * CHEER.length) | 0]!, 3.6)
-      } else bubble.show('thought', 'heart', 3)
-    } else bubble.show('thought', MUSINGS[(Math.random() * MUSINGS.length) | 0]!, 3.4)
+        mood = { kind: 'speech', face: pick(CHEER.faces), line: `${name} says ${pick(CHEER.lines)}` }
+      } else mood = { kind: 'thought', face: 'heart', line: `${name} is happy` }
+    } else {
+      const musing = pick(MUSINGS)
+      mood = { kind: 'thought', face: musing.face, line: `${name} ${musing.line}` }
+    }
+    const seconds = app.speakNow(mood.line)
+    bubble.show(mood.kind, mood.face, seconds)
+    if (humming) bubble.hum()
+    // Long enough after the line finishes that the ticker gets the world back.
+    museTimer = seconds + 10 + Math.random() * 14
   }
   bubble.update(dt, { x: petView.position.x, y: terrain.shape.groundY, z: petView.position.z }, cameraPan)
 
