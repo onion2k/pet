@@ -6,7 +6,7 @@ import { App } from './game/app'
 import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
-import { MEADOW, ROAM_INSET, TERRAIN_CLEARING } from './data/biome'
+import { MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
 import { worldAt, type Rgb } from './game/world'
 import { PaletteTexture } from './render/palette'
 import { createWeather } from './render/weather'
@@ -35,13 +35,24 @@ watchResize(stage)
 
 const screenScene = new Transform()
 /**
- * A long lens, pulled back far enough to sit the pet in its surroundings rather
- * than filling the frame with it. Framed against the clear band between the two
- * icon strips, with the ground taking the lower third.
+ * A longish lens, pulled back far enough to sit the pet in its surroundings
+ * rather than filling the frame with it, and framed against the clear band
+ * between the two icon strips.
+ *
+ * The camera does not move: it pans on the spot to follow the pet, the way you
+ * would turn your head to watch something cross a field.
  */
-const screenCamera = new Camera(gl, { fov: 24, near: 0.1, far: 60, aspect: SCREEN_PX[0] / SCREEN_PX[1] })
-screenCamera.position.set(0, 4.35, 10.5)
-screenCamera.lookAt([0, 1.53, 0])
+const CAMERA_POS: [number, number, number] = [0, 3.9, 9.0]
+const CAMERA_TARGET_Y = 1.35
+/** How far the pan may swing either way. Beyond it the pet leaves the middle
+ *  of the frame and walks out toward the edge, which is the point. */
+const MAX_PAN = (40 * Math.PI) / 180
+
+const screenCamera = new Camera(gl, { fov: 28, near: 0.1, far: 60, aspect: SCREEN_PX[0] / SCREEN_PX[1] })
+screenCamera.position.set(...CAMERA_POS)
+screenCamera.lookAt([0, CAMERA_TARGET_Y, 0])
+/** Eased pan angle, so the camera never snaps to a new heading. */
+let cameraPan = 0
 
 const backdrop = createBackdrop(gl)
 backdrop.root.setParent(screenScene)
@@ -72,7 +83,7 @@ const petView = new PetView(gl, speciesOf('egg').model)
 petView.root.position.y = terrain.shape.groundY
 // Roaming stays inside the level clearing, so the pet's feet never step onto
 // terrain that steps up or down beneath them.
-petView.setBounds(TERRAIN_CLEARING - ROAM_INSET)
+petView.setBounds(ROAM_HALF_X, ROAM_HALF_Z)
 petView.setShelter(terrain.shape.shelter)
 petView.root.setParent(screenScene)
 
@@ -246,6 +257,22 @@ function step(dt: number): void {
   }
 
   shell.setPower(app.mode === 'boot' ? 1 - app.bootTimer / 1.4 : 1)
+  // Pan to keep the pet in view. Clamped, so once it strays past what the
+  // swing can cover it drifts out toward the side of the screen on its own.
+  const pet = petView.position
+  const wanted = Math.max(
+    -MAX_PAN,
+    Math.min(MAX_PAN, Math.atan2(pet.x - CAMERA_POS[0], CAMERA_POS[2] - pet.z)),
+  )
+  cameraPan += (wanted - cameraPan) * Math.min(1, dt * 1.8)
+  screenCamera.position.set(...CAMERA_POS)
+  screenCamera.lookAt([
+    CAMERA_POS[0] + Math.sin(cameraPan) * CAMERA_POS[2],
+    CAMERA_TARGET_Y,
+    CAMERA_POS[2] - Math.cos(cameraPan) * CAMERA_POS[2],
+  ])
+  screenCamera.updateMatrixWorld()
+
   petView.update(dt, elapsed, app.visual)
   particles.update(dt)
   backdrop.update(elapsed)
@@ -285,8 +312,14 @@ function step(dt: number): void {
   // Place the sun on the same arc that lights the scene, so the shadows and the
   // sky always agree. It sinks below the horizon and the moon takes over.
   const nightside = world.sunHeight <= 0
+  // Shift the sun by the pan, or it would sit welded to the screen while the
+  // world turned underneath it.
+  const halfFovH = Math.atan(Math.tan((28 * Math.PI) / 360) * (SCREEN_PX[0] / SCREEN_PX[1]))
   backdrop.setSun(
-    [0.5 - world.light.direction[0] * 0.55, 0.12 + Math.abs(world.sunHeight) * 0.62],
+    [
+      0.5 - world.light.direction[0] * 0.55 - cameraPan / (2 * halfFovH),
+      0.12 + Math.abs(world.sunHeight) * 0.62,
+    ],
     nightside ? [0.55, 0.62, 0.85] : world.light.colour,
     nightside ? 0.035 : 0.05,
   )
@@ -332,6 +365,7 @@ if (import.meta.env.DEV) {
       biome,
       petView,
       weather,
+      cameraPan: () => cameraPan,
       world: () => worldAt(app.worldNow()),
       setTimeOffset: (ms: number) => {
         timeOffset = ms

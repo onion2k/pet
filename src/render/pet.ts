@@ -208,8 +208,9 @@ export type PetMood = {
   mobile: boolean
 }
 
-/** World units per second at an amble. */
-const WALK_SPEED = 0.42
+/** World units per second at an amble. The meadow is wide, so this is a
+ *  purposeful walk rather than the old shuffle. */
+const WALK_SPEED = 0.7
 /** Stride cycles per second. */
 const STRIDE_RATE = 1.15
 
@@ -243,8 +244,8 @@ export class PetView {
   /** Position within the hop cycle. Accumulated so changing pace never jumps. */
   private phase = 0
   private shadow: Mesh
-  /** How far from the centre of the clearing the pet may roam. */
-  private bounds = 1.2
+  /** How far the pet may roam: half-extents, wide in x and shallow in z. */
+  private bounds = { x: 1.2, z: 1.0 }
   private shelter: ShelterTarget | null = null
   /** False until the first update, so a pet loaded asleep starts indoors. */
   private started = false
@@ -330,9 +331,9 @@ export class PetView {
     if (animate) this.hatch = 0
   }
 
-  /** Limits the roaming to the level ground of the clearing. */
-  setBounds(radius: number): void {
-    this.bounds = Math.max(0, radius)
+  /** Limits the roaming to the level ground of the lane. */
+  setBounds(halfX: number, halfZ: number): void {
+    this.bounds = { x: Math.max(0, halfX), z: Math.max(0, halfZ) }
   }
 
   /** Applies the current sky and sun, shared with the terrain. */
@@ -415,12 +416,12 @@ export class PetView {
   /** Somewhere in the clearing that is not inside the shelter. */
   private pickRoamTarget(): { x: number; z: number } | null {
     for (let attempt = 0; attempt < 12; attempt++) {
+      // Somewhere in the lane's ellipse. Biased away from where it already is
+      // so it strikes out across the meadow rather than shuffling on the spot.
       const angle = Math.random() * Math.PI * 2
-      const radius = this.bounds * (0.35 + Math.random() * 0.65)
-      const x = Math.cos(angle) * radius
-      // Flattened in z: wandering toward or away from the camera reads badly
-      // on a screen this small.
-      const z = Math.sin(angle) * radius * 0.45
+      const reach = 0.35 + Math.random() * 0.65
+      const x = Math.cos(angle) * reach * this.bounds.x
+      const z = Math.sin(angle) * reach * this.bounds.z
       if (!this.blockedByShelter(x, z)) return { x, z }
     }
     return null

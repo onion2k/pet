@@ -17,19 +17,30 @@ export const MEADOW: Biome = {
 
 export const BIOMES: Biome[] = [MEADOW]
 
-/** Columns across the terrain patch. Wide enough that its far edge is fully
- *  swallowed by haze before it can be seen. */
-export const TERRAIN_SIZE = 80
+/**
+ * Columns across the terrain patch. Twice as wide as it is deep: the camera
+ * pans left and right to follow the pet, so the world has to extend much
+ * further sideways than it does front to back.
+ */
+export const TERRAIN_COLS = 160
+export const TERRAIN_ROWS = 80
 /** World size of one terrain voxel. Slightly coarser than a pet's. */
 export const TERRAIN_VOXEL = 0.18
 /** Height, in voxels, of the flat ground the pet stands on. */
 export const TERRAIN_BASE = 4
 /** How far the ground rises and falls either side of the base. */
 export const TERRAIN_RELIEF = 3
-/** Radius, in world units, kept level for the pet to move around in. */
-export const TERRAIN_CLEARING = 2.2
-/** How far in from the clearing's edge the pet keeps, so its feet stay level. */
-export const ROAM_INSET = 0.95
+/**
+ * The level lane the pet walks in: a broad ellipse rather than a disc, since
+ * the pet ranges right across the meadow but only a little toward and away
+ * from the camera. Relief and scenery live in front of it, behind it, and
+ * beyond its ends.
+ */
+export const LANE_HALF_X = 10.6
+export const LANE_HALF_Z = 1.8
+/** How far the pet ranges, kept inside the lane so its feet stay level. */
+export const ROAM_HALF_X = 9.5
+export const ROAM_HALF_Z = 1.0
 /** Columns between candidate scenery slots. */
 export const PROP_SPACING = 3
 

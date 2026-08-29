@@ -6,9 +6,11 @@ import {
   SHELTER_CENTRE,
   SHELTER_COLUMNS,
   TERRAIN_BASE,
-  TERRAIN_CLEARING,
+  LANE_HALF_X,
+  LANE_HALF_Z,
   TERRAIN_RELIEF,
-  TERRAIN_SIZE,
+  TERRAIN_COLS,
+  TERRAIN_ROWS,
   TERRAIN_VOXEL,
   type Biome,
 } from '../data/biome'
@@ -81,10 +83,11 @@ function placeShelter(seed: number): ShelterPlacement {
     x: (SHELTER_COLUMNS.w / 2) * TERRAIN_VOXEL,
     z: (SHELTER_COLUMNS.d / 2) * TERRAIN_VOXEL,
   }
-  const middle = TERRAIN_SIZE / 2
+  const middleX = TERRAIN_COLS / 2
+  const middleZ = TERRAIN_ROWS / 2
   return {
-    ox: Math.round(middle + centre.x / TERRAIN_VOXEL - SHELTER_COLUMNS.w / 2),
-    oz: Math.round(middle + centre.z / TERRAIN_VOXEL - SHELTER_COLUMNS.d / 2),
+    ox: Math.round(middleX + centre.x / TERRAIN_VOXEL - SHELTER_COLUMNS.w / 2),
+    oz: Math.round(middleZ + centre.z / TERRAIN_VOXEL - SHELTER_COLUMNS.d / 2),
     w: SHELTER_COLUMNS.w,
     d: SHELTER_COLUMNS.d,
     centre,
@@ -96,21 +99,27 @@ function placeShelter(seed: number): ShelterPlacement {
 
 export function terrainShape(seed: string): TerrainShape {
   const s = seedFrom(seed)
-  const half = TERRAIN_SIZE / 2
-  const clearing = TERRAIN_CLEARING / TERRAIN_VOXEL
+  const halfX = TERRAIN_COLS / 2
+  const halfZ = TERRAIN_ROWS / 2
+  const laneX = LANE_HALF_X / TERRAIN_VOXEL
+  const laneZ = LANE_HALF_Z / TERRAIN_VOXEL
   const shelter = placeShelter(s)
 
-  const cache = new Int8Array(TERRAIN_SIZE * TERRAIN_SIZE)
-  for (let z = 0; z < TERRAIN_SIZE; z++) {
-    for (let x = 0; x < TERRAIN_SIZE; x++) {
+  const cache = new Int8Array(TERRAIN_COLS * TERRAIN_ROWS)
+  for (let z = 0; z < TERRAIN_ROWS; z++) {
+    for (let x = 0; x < TERRAIN_COLS; x++) {
       // Two octaves: broad swells with a little local roughness.
       const broad = noise(x, z, 0.055, s)
       const fine = noise(x, z, 0.17, s ^ 0x9e37)
       let value = broad * 0.75 + fine * 0.25
 
-      // Level the middle so the pet always has somewhere flat to stand.
-      const distance = Math.hypot(x - half, z - half)
-      const flatten = 1 - Math.min(1, Math.max(0, (distance - clearing) / (clearing * 1.4)))
+      // Level the lane the pet walks in. An ellipse, not a disc: the pet
+      // ranges right across the meadow but only a little in depth, so the
+      // relief survives in front of the lane and behind it.
+      const ex = (x - halfX) / laneX
+      const ez = (z - halfZ) / laneZ
+      const reach = Math.hypot(ex, ez)
+      const flatten = 1 - Math.min(1, Math.max(0, (reach - 1) / 0.5))
       value = value * (1 - flatten) + 0.5 * flatten
 
       // The shelter gets its own level pad rather than a wider clearing, which
@@ -121,21 +130,21 @@ export function terrainShape(seed: string): TerrainShape {
         x >= shelter.ox - 1 &&
         x < shelter.ox + shelter.w + 1 &&
         z >= shelter.oz - 1 &&
-        z < half + 2
+        z < halfZ + 2
       if (onPad) value = 0.5
 
       const height = Math.round(TERRAIN_BASE + (value - 0.5) * 2 * TERRAIN_RELIEF)
-      cache[z * TERRAIN_SIZE + x] = Math.max(1, height)
+      cache[z * TERRAIN_COLS + x] = Math.max(1, height)
     }
   }
 
   return {
-    size: TERRAIN_SIZE,
+    size: TERRAIN_COLS,
     shelter,
     heightAt: (x, z) =>
-      x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE
+      x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS
         ? 0
-        : cache[z * TERRAIN_SIZE + x]!,
+        : cache[z * TERRAIN_COLS + x]!,
     groundY: TERRAIN_BASE * TERRAIN_VOXEL,
   }
 }
@@ -160,8 +169,10 @@ function scatterProps(
 ): Scenery {
   const voxels = new Map<number, Voxel>()
   const taken = new Set<number>()
-  const half = TERRAIN_SIZE / 2
-  const clearing = TERRAIN_CLEARING / TERRAIN_VOXEL + PROP_CLEARING_MARGIN
+  const halfX = TERRAIN_COLS / 2
+  const halfZ = TERRAIN_ROWS / 2
+  const laneX = LANE_HALF_X / TERRAIN_VOXEL
+  const laneZ = LANE_HALF_Z / TERRAIN_VOXEL + PROP_CLEARING_MARGIN
   const totalWeight = PROPS.reduce((sum, prop) => sum + prop.weight, 0)
   let top = 0
   let count = 0
@@ -199,7 +210,7 @@ function scatterProps(
           const ch = row[x]
           if (!ch || ch === '.') continue
           const wy = baseY + y
-          voxels.set((wy * TERRAIN_SIZE + (oz + z)) * TERRAIN_SIZE + (ox + x), colour(ch as PropKey))
+          voxels.set((wy * TERRAIN_ROWS + (oz + z)) * TERRAIN_COLS + (ox + x), colour(ch as PropKey))
           top = Math.max(top, wy)
         }
       }
@@ -213,15 +224,15 @@ function scatterProps(
   count++
   // Reserve the shelter and the path back to the clearing, so nothing is
   // scattered against its walls or left standing in the pet's way.
-  for (let z = sh.oz - 2; z < half + 2; z++) {
+  for (let z = sh.oz - 2; z < halfZ + 2; z++) {
     for (let x = sh.ox - 2; x < sh.ox + sh.w + 2; x++) {
-      if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) continue
-      taken.add(z * TERRAIN_SIZE + x)
+      if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
+      taken.add(z * TERRAIN_COLS + x)
     }
   }
 
-  for (let cz = 0; cz < TERRAIN_SIZE; cz += PROP_SPACING) {
-    for (let cx = 0; cx < TERRAIN_SIZE; cx += PROP_SPACING) {
+  for (let cz = 0; cz < TERRAIN_ROWS; cz += PROP_SPACING) {
+    for (let cx = 0; cx < TERRAIN_COLS; cx += PROP_SPACING) {
       if (hash2(cx, cz, seed ^ 0x1111) > biome.propDensity) continue
 
       const prop = pick(hash2(cx, cz, seed ^ 0x4444))
@@ -232,17 +243,17 @@ function scatterProps(
       const oz = cz + Math.floor(hash2(cx, cz, seed ^ 0x3333) * PROP_SPACING) - (depth >> 1)
 
       // Must fit on the patch, clear of the pet's ground, on level enough footing.
-      if (ox < 1 || oz < 1 || ox + width >= TERRAIN_SIZE || oz + depth >= TERRAIN_SIZE) continue
+      if (ox < 1 || oz < 1 || ox + width >= TERRAIN_COLS || oz + depth >= TERRAIN_ROWS) continue
       let lowest = Infinity
       let highest = -Infinity
       let blocked = false
       for (let z = oz; z < oz + depth && !blocked; z++) {
         for (let x = ox; x < ox + width; x++) {
-          if (Math.hypot(x - half, z - half) < clearing) {
+          if (Math.hypot((x - halfX) / laneX, (z - halfZ) / laneZ) < 1) {
             blocked = true
             break
           }
-          if (taken.has(z * TERRAIN_SIZE + x)) {
+          if (taken.has(z * TERRAIN_COLS + x)) {
             blocked = true
             break
           }
@@ -259,8 +270,8 @@ function scatterProps(
       const pad = prop.spacing
       for (let z = oz - pad; z < oz + depth + pad; z++) {
         for (let x = ox - pad; x < ox + width + pad; x++) {
-          if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) continue
-          taken.add(z * TERRAIN_SIZE + x)
+          if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
+          taken.add(z * TERRAIN_COLS + x)
         }
       }
       count++
@@ -412,19 +423,19 @@ export function createTerrain(
     }
 
     let maxHeight = 1
-    for (let z = 0; z < TERRAIN_SIZE; z++) {
-      for (let x = 0; x < TERRAIN_SIZE; x++) maxHeight = Math.max(maxHeight, shape.heightAt(x, z))
+    for (let z = 0; z < TERRAIN_ROWS; z++) {
+      for (let x = 0; x < TERRAIN_COLS; x++) maxHeight = Math.max(maxHeight, shape.heightAt(x, z))
     }
 
     const scenery = scatterProps(shape, nextBiome, s, cache)
-    const propKey = (x: number, y: number, z: number) => (y * TERRAIN_SIZE + z) * TERRAIN_SIZE + x
+    const propKey = (x: number, y: number, z: number) => (y * TERRAIN_ROWS + z) * TERRAIN_COLS + x
 
     const source: VoxelSource = {
-      w: TERRAIN_SIZE,
+      w: TERRAIN_COLS,
       h: Math.max(maxHeight, scenery.top + 1),
-      d: TERRAIN_SIZE,
+      d: TERRAIN_ROWS,
       at(x, y, z) {
-        if (x < 0 || z < 0 || x >= TERRAIN_SIZE || z >= TERRAIN_SIZE) return null
+        if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) return null
         // Anything below the patch counts as solid so the underside is culled.
         if (y < 0) return voxel(MATERIAL_INDEX.rock)
         const height = shape.heightAt(x, z)
@@ -444,9 +455,9 @@ export function createTerrain(
     }
 
     const origin: [number, number, number] = [
-      (-TERRAIN_SIZE / 2) * TERRAIN_VOXEL,
+      (-TERRAIN_COLS / 2) * TERRAIN_VOXEL,
       0,
-      (-TERRAIN_SIZE / 2) * TERRAIN_VOXEL,
+      (-TERRAIN_ROWS / 2) * TERRAIN_VOXEL,
     ]
     const built = buildVoxels(gl, source, { scale: TERRAIN_VOXEL, origin })
     faces = built.faces

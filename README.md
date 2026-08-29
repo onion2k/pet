@@ -131,6 +131,14 @@ is bounded well inside the level clearing so its feet never step onto ground
 that steps up or down beneath them. Eggs have nothing to walk with, and a
 sleeping pet stays where it is.
 
+The clearing runs the full width of the yard, so the pet has far more ground to
+cover than the frame can hold at once. Rather than moving, the camera stays put
+and **turns on the spot to follow it**, easing round and stopping at forty
+degrees. Inside that arc the pet stays centred; past it the camera holds still
+and the pet walks on out towards the side of the screen, which is what makes the
+yard feel wider than the window onto it. The sun is shifted by the same angle,
+so it stays put in the world instead of riding along with the view.
+
 ### Time, seasons and weather
 
 The world keeps its own clock, running far faster than real time. A day takes
@@ -186,9 +194,11 @@ never touched, and seasons can cross-fade rather than jump.
 The pet stands on a voxel terrain patch built from the same mesh path as the
 pets themselves, so it gets identical hidden-face culling and baked corner
 occlusion. Heights come from two octaves of deterministic value noise, seeded
-from the pet's id — every life gets its own ground. The middle is levelled into
-a clearing for the pet to stand and eventually move around in. The patch fades
-into the sky with depth-based haze, so its edge is never a visible boundary.
+from the pet's id — every life gets its own ground. The patch is twice as wide
+as it is deep, and the middle is levelled into an elliptical clearing that runs
+almost its whole width, so the pet has somewhere to roam without ever meeting a
+step. The patch fades into the sky with depth-based haze, so its edge is never a
+visible boundary.
 
 A shelter stands at the back of the yard, on its own levelled pad with a level
 path running forward to the clearing — the pet does not sample terrain height as
