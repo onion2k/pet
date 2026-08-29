@@ -21,6 +21,8 @@ const COOL = '#7fd6ff'
 /** Height of the icon strips. The lower one is taller because it carries the label. */
 const TOP_BAND = 16
 const BOTTOM_BAND = 21
+/** The news crawl, sitting just above the lower icon strip. */
+const TICKER_BAND = 11
 
 function duration(ms: number): string {
   const minutes = Math.floor(ms / 60_000)
@@ -81,9 +83,20 @@ function drawRing(hud: Hud, app: App): void {
   hud.textCentered(hud.width / 2, hud.height - 7, label, blinkOn ? INK : DIM)
 }
 
+/** The scrolling news line. Ambient world messaging, one line at a time. */
+function drawTicker(hud: Hud, app: App): void {
+  const y = hud.height - BOTTOM_BAND - TICKER_BAND
+  hud.rect(0, y, hud.width, TICKER_BAND, PANEL)
+  hud.rect(0, y, hud.width, 1, '#1c1c2c')
+  if (app.tickerText) {
+    hud.text(Math.round(hud.width - app.tickerOffset), y + 3, app.tickerText, COOL)
+  }
+}
+
 function drawMessage(hud: Hud, app: App): void {
   if (app.messageTimer <= 0) return
-  const y = hud.height - BOTTOM_BAND - 12
+  // Above the ticker, so a toast never sits on top of the crawl.
+  const y = hud.height - BOTTOM_BAND - TICKER_BAND - 12
   const width = hud.width - 12
   hud.rect(6, y, width, 10, PANEL)
   hud.frame(6, y, width, 10, '#2a2a40')
@@ -120,8 +133,9 @@ function drawMain(hud: Hud, app: App): void {
     hud.text(hud.width - Math.round(hud.safeInset(TOP_BAND + 14)) - 24, TOP_BAND + 14, 'ZZZ', COOL)
   }
   if (pet.stage === 'egg') {
-    hud.textCentered(hud.width / 2, hud.height - BOTTOM_BAND - 10, 'KEEP IT WARM', DIM)
+    hud.textCentered(hud.width / 2, hud.height - BOTTOM_BAND - TICKER_BAND - 10, 'KEEP IT WARM', DIM)
   }
+  drawTicker(hud, app)
   drawMessage(hud, app)
   drawRing(hud, app)
 }

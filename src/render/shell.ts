@@ -257,8 +257,9 @@ const SHELL_ROUNDNESS = 0.68
 const FRONT_Z = 0.2
 
 const SCREEN_W = 2.08
-const SCREEN_H = SCREEN_W / (192 / 160)
-const SCREEN_Y = 0.53
+// Taller than the classic 1.2 ratio: the extra rows carry the news ticker.
+const SCREEN_H = SCREEN_W / (192 / 172)
+const SCREEN_Y = 0.58
 /** Corner curvature of the lit area. Low value = a rounded rectangle. */
 const SCREEN_ROUNDNESS = 0.15
 

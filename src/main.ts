@@ -20,8 +20,9 @@ import { Particles } from './render/particles'
 import { PetView } from './render/pet'
 import { drawScreen } from './ui/draw'
 
-/** Native resolution of the pet's screen. Everything above it is upscaling. */
-const SCREEN_PX: [number, number] = [192, 160]
+/** Native resolution of the pet's screen. Everything above it is upscaling.
+ *  Twelve rows taller than the classic 192x160, to house the news ticker. */
+const SCREEN_PX: [number, number] = [192, 172]
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement | null
 if (!canvas) throw new Error('Missing #stage canvas')

@@ -10,7 +10,11 @@ import { metrics, type Metrics } from './metrics'
 import { load, newPet, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
 import { hoursUntilSunrise, isNight, seasonIdAt, worldAt, WORLD_HOUR_MS } from './world'
-import { findCurio, type Curio } from '../data/curios'
+import { CURIO_COUNT, findCurio, type Curio } from '../data/curios'
+import { textWidth } from '../data/font'
+import { SPECIES_COUNT } from '../data/species'
+import type { StatKey } from './types'
+import type { SeasonId, WeatherId } from '../data/seasons'
 import { SHELLS, shellById, type ShellColour } from '../data/shells'
 import type { PetState, SaveFile } from './types'
 
@@ -45,6 +49,15 @@ const SKIP_SECONDS_PER_HOUR = 0.44
 /** Bounds on that, so a short sleep does not flicker and a long one does not drag. */
 const SKIP_SECONDS_MIN = 1.2
 const SKIP_SECONDS_MAX = 6
+
+/**
+ * The news ticker. It crawls across the width of the screen; this matches
+ * SCREEN_PX in main and is only needed to know when a line has fully left the
+ * glass.
+ */
+const TICKER_VIEW_PX = 192
+/** Crawl speed, in screen pixels per second. */
+const TICKER_SPEED = 22
 
 /** How long C must be held to back out of a submenu or a game. */
 export const HOLD_TO_BACK_SECONDS = 0.8
@@ -82,6 +95,12 @@ export class App {
   retiring: { name: string; speciesName: string } | null = null
   /** What the pet found while the player was away, for the welcome screen. */
   found: Curio | null = null
+  /** The line currently crawling across the ticker, and how far it has come. */
+  tickerText = ''
+  tickerOffset = 0
+  private tickerRotation = 0
+  private tickerQueue: string[] = []
+  private lastSeasonId: SeasonId | null = null
   message = ''
   messageTimer = 0
   awayMs = 0
@@ -171,6 +190,78 @@ export class App {
     if (!curio) return
     this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
     this.found = curio
+    this.pushTicker(`${pet.name} found a ${curio.name}`)
+  }
+
+  /** Queues a one-off announcement; it runs after the current line finishes. */
+  pushTicker(text: string): void {
+    this.tickerQueue.push(text.toUpperCase())
+  }
+
+  /**
+   * The ambient news rotation: the sky, the pet, the lineage's standing goals.
+   * Rebuilt fresh each time a line is needed, so everything reads current.
+   */
+  private tickerCandidates(): string[] {
+    const world = worldAt(this.worldNow())
+    const pet = this.pet
+    const out: string[] = []
+
+    if (world.seasonBlend > 0) out.push(`${world.nextSeason.name.toUpperCase()} IS COMING`)
+    const weatherLines: Record<WeatherId, string> = {
+      clear: 'CLEAR SKIES OVER THE MEADOW',
+      rain: 'RAIN ON THE MEADOW',
+      snow: 'SNOW IS FALLING',
+      mist: 'MIST LIES LOW',
+    }
+    out.push(weatherLines[world.weather])
+
+    if (pet && pet.stage !== 'egg' && !pet.asleep) {
+      if (pet.sick) {
+        out.push(`${pet.name} NEEDS MEDICINE`)
+      } else {
+        const need = urgentNeeds(pet)[0]
+        const needLines: Partial<Record<StatKey, string>> = {
+          hunger: `${pet.name} IS HUNGRY`,
+          hygiene: `${pet.name} COULD USE A BATH`,
+          energy: `${pet.name} IS SLEEPY`,
+          happiness: `${pet.name} IS FEELING GLUM`,
+        }
+        if (need && needLines[need]) out.push(needLines[need]!)
+      }
+      if (isNight(this.worldNow())) out.push('THE SUN IS DOWN... BEDTIME?')
+    }
+
+    if (this.save.streak.days > 1) out.push(`CARE STREAK: ${this.save.streak.days} DAYS`)
+    out.push(`FORMS FOUND: ${this.save.discovered.length}/${SPECIES_COUNT}`)
+    const kinds = Object.keys(this.save.curios).length
+    if (kinds < CURIO_COUNT) out.push(`CURIOS: ${kinds}/${CURIO_COUNT}`)
+    const locked = SHELLS.find((shell) => !shell.unlocked(this.save))
+    if (locked) out.push(`EARN THE ${locked.name.toUpperCase()} SHELL: ${locked.hint.toUpperCase()}`)
+    out.push('PETZ-9000 NEWS')
+    return out
+  }
+
+  private advanceTicker(dt: number): void {
+    // A season turning over is breaking news.
+    const seasonNow = seasonIdAt(this.worldNow())
+    if (this.lastSeasonId && seasonNow !== this.lastSeasonId) {
+      this.pushTicker(`${seasonNow} has arrived`)
+    }
+    this.lastSeasonId = seasonNow
+
+    if (this.tickerText) {
+      this.tickerOffset += dt * TICKER_SPEED
+      if (this.tickerOffset <= TICKER_VIEW_PX + textWidth(this.tickerText)) return
+    }
+    const queued = this.tickerQueue.shift()
+    if (queued) {
+      this.tickerText = queued
+    } else {
+      const candidates = this.tickerCandidates()
+      this.tickerText = candidates[this.tickerRotation++ % candidates.length] ?? ''
+    }
+    this.tickerOffset = 0
   }
 
   /** Species reached across every generation, for the collection counter. */
@@ -609,6 +700,8 @@ export class App {
       return
     }
 
+    this.advanceTicker(dt)
+
     const pet = this.pet
     if (!pet) return
 
@@ -647,6 +740,7 @@ export class App {
       if (result) {
         this.evolution = result
         this.syncDiscovered()
+        this.pushTicker(`${pet.name} became ${result.toName}`)
         this.mode = 'evolve'
         this.hooks.form(result.toId, true)
         this.hooks.sound(result.toId === 'blob' ? 'hatch' : 'evolve')

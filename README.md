@@ -3,7 +3,8 @@
 A 3D virtual pet in a plastic shell. Single page, no backend, saves to
 `localStorage`. Built with [ogl](https://github.com/oframe/ogl), TypeScript and
 Vite; every asset — geometry, textures, font, sound — is generated in code, so
-there is nothing to load.
+there is nothing to load. The screen is a 192x172 framebuffer — twelve rows
+taller than the classic 192x160, to house the ticker.
 
 ```bash
 npm install
@@ -26,6 +27,12 @@ you are tapping or typing:
 
 Six icons ring the screen: feed, play, clean, medicine, sleep and status. An
 icon blinks red when the matching stat is critical.
+
+A news ticker crawls along the bottom of the screen, above the lower icons: the
+weather, a season on its way, what the pet needs, the lineage's standing goals,
+and breaking news — an evolution, a curio found, a season arriving. Any system
+can push a line onto it (`app.pushTicker`), so it is the game's ambient
+messaging channel; the toast remains for immediate feedback.
 
 **Hold C** — press and hold the third button, or the C key — to back out of the
 feed menu, the game menu, or a game in progress:
