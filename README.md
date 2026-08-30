@@ -66,6 +66,27 @@ puts it back. Turning the shell rather than moving the camera is deliberate —
 the lights are fixed in view space, so the highlight travels across the plastic
 as it turns, and the mouldings catch it at a raking angle.
 
+### The booklet
+
+A **HOW TO PLAY** link sits at the top right of the page, and behind it is
+`how-to-play.html`: an illustrated instructions booklet covering the buttons,
+the icon ring, the five stats, the food, the three games, the whole family tree,
+foraging, the curio board, the world's clock, and a map of the meadow with the
+four grounds laid out by how far off they are.
+
+Almost none of it is written twice. The creatures are drawn from their own voxel
+models (`howto/voxel-sprite.ts`), so a picture in the booklet cannot disagree
+with the thing that hatches. The minigame illustrations are real `GameSession`s,
+wound forward a few frames and asked to draw themselves onto a canvas the same
+192x172 as the glass — which is what the drawing half of `Hud` was split into
+`render/pixels.ts` for. The tables of food, grounds, curios, forms, shells and
+visitors are read out of the same data the game plays from.
+
+What it deliberately leaves out is the dice: which curio wants which weather,
+how far out the rare things live, what the odds are of coming home muddy. Those
+are the game's to reveal, and a booklet that printed them would hand the player
+the answers to the only questions worth having.
+
 ## The long game
 
 Care keeps a pet well; the lineage is why you keep coming back.
@@ -746,6 +767,7 @@ src/
   render/     ogl scene, voxel mesh builder, shell geometry, bloom, HUD canvas
   engine/     input hit-testing, WebAudio beeper, the clock and dice seams
   ui/         screen drawing
+  howto/      the instructions booklet: voxel sprites, screen shots, the map
 test/
   harness.ts  the game driven by button presses, with no renderer
   unit/       one module at a time
