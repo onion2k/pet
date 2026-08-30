@@ -1,6 +1,7 @@
 import { random } from '../engine/random'
 import type { StatKey } from '../game/types'
 import type { WeatherId } from './seasons'
+import type { YardGameId } from './yardgames'
 
 /**
  * The pet's voice: little lines it says through the news ticker, shown as
@@ -37,6 +38,8 @@ interface VoicePack {
   goodnight?: string[]
   morning?: string[]
   needs?: Partial<Record<StatKey, string>>
+  /** What it says about something out in the yard it would like to play with. */
+  yard?: Partial<Record<YardGameId, string[]>>
 }
 
 const PACKS: Record<string, VoicePack> = {
@@ -49,6 +52,10 @@ const PACKS: Record<string, VoicePack> = {
     ],
     welcome: ["HI HI HI HI HI!"],
     goodnight: ["FIRST SLEEPS ARE THE BEST SLEEPS"],
+    yard: {
+      fetch: ["A ROUND THING! LIKE ME! HELLO ROUND THING!"],
+      dive: ["LEAVES! ALL THE LEAVES! I COULD LIVE IN THERE!"],
+    },
   },
   pudge: {
     monologue: [
@@ -69,6 +76,11 @@ const PACKS: Record<string, VoicePack> = {
     ],
     won: ["OBVIOUSLY. I NEVER LOSE."],
     lost: ["THAT ONE DIDN'T COUNT. REMATCH."],
+    yard: {
+      fetch: ["I COULD KICK THAT BALL OVER THE WALL. WATCH."],
+      hill: ["THAT HILL DOESN'T SCARE ME. IT SHOULD."],
+      chase: ["NOTHING OUTRUNS ME. NOTHING."],
+    },
   },
   sprout: {
     monologue: [
@@ -108,6 +120,11 @@ const PACKS: Record<string, VoicePack> = {
     ],
     won: ["CHAMPION! AS FORETOLD!"],
     lost: ["THE SUN WAS IN MY EYES"],
+    yard: {
+      chase: ["THAT BUTTERFLY HAS NEVER BEEN CAUGHT. UNTIL TODAY."],
+      fetch: ["BALL. ME. NOW. THIS IS A SPORT."],
+      hill: ["I HOLD THE HILL RECORD. AGAINST MYSELF."],
+    },
   },
   grump: {
     monologue: [
@@ -119,6 +136,11 @@ const PACKS: Record<string, VoicePack> = {
     welcome: ["HMPH. TOOK YOU LONG ENOUGH."],
     fed: [() => "NOT BAD. I'VE HAD WORSE."],
     needs: { hunger: "A CREATURE COULD STARVE OUT HERE" },
+    yard: {
+      fetch: ["THERE'S A BALL OUT THERE. NOT THAT I CARE."],
+      dive: ["SOMEONE PILED THOSE LEAVES UP. WASTEFUL. ...DEEP, THOUGH."],
+      hill: ["A SLED. AT MY AGE. ...WELL. PERHAPS ONCE."],
+    },
   },
   verdant: {
     monologue: [
@@ -128,6 +150,10 @@ const PACKS: Record<string, VoicePack> = {
       "BREATHE IN. BREATHE OUT. BLOOM.",
     ],
     goodnight: ["REST IS HOW GARDENS GROW..."],
+    yard: {
+      dive: ["THE LEAVES HAVE COME DOWN. THEY ARE MEANT TO BE FALLEN IN."],
+      chase: ["THE BUTTERFLY AND I HAVE AN UNDERSTANDING"],
+    },
   },
   lumen: {
     monologue: [
@@ -137,6 +163,12 @@ const PACKS: Record<string, VoicePack> = {
     ],
     night: ["3AM IS MY FINEST HOUR"],
     goodnight: ["DIMMING TO STANDBY... GOODNIGHT"],
+    yard: {
+      catch: [
+        "THE LITTLE LIGHTS ARE OUT. THEY GLOW LIKE ME.",
+        "STAY UP. JUST TONIGHT. THE FIREFLIES ARE HERE.",
+      ],
+    },
   },
   aurora: {
     monologue: [
@@ -197,6 +229,38 @@ const NEED_BASE: Partial<Record<StatKey, string>> = {
 
 export const SICK_LINE = "I DON'T FEEL SO GOOD..."
 
+/**
+ * Noticing something out in the yard, in the first person.
+ *
+ * The arrival is already announced by the yard itself -- *a ball has turned up*
+ * -- but that is the device reporting, it happens once, and it says nothing
+ * about there being a game in it. This is the pet asking, which is the only
+ * thing that makes the extra row on the PLAY menu findable by a player who
+ * never thought to look at PLAY twice.
+ */
+const YARD_BASE: Record<YardGameId, string[]> = {
+  fetch: [
+    "THE BALL! THE BALL IS OUT!",
+    "SOMEBODY LEFT A BALL. FOR ME? FOR ME.",
+  ],
+  chase: [
+    "THERE IS A BUTTERFLY AND I MUST HAVE IT",
+    "IT KEEPS GOING THE OTHER WAY. RUDE.",
+  ],
+  dive: [
+    "THOSE LEAVES ARE PERFECTLY PILED UP",
+    "ONE OF THOSE DRIFTS IS DEEP. I CAN TELL.",
+  ],
+  hill: [
+    "SOMEONE LEFT THE SLED OUT!",
+    "THE HILL IS RIGHT THERE. RIGHT THERE.",
+  ],
+  catch: [
+    "THE FIREFLIES ARE OUT! QUICK!",
+    "LITTLE LIGHTS. I WANT ONE.",
+  ],
+}
+
 /** Idle musings everyone shares. Species packs colour them heavily. */
 const MONOLOGUE = [
   "DO CLOUDS EVER GET LONELY?",
@@ -236,6 +300,8 @@ export const voice = {
   morning: (speciesId: string) => blend(MORNING, packOf(speciesId).morning),
   need: (need: StatKey, speciesId: string): string | undefined =>
     packOf(speciesId).needs?.[need] ?? NEED_BASE[need],
+  yard: (game: YardGameId, speciesId: string): string =>
+    blend(YARD_BASE[game], packOf(speciesId).yard?.[game]),
   monologue: (night: boolean, weather: WeatherId, speciesId: string): string => {
     const base = [...MONOLOGUE]
     if (night) base.push(...MONOLOGUE_NIGHT)

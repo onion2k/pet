@@ -12,6 +12,7 @@ import {
 import { foodById, FOODS } from '../../src/data/foods'
 import { YARD_GAMES } from '../../src/data/yardgames'
 import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
+import { PLAY_MIN_ENERGY } from '../../src/game/app'
 import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
 import { blend, EGG_LINES, pick, SICK_LINE, voice } from '../../src/data/voice'
 import { GROWTH_STAGES, plantById, PLANTS } from '../../src/data/plants'
@@ -817,13 +818,22 @@ describe('the yard games', () => {
   })
 
   it('cost less than the PLAY icon insists a pet has', () => {
-    // The icon refuses a pet under fifteen; a game that cost more than that
-    // could be opened and never started.
-    for (const game of YARD_GAMES) expect(game.energy).toBeLessThan(15)
+    // The icon refuses a pet under that; a game costing more could be offered,
+    // asked for on the ticker, and then never started.
+    for (const game of YARD_GAMES) expect(game.energy).toBeLessThan(PLAY_MIN_ENERGY)
   })
 
   it('have a session behind every row', () => {
     for (const game of YARD_GAMES) expect(YARD_SESSIONS[game.id]).toBeDefined()
+  })
+
+  it('have something for the pet to say about every one of them', () => {
+    // A game with no line is a row on the menu nobody is ever told about.
+    for (const game of YARD_GAMES) {
+      const line = voice.yard(game.id, 'blob')
+      expect(line.length).toBeGreaterThan(0)
+      expect(line).toBe(line.toUpperCase())
+    }
   })
 
   it('say the same thing on the menu as in the game', () => {

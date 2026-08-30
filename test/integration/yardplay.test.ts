@@ -4,6 +4,7 @@ import { emptySave } from '../../src/game/save'
 import { isPresent, withinHours } from '../../src/game/visitors'
 import { DAY_MS, seasonIdAt, worldHour } from '../../src/game/world'
 import { YARD_GAMES, yardGameById } from '../../src/data/yardgames'
+import { PLAY_MIN_ENERGY } from '../../src/game/app'
 
 /**
  * Playing with what is out in the yard. The part worth testing is not the game
@@ -156,5 +157,66 @@ describe('the read on the day', () => {
     // Fetch wants nothing in particular, so it is never a bad day for it --
     // which is what makes it the dependable one, as the near ground is.
     expect(withBall().app.playProspect(fetch)).toBe('fair')
+  })
+})
+
+describe('the pet mentioning what is out there', () => {
+  /** Every line the ticker shows over a good long stretch. */
+  const linesOver = (h: ReturnType<typeof withBall>, seconds = 600) => {
+    const seen = new Set<string>()
+    for (let i = 0; i < seconds * 4; i++) {
+      h.advance(0.25)
+      if (h.app.tickerText) seen.add(h.app.tickerText)
+    }
+    return [...seen]
+  }
+
+  const mentionsBall = (lines: string[]) => lines.some((l) => l.includes('BALL'))
+
+  it('asks about the ball while it is out there', () => {
+    expect(mentionsBall(linesOver(withBall()))).toBe(true)
+  })
+
+  it('says nothing about a yard it has nothing in', () => {
+    expect(mentionsBall(linesOver(withEmptyYard()))).toBe(false)
+  })
+
+  it('stops asking once you have taken the hint', () => {
+    const h = withBall()
+    h.select('play')
+    h.tap('b')
+    // Started and abandoned still counts: the pet asked and you went out.
+    h.frames(6)
+    h.holdBack()
+    expect(mentionsBall(linesOver(h))).toBe(false)
+  })
+
+  it('never asks for a game the PLAY icon would refuse', () => {
+    // The pet asking for something it is then told it is too tired for is the
+    // one way this line can actively mislead.
+    const h = withBall()
+    h.pet.stats.energy = PLAY_MIN_ENERGY - 1
+    expect(mentionsBall(linesOver(h))).toBe(false)
+  })
+
+  it('says nothing while the pet is asleep', () => {
+    // Held asleep rather than set once: the simulation rightly wakes a pet put
+    // to bed in broad daylight with a full tank, within a couple of seconds.
+    const h = withBall()
+    const seen = new Set<string>()
+    for (let i = 0; i < 2400; i++) {
+      h.pet.asleep = true
+      h.advance(0.25)
+      if (h.app.tickerText) seen.add(h.app.tickerText)
+    }
+    expect(mentionsBall([...seen])).toBe(false)
+  })
+
+  it('leaves room for everything else the ticker has to say', () => {
+    // One line even when the yard is full, or a busy day buries the weather,
+    // the streak and the pet's own thoughts under a run of invitations.
+    const lines = linesOver(withBall())
+    const invitations = lines.filter((l) => mentionsBall([l]))
+    expect(invitations.length).toBeLessThan(lines.length / 2)
   })
 })
