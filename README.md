@@ -475,19 +475,31 @@ supply line back into the rest of the game.
 A/C to pick, B to go — each wanting a different sort of day. They belong to the
 place the family lives, so moving house swaps all four.
 
-| Role | In the meadow | In the wood | From | Costs | Wants |
+| Role | From | Costs | Wants | In the meadow | On the shore |
 | --- | --- | --- | --- | --- | --- |
-| near | The Old Wall | The Coppice | child | 6 | nothing in particular |
-| wet | The Creek | The Streambed | adult | 10 | rain, or a mist |
-| sheltered | The Hollow | The Deadfall | adult | 9 | autumn |
-| far | The Long Hill | The Ridge | adult | 14 | clear weather |
+| near | child | 6 | nothing in particular | The Old Wall | The Tideline |
+| wet | adult | 10 | rain, or a mist | The Creek | The Rockpools |
+| sheltered | adult | 9 | autumn | The Hollow | The Dunes |
+| far | adult | 14 | clear weather | The Long Hill | The Headland |
 
-Every biome supplies the same four roles. That is not tidiness: it is what stops
-moving house from stranding anyone. A child always has exactly one ground
-wherever it lives, and nowhere lacks somewhere to go on a fair day. What differs
-between two places' grounds is what they turn up — the meadow favours stones and
-feathers, the wood favours blooms — because curios are the collection, and that
-is the right thing to make a place worth living in.
+Every biome supplies the same four roles at the same costs. That is not
+tidiness: it is what stops moving house from stranding anyone. A child always
+has exactly one ground wherever it lives, and nowhere lacks somewhere to go on a
+fair day. What differs is what a place turns up, because curios are the
+collection and that is the right thing to make somewhere worth living in.
+
+| Place | Leans toward |
+| --- | --- |
+| Meadow | an even spread — pebbles, dewdrops, toadstools, feathers, geodes |
+| Woodland | blooms: blossom and toadstools, and snowdrops off the ridge |
+| Beach | stones and weather: pebbles, feathers, geodes |
+| Hillside | geodes and snowdrops — cold, stony finds |
+| Village | blossom, and the churchyard for the autumn ones |
+
+Sunpetals are the summer bloom nothing inland favours, and they are why two of
+the five are worth the walk: the beach turns them up on the tideline and the
+village out on the water meadow. A collection you cannot finish without living
+somewhere else is the point of the whole arrangement.
 
 Every row carries a read on today — LOOKS PROMISING, WORTH A TRY, NOT TODAY —
 worked out from the ground against the live season and weather, and the same
@@ -571,11 +583,27 @@ retire, because both are things you do a handful of times in a family's life and
 neither should happen because a thumb rested on a button — and the move menu
 offers everywhere it could live.
 
+Five places to live: the **Meadow**, the **Woodland**, the **Beach**, the
+**Hillside** and the **Village**.
+
 Moving is not a repaint. **The grounds and the visitors come with the house**, so
 where you live decides what the next stretch of play is made of: a different four
 grounds turning up different curios, and a different cast out in the yard. A
 biome that only changed the colours would be wallpaper, and you would pick one
 once and forget it.
+
+What tells the five apart on screen is mostly what stands up out of the ground —
+trunks, cottages, outcrops, marram — and only secondarily the colours. That means
+how much of the *shared* cover a place gets is part of its character too: a
+village green has had the stones picked off it, a hilltop has less grass than a
+meadow, and a beach has none at all. Left even, the shared stones and grass
+outweigh everything distinctive and all five read as a recoloured meadow.
+
+The village needs no materials the shelter did not already need — a roof is a
+roof — so it costs a prop set rather than a palette, and the pet's own shelter
+stays its own shelter with the cottages as neighbours. The beach has sand but no
+sea: the terrain is one heightfield with no water plane, so a shore reads as
+dunes rather than as a coast.
 
 **The garden stays, the friends follow.** Plantings belong to the ground they
 were put in — moving leaves three generations of trees standing where they are,

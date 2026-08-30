@@ -33,6 +33,18 @@ export type GroundId =
   | 'streambed'
   | 'deadfall'
   | 'ridge'
+  | 'tideline'
+  | 'rockpools'
+  | 'dunes'
+  | 'headland'
+  | 'sheepfold'
+  | 'spring'
+  | 'cleft'
+  | 'summit'
+  | 'lane'
+  | 'duckpond'
+  | 'churchyard'
+  | 'watermeadow'
 
 export interface Ground {
   id: GroundId
@@ -165,8 +177,170 @@ export const WOODLAND_GROUNDS: Ground[] = [
   },
 ]
 
+/**
+ * The beach's four. Stones and weather rather than blooms -- and the one place
+ * that turns up sunpetals, which nothing inland favours.
+ */
+export const BEACH_GROUNDS: Ground[] = [
+  {
+    id: 'tideline',
+    role: 'near',
+    name: 'The Tideline',
+    place: 'the tideline',
+    note: 'Whatever the sea left.',
+    from: 'child',
+    energy: 6,
+    luck: 0.55,
+    favours: ['sunpetal', 'pebble'],
+  },
+  {
+    id: 'rockpools',
+    role: 'wet',
+    name: 'The Rockpools',
+    place: 'the rockpools',
+    note: 'Wants rain, or a mist.',
+    from: 'adult',
+    energy: 10,
+    luck: 0.7,
+    weather: ['rain', 'mist'],
+    favours: ['dewdrop', 'geode'],
+  },
+  {
+    id: 'dunes',
+    role: 'sheltered',
+    name: 'The Dunes',
+    place: 'the dunes',
+    note: 'Out of the wind. Best in autumn.',
+    from: 'adult',
+    energy: 9,
+    luck: 0.7,
+    seasons: ['autumn'],
+    favours: ['feather', 'pebble'],
+  },
+  {
+    id: 'headland',
+    role: 'far',
+    name: 'The Headland',
+    place: 'the headland',
+    note: 'A climb, and a wide view.',
+    from: 'adult',
+    energy: 14,
+    luck: 0.75,
+    weather: ['clear'],
+    favours: ['feather', 'geode'],
+  },
+]
+
+/** The hill's four. Stone and cold weather: geodes and snowdrops. */
+export const HILL_GROUNDS: Ground[] = [
+  {
+    id: 'sheepfold',
+    role: 'near',
+    name: 'The Sheepfold',
+    place: 'the sheepfold',
+    note: 'Just down the slope.',
+    from: 'child',
+    energy: 6,
+    luck: 0.55,
+    favours: ['pebble'],
+  },
+  {
+    id: 'spring',
+    role: 'wet',
+    name: 'The Spring',
+    place: 'the spring',
+    note: 'Wants rain, or a mist.',
+    from: 'adult',
+    energy: 10,
+    luck: 0.7,
+    weather: ['rain', 'mist'],
+    favours: ['dewdrop', 'geode'],
+  },
+  {
+    id: 'cleft',
+    role: 'sheltered',
+    name: 'The Cleft',
+    place: 'the cleft',
+    note: 'Out of the wind. Best in autumn.',
+    from: 'adult',
+    energy: 9,
+    luck: 0.7,
+    seasons: ['autumn'],
+    favours: ['toadstool', 'geode'],
+  },
+  {
+    id: 'summit',
+    role: 'far',
+    name: 'The Summit',
+    place: 'the summit',
+    note: 'A climb, and a wide view.',
+    from: 'adult',
+    energy: 14,
+    luck: 0.75,
+    weather: ['clear'],
+    favours: ['snowdrop', 'feather'],
+  },
+]
+
+/** The village's four. Gardens and old corners: blooms, and what people drop. */
+export const VILLAGE_GROUNDS: Ground[] = [
+  {
+    id: 'lane',
+    role: 'near',
+    name: 'The Lane',
+    place: 'the lane',
+    note: 'Past the neighbours.',
+    from: 'child',
+    energy: 6,
+    luck: 0.55,
+    favours: ['blossom'],
+  },
+  {
+    id: 'duckpond',
+    role: 'wet',
+    name: 'The Duckpond',
+    place: 'the duckpond',
+    note: 'Wants rain, or a mist.',
+    from: 'adult',
+    energy: 10,
+    luck: 0.7,
+    weather: ['rain', 'mist'],
+    favours: ['dewdrop', 'feather'],
+  },
+  {
+    id: 'churchyard',
+    role: 'sheltered',
+    name: 'The Churchyard',
+    place: 'the churchyard',
+    note: 'Quiet. Best in autumn.',
+    from: 'adult',
+    energy: 9,
+    luck: 0.7,
+    seasons: ['autumn'],
+    favours: ['toadstool', 'snowdrop'],
+  },
+  {
+    id: 'watermeadow',
+    role: 'far',
+    name: 'The Water Meadow',
+    place: 'the water meadow',
+    note: 'A long walk, and a wide view.',
+    from: 'adult',
+    energy: 14,
+    luck: 0.75,
+    weather: ['clear'],
+    favours: ['sunpetal', 'blossom'],
+  },
+]
+
 /** Every ground in the world, so an id can be looked up without its biome. */
-export const GROUNDS: Ground[] = [...MEADOW_GROUNDS, ...WOODLAND_GROUNDS]
+export const GROUNDS: Ground[] = [
+  ...MEADOW_GROUNDS,
+  ...WOODLAND_GROUNDS,
+  ...BEACH_GROUNDS,
+  ...HILL_GROUNDS,
+  ...VILLAGE_GROUNDS,
+]
 
 export const groundById = (id: GroundId): Ground => {
   const found = GROUNDS.find((g) => g.id === id)

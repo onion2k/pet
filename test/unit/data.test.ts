@@ -11,12 +11,13 @@ import {
 } from '../../src/data/grounds'
 import { foodById, FOODS } from '../../src/data/foods'
 import { visitorFor, YARD_GAMES } from '../../src/data/yardgames'
+import { CURIOS } from '../../src/data/curios'
 import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
 import { PLAY_MIN_ENERGY } from '../../src/game/app'
 import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
 import { blend, EGG_LINES, pick, SICK_LINE, voice } from '../../src/data/voice'
 import { GROWTH_STAGES, plantById, PLANTS } from '../../src/data/plants'
-import { VISITORS, type VisitorRole } from '../../src/data/visitors'
+import { UNIVERSAL_VISITORS, VISITORS, type VisitorRole } from '../../src/data/visitors'
 import { SHELLS, shellById } from '../../src/data/shells'
 import { ICON_LABEL, ICON_ORDER, ICON_SIZE, iconRows } from '../../src/data/icons'
 import { glyph, textWidth } from '../../src/data/font'
@@ -91,6 +92,24 @@ describe('grounds', () => {
       const roles = biome.grounds.map((g) => g.role).sort()
       expect(roles, biome.id).toEqual(['far', 'near', 'sheltered', 'wet'])
     }
+  })
+
+  it('writes every place as a phrase a journey line can swallow', () => {
+    // "ambles down to the old wall" -- lower case, and no leading article
+    // missing, since the line does not supply one.
+    for (const ground of GROUNDS) {
+      expect(ground.place, ground.id).toBe(ground.place.toLowerCase())
+      expect(ground.place.startsWith('the '), ground.id).toBe(true)
+    }
+  })
+
+  it('gives every curio somewhere that favours it', () => {
+    // A curio favoured nowhere can still be found, but only by accident, and it
+    // would sit on the board for a whole family with nothing a player could do
+    // about it. Sunpetals were exactly that until the beach and the village
+    // turned up -- which is now the reason those two are worth the walk.
+    const favoured = new Set(GROUNDS.flatMap((g) => g.favours))
+    for (const curio of CURIOS) expect(favoured, curio.id).toContain(curio.id)
   })
 
   it('keeps ground ids unique across biomes, since the larder keys off them', () => {
@@ -545,10 +564,17 @@ describe('visitors', () => {
   })
 
   it('only lets the living ones be befriended', () => {
-    const alive = ['fireflies', 'rabbit', 'butterfly', 'moth', 'glowworms', 'deer']
-    for (const visitor of VISITORS) {
-      if (visitor.friend) expect(alive, visitor.id).toContain(visitor.id)
+    // Written as which things are *not* alive rather than which are, so that a
+    // new place bringing four new creatures costs nothing here and a new object
+    // -- which is the case worth catching -- has to be thought about.
+    const objects = ['ball', 'snowman', 'pumpkin', 'leafpile', 'sled']
+    for (const id of objects) {
+      const visitor = VISITORS.find((v) => v.id === id)!
+      expect(visitor.friend, id).toBeUndefined()
     }
+    // A sled cannot be befriended however far the pet walks, and the objects
+    // are exactly the ones that turn up everywhere.
+    expect([...objects].sort()).toEqual([...UNIVERSAL_VISITORS].sort())
   })
 
   it('leaves at least one visitor befriendable per season it appears in', () => {
@@ -849,6 +875,20 @@ describe('biome', () => {
       for (const name of Object.keys(biome.materials ?? {})) {
         expect(MATERIALS, biome.id).toContain(name)
       }
+    }
+  })
+
+  it('fits the move menu on the glass, however many places there are to live', () => {
+    // Same shape as the games menu: 24px in, one tall row of 27 and the rest a
+    // line each, above the standing line about the garden at 138.
+    expect(24 + 27 + (BIOMES.length - 1) * 10).toBeLessThanOrEqual(138)
+  })
+
+  it('names every place twice over: shouted for the ticker, plain for the menu', () => {
+    for (const biome of BIOMES) {
+      expect(biome.prose, biome.id).toBe(biome.prose.toUpperCase())
+      expect(biome.name[0], biome.id).toBe(biome.name[0]!.toUpperCase())
+      expect(biome.note.length, biome.id).toBeGreaterThan(0)
     }
   })
 
