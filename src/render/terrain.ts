@@ -18,6 +18,7 @@ import {
   type Biome,
 } from '../data/biome'
 import { LANTERN, SHELTER, type Prop, type PropKey } from '../data/props'
+import type { Shore } from '../data/biome'
 import { MATERIAL_INDEX, PROP_MATERIAL } from '../data/seasons'
 import { expandLayers } from '../data/voxel-format'
 import type { PaletteTexture } from './palette'
@@ -76,6 +77,8 @@ export interface TerrainShape {
   heightAt(x: number, z: number): number
   /** World Y the pet stands on. */
   groundY: number
+  /** World Y the water sits at, or null where there is none. */
+  seaY: number | null
   shelter: ShelterPlacement
   /** Every lantern in the yard, the shelter's own first. */
   lamps: LampPlacement[]
@@ -134,8 +137,37 @@ function lampAt(
   }
 }
 
-export function terrainShape(seed: string): TerrainShape {
+/**
+ * How much of the way from the top of the beach to the patch's edge the ground
+ * takes to go fully under. The rest is flat seabed.
+ */
+const SHORE_RUN = 0.5
+
+/** A voxel height as the 0..1 value the noise field is written in. */
+const heightValue = (height: number): number =>
+  (height - TERRAIN_BASE) / (2 * TERRAIN_RELIEF) + 0.5
+
+/**
+ * How far under the water a column is, 0 at the top of the beach and 1 out
+ * where the seabed has levelled off. Eased at both ends so the beach meets the
+ * clearing without a crease and the seabed flattens without a step.
+ */
+function shoreFall(z: number, shore: Shore): number {
+  const fromCol = TERRAIN_ROWS / 2 + shore.from / TERRAIN_VOXEL
+  // Under water well before the patch runs out, rather than only just by the
+  // edge. Spread over the whole remaining depth the noise still has a say
+  // halfway out, and a dune that keeps its head up out there is a sandbank
+  // sitting in open water -- which reads as a fault rather than as a beach.
+  // Finishing early leaves flat seabed under the far water instead.
+  const run = fromCol * SHORE_RUN
+  if (run <= 0) return 0
+  const t = Math.min(1, Math.max(0, (fromCol - z) / run))
+  return t * t * (3 - 2 * t)
+}
+
+export function terrainShape(seed: string, biome: Biome): TerrainShape {
   const s = seedFrom(seed)
+  const shore = biome.shore
   const halfX = TERRAIN_COLS / 2
   const halfZ = TERRAIN_ROWS / 2
   const laneX = LANE_HALF_X / TERRAIN_VOXEL
@@ -170,6 +202,16 @@ export function terrainShape(seed: string): TerrainShape {
       const onPad = x >= padMinX && x < padMaxX && z >= shelter.oz - 1 && z < halfZ + 2
       if (onPad) value = 0.5
 
+      // Out past the shelter the ground falls away under the water. Pulling the
+      // height toward a single seabed value rather than subtracting from it
+      // damps the noise as it goes, which is what keeps the waterline one line
+      // rather than a scatter of islands -- while leaving enough of it near the
+      // top of the beach for the edge to wander the way an edge should.
+      if (shore) {
+        const fall = shoreFall(z, shore)
+        value = value * (1 - fall) + heightValue(shore.floor) * fall
+      }
+
       const height = Math.round(TERRAIN_BASE + (value - 0.5) * 2 * TERRAIN_RELIEF)
       cache[z * TERRAIN_COLS + x] = Math.max(1, height)
     }
@@ -195,6 +237,7 @@ export function terrainShape(seed: string): TerrainShape {
         ? 0
         : cache[z * TERRAIN_COLS + x]!,
     groundY: TERRAIN_BASE * TERRAIN_VOXEL,
+    seaY: shore ? shore.level * TERRAIN_VOXEL : null,
   }
 }
 
@@ -511,12 +554,12 @@ export function createTerrain(
   })
 
   let mesh: Mesh | null = null
-  let shape = terrainShape(seed)
+  let shape = terrainShape(seed, biome)
   let faces = 0
   let props = 0
 
   const build = (nextSeed: string, nextBiome: Biome) => {
-    shape = terrainShape(nextSeed)
+    shape = terrainShape(nextSeed, nextBiome)
     const s = seedFrom(nextSeed)
     const cache = new Map<string, Voxel>()
     // Terrain stores a material index; the colour comes from the season palette
@@ -550,6 +593,20 @@ export function createTerrain(
         const height = shape.heightAt(x, z)
         if (y < height) {
           if (y === height - 1) {
+            // Sand the water reaches is not the sand above it. The band is read
+            // off the height rather than off where the water plane happens to
+            // be drawn, so the foam follows every wander of the waterline
+            // instead of ruling a straight line across it.
+            //
+            // Gated on being out on the shore as well, and not on the height
+            // alone: the clearing is levelled to exactly the height a foam line
+            // wants, so by height alone the whole lane the pet walks in came up
+            // white.
+            const beach = nextBiome.shore
+            if (beach && shoreFall(z, beach) > 0) {
+              if (height <= beach.level) return voxel(MATERIAL_INDEX.wet)
+              if (height === beach.level + 1) return voxel(MATERIAL_INDEX.foam)
+            }
             // Dither the two surface shades so the ground is not a flat colour.
             const tint = hash2(x, z, s ^ 0x5bf0) > 0.62
             return voxel(tint ? MATERIAL_INDEX.surfaceB : MATERIAL_INDEX.surfaceA)

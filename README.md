@@ -601,9 +601,51 @@ outweigh everything distinctive and all five read as a recoloured meadow.
 
 The village needs no materials the shelter did not already need — a roof is a
 roof — so it costs a prop set rather than a palette, and the pet's own shelter
-stays its own shelter with the cottages as neighbours. The beach has sand but no
-sea: the terrain is one heightfield with no water plane, so a shore reads as
-dunes rather than as a coast.
+stays its own shelter with the cottages as neighbours.
+
+### The sea
+
+The beach has water at the back of it, and where the water could go was decided
+by the haze rather than by taste.
+
+The patch fades into the sky with depth so its edge is never a visible boundary:
+by the far row the haze is already eight parts in ten. A sea parked out past that
+edge would therefore be the colour of the sky and nothing else. So the water is
+*on* the patch. Past the shelter the ground falls away — pulled toward one seabed
+value rather than having depth subtracted from it, which damps the noise as it
+descends and is what keeps the waterline a single line instead of a scatter of
+sandbanks — and the water fills what it leaves. That puts the waterline in the
+band that is still crisp and lets the far water melt into the horizon on its own.
+
+The water is one flat plane, two triangles, with everything that moves in the
+fragment stage. What sells it at this size is not the surface — it is four pixels
+tall by the time the haze has it — but three things around it: that the ground
+goes visibly under it, that it takes the sky's colour where it is far enough off
+to be a mirror, and that the sun lies on it in a line of sparks written into the
+same bloom mask the lantern glass uses.
+
+The one place it deliberately parts company with the land is the fade. The
+terrain hazes all the way to the sky, because its edge is meant to disappear.
+Water given the same treatment vanishes outright — almost everything you can see
+of a sea is the far part, beyond where the sand stops, and hazed to sky that part
+*is* sky. A real sea keeps most of its colour right up to the horizon and then
+stops at a line. So the water settles toward a horizon tint rather than toward
+the sky and never quite gets there, which is what puts a horizon in the frame at
+all.
+
+Wet sand and foam are two more materials rather than something painted into the
+water, so the band follows every wander of the waterline instead of ruling a
+straight line across it — and goes grey in winter like everything else. They are
+read off the height, but only out on the shore: the clearing is levelled to
+exactly the height a foam line wants, and by height alone the whole lane the pet
+walks in came up white.
+
+Nothing the pet touches is ever near it. The pet does not sample the ground as it
+walks — it is placed at `groundY` wherever it goes — so a roaming band that dipped
+to the waterline would have it standing in the sea and never knowing. The lane,
+the verge, the lantern row and the shelter pad are all asserted dry across a
+spread of seeds in `test/unit/shore.test.ts`, which is the part of the renderer
+that is pure arithmetic and the part that can drown a pet.
 
 **The garden stays, the friends follow.** Plantings belong to the ground they
 were put in — moving leaves three generations of trees standing where they are,

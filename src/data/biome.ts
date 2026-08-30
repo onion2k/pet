@@ -29,6 +29,28 @@ export type BiomeId = 'meadow' | 'woodland' | 'beach' | 'hill' | 'village'
  * decision about what the next stretch of play is made of -- which is the same
  * reason PLAY was rebuilt to read the yard instead of ignoring it.
  */
+/**
+ * Water at the back of the patch.
+ *
+ * It has to be *on* the patch rather than beyond it. The ground fades into the
+ * sky with depth -- by the patch's far edge the haze is already eight parts in
+ * ten -- so a sea parked past the edge would be the colour of the sky and
+ * nothing else. The ground falls away instead, and the water fills what it
+ * leaves, which puts the waterline in the band that is still crisp and lets the
+ * far water melt into the horizon on its own.
+ */
+export interface Shore {
+  /** World z the ground starts falling away. Behind the shelter, never in it. */
+  from: number
+  /** Height in voxels the seabed settles to. Below `level`. */
+  floor: number
+  /** Height in voxels the water surface sits at. Below the clearing's. */
+  level: number
+  /** Water over sand, and water over nothing. */
+  shallow: string
+  deep: string
+}
+
 export interface Biome {
   id: BiomeId
   name: string
@@ -52,6 +74,8 @@ export interface Biome {
    * colours behind them are swapped on the texture every frame anyway.
    */
   materials?: Partial<Record<Material, string>>
+  /** Water at the back, if this place has any. */
+  shore?: Shore
 }
 
 export const MEADOW: Biome = {
@@ -97,6 +121,15 @@ export const BEACH: Biome = {
   props: BEACH_PROPS,
   grounds: BEACH_GROUNDS,
   visitors: { flitter: 'tern', glow: 'seafire', grazer: 'crab', bloom: 'seapinks' },
+  // Starts behind the shelter -- which stands at z -2.45 and would otherwise
+  // have its feet in the water -- and runs out to the patch's edge.
+  shore: {
+    from: -3.7,
+    floor: 1,
+    level: 3,
+    shallow: '#4d8f9e',
+    deep: '#1d4a63',
+  },
   materials: {
     surfaceA: '#e0cd9a',
     surfaceB: '#d4be86',
