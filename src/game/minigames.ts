@@ -1,4 +1,4 @@
-import type { Hud } from '../render/hud'
+import type { PixelCanvas } from '../render/pixels'
 import type { ButtonId } from '../render/shell'
 import type { Burst } from '../render/particles'
 import type { SoundId } from '../engine/audio'
@@ -20,7 +20,7 @@ export interface GameSession {
   won: boolean
   press(button: ButtonId): GameFeedback | null
   update(dt: number): GameFeedback | null
-  draw(hud: Hud): void
+  draw(hud: PixelCanvas): void
 }
 
 export interface Minigame {
@@ -33,17 +33,17 @@ export interface Minigame {
 const ROUNDS = 5
 const NEEDED = 3
 
-const centre = (hud: Hud) => hud.width / 2
+const centre = (hud: PixelCanvas) => hud.width / 2
 
 const PANEL = '#080810'
 
 /** Solid backing, so game elements stay readable over the 3D pet behind them. */
-function panel(hud: Hud, x: number, y: number, w: number, h: number): void {
+function panel(hud: PixelCanvas, x: number, y: number, w: number, h: number): void {
   hud.rect(x, y, w, h, PANEL)
   hud.frame(x, y, w, h, '#242438')
 }
 
-function drawHeader(hud: Hud, title: string, round: number, wins: number): void {
+function drawHeader(hud: PixelCanvas, title: string, round: number, wins: number): void {
   hud.rect(0, 0, hud.width, 12, PANEL)
   // Keep the header clear of the screen's rounded top corners.
   const inset = Math.round(hud.safeInset(5)) + 2
@@ -58,7 +58,7 @@ function drawHeader(hud: Hud, title: string, round: number, wins: number): void 
 
 /** The standing instruction line every game shares. */
 /** Sits above the shared hold-to-back strip along the bottom edge. */
-function drawFooter(hud: Hud, hint: string): void {
+function drawFooter(hud: PixelCanvas, hint: string): void {
   hud.rect(0, hud.height - 27, hud.width, 13, PANEL)
   hud.textCentered(centre(hud), hud.height - 24, hint, '#6a6a86')
 }

@@ -1,0 +1,578 @@
+/**
+ * The booklet that comes in the box: bright paper, chunky outlines, and the
+ * meadow's own colours. The game itself is a dark object in a dark room, so the
+ * instructions are deliberately the other thing -- daylight, on paper.
+ */
+
+:root {
+  color-scheme: light;
+  --paper: #fffaf0;
+  --sky: #cdeffb;
+  --grass: #a5dd6d;
+  --grass-deep: #6cbe4c;
+  --ink: #3f3357;
+  --ink-soft: #6a5f83;
+  --sun: #ffd93d;
+  --berry: #ff6fae;
+  --cool: #4fb8e8;
+  --shadow: 0 4px 0 rgba(63, 51, 87, 0.16);
+  --round: 18px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 84px;
+}
+
+body {
+  margin: 0;
+  background: var(--sky);
+  background-image:
+    radial-gradient(circle at 12% 8%, #ffffff8c 0 22%, transparent 60%),
+    radial-gradient(circle at 88% 4%, #ffffff70 0 18%, transparent 55%),
+    linear-gradient(#cdeffb 0 46%, #dff4c4 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+img,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+.pixel-word {
+  height: auto;
+}
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px 100px;
+}
+
+/* --- the strip along the top ------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #fffaf0e6;
+  backdrop-filter: blur(8px);
+  border-bottom: 4px solid var(--ink);
+}
+
+.topbar strong {
+  letter-spacing: 0.16em;
+  font-size: 14px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--sun);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  padding: 7px 16px;
+  box-shadow: var(--shadow);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.pill:hover,
+.pill:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(63, 51, 87, 0.2);
+}
+
+.pill.ghost {
+  background: var(--paper);
+}
+
+/* --- hero --------------------------------------------------------------- */
+
+.hero {
+  text-align: center;
+  padding: 56px 0 24px;
+}
+
+.hero .pixel-word {
+  image-rendering: pixelated;
+  display: block;
+  margin: 0 auto 18px;
+}
+
+.hero p {
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 19px;
+}
+
+.hero .sub {
+  color: var(--ink-soft);
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* --- contents ----------------------------------------------------------- */
+
+.contents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 26px 0 44px;
+}
+
+.contents a {
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 5px 13px;
+}
+
+.contents a:hover {
+  background: var(--sun);
+}
+
+/* --- sections ----------------------------------------------------------- */
+
+section {
+  margin: 0 0 56px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+
+h2 .num {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--berry);
+  color: #fff;
+  font-size: 18px;
+  box-shadow: var(--shadow);
+}
+
+h3 {
+  font-size: 20px;
+  margin: 26px 0 8px;
+}
+
+.lede {
+  color: var(--ink-soft);
+  margin: 0 0 20px;
+  max-width: 74ch;
+}
+
+p {
+  max-width: 74ch;
+}
+
+.card {
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: var(--round);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.tint-sun { border-top: 10px solid var(--sun); }
+.tint-grass { border-top: 10px solid var(--grass); }
+.tint-berry { border-top: 10px solid var(--berry); }
+.tint-cool { border-top: 10px solid var(--cool); }
+
+.tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #efe7ff;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+}
+
+.note {
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+/* --- buttons table ------------------------------------------------------ */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: var(--round);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 2px solid #ece3d4;
+  vertical-align: top;
+}
+
+th {
+  background: #f4ecdd;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+.key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  background: var(--sun);
+  font-weight: 800;
+  box-shadow: 0 3px 0 rgba(63, 51, 87, 0.2);
+}
+
+/* --- pictures ----------------------------------------------------------- */
+
+.screenshot,
+.art-tile,
+.pixel-word {
+  image-rendering: pixelated;
+}
+
+.screenshot {
+  /* The size is set in points when the canvas is made; on a narrow screen it
+     has to be allowed to shrink without squashing the picture. */
+  max-width: 100%;
+  height: auto;
+  border: 4px solid var(--ink);
+  border-radius: 14px;
+  background: #08080c;
+  box-shadow: var(--shadow);
+  display: block;
+}
+
+.art-tile {
+  display: block;
+}
+
+.icon-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 14px;
+}
+
+.icon-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: var(--round);
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+}
+
+.icon-card .plate {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 14px;
+  background: #14141f;
+  border: 3px solid var(--ink);
+}
+
+.icon-card b {
+  display: block;
+  letter-spacing: 0.08em;
+}
+
+.icon-card span {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+/* --- games -------------------------------------------------------------- */
+
+.game {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .game {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+
+/* --- family tree -------------------------------------------------------- */
+
+.tree {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+}
+
+.creature {
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: var(--round);
+  box-shadow: var(--shadow);
+  padding: 12px 14px 14px;
+  text-align: center;
+  width: 100%;
+}
+
+.creature .pic {
+  display: grid;
+  place-items: center;
+  min-height: 118px;
+  border-radius: 14px;
+  background: linear-gradient(#eaf7ff, #e4f5cf);
+  border: 2px solid #e0d6c4;
+  margin-bottom: 10px;
+}
+
+.creature b {
+  display: block;
+  font-size: 18px;
+}
+
+.creature .stage {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.creature .blurb {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  /* Two lines' worth, so cards side by side line their labels up rather than
+     stepping down the row. */
+  min-height: 2.9em;
+}
+
+.creature .because {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #fff0c9;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 2px 11px;
+}
+
+.branch {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #ffffffb0;
+  border: 3px dashed var(--ink);
+  border-radius: 22px;
+  padding: 16px;
+}
+
+.branch > .creature {
+  margin-bottom: 14px;
+}
+
+/* The adults hang off the bottom of their panel, so the three branches' rows
+   line up however long each child's description ran. */
+.branch > .pair {
+  margin-top: auto;
+}
+
+.pair {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 560px) {
+  .pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+.arrow {
+  text-align: center;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.single {
+  max-width: 280px;
+}
+
+/* --- curios ------------------------------------------------------------- */
+
+.curio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: var(--round);
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+}
+
+.curio .plate {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: #14141f;
+  border: 3px solid var(--ink);
+}
+
+.swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 2px solid var(--ink);
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+
+/* --- map ---------------------------------------------------------------- */
+
+.map {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--round);
+  box-shadow: var(--shadow);
+}
+
+.map-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  fill: #3f3357;
+}
+
+.map-whisper {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  fill: #4c5c3a;
+}
+
+.pin-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  fill: #3f3357;
+}
+
+.pin-note {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  fill: #6a5f83;
+}
+
+/* --- odds and ends ------------------------------------------------------ */
+
+.callout {
+  background: #fff0c9;
+  border: 3px solid var(--ink);
+  border-left-width: 12px;
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin: 18px 0;
+  box-shadow: var(--shadow);
+}
+
+.callout b {
+  letter-spacing: 0.04em;
+}
+
+ul.plain {
+  padding-left: 20px;
+  max-width: 74ch;
+}
+
+ul.plain li {
+  margin-bottom: 6px;
+}
+
+footer {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 30px 0 10px;
+}
+
+.toTop {
+  display: inline-block;
+  margin-top: 14px;
+}

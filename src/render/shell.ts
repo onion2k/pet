@@ -2,6 +2,7 @@ import { Mesh, Plane, Program, Transform } from 'ogl'
 import type { OGLRenderingContext, Texture } from 'ogl'
 import { createFrontDecal, DECAL_SIZE } from './decal'
 import { pebbleGeometry } from './shell-geometry'
+import { SCREEN_CORNER_POWER, SCREEN_ROUNDNESS } from './pixels'
 
 export type ButtonId = 'a' | 'b' | 'c'
 
@@ -287,8 +288,6 @@ const SCREEN_W = 2.08
 // Taller than the classic 1.2 ratio: the extra rows carry the news ticker.
 const SCREEN_H = SCREEN_W / (192 / 172)
 const SCREEN_Y = 0.58
-/** Corner curvature of the lit area. Low value = a rounded rectangle. */
-const SCREEN_ROUNDNESS = 0.15
 
 /**
  * The mouldings hang directly below the screen and run to just above the
@@ -450,10 +449,7 @@ export function createShell(
   }
 }
 
-/**
- * Superellipse exponent of the lit screen area. The HUD uses it to keep content
- * clear of the rounded glass corners.
- */
-export const SCREEN_CORNER_POWER = 1 / SCREEN_ROUNDNESS
+/** Re-exported from the pixel canvas, which is what lays out against it. */
+export { SCREEN_CORNER_POWER }
 
 export { SCREEN_W, SCREEN_H }
