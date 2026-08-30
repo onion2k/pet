@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { harness } from '../harness'
 import { emptyPlayAxes, emptySave, flushSave } from '../../src/game/save'
-import { KINDLING, LARDER_CAP } from '../../src/game/larder'
+import { KINDLING } from '../../src/game/larder'
 import { CRITICAL, SICK_THRESHOLD } from '../../src/game/tuning'
 import { DAY_MS, isNight } from '../../src/game/world'
 import { COMMON_CURIOS } from '../../src/data/curios'

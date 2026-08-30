@@ -12,8 +12,6 @@ import {
 import { foodById, FOODS } from '../../src/data/foods'
 import { YARD_GAMES } from '../../src/data/yardgames'
 import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
-import { VISITORS } from '../../src/data/visitors'
-import { SEASONS } from '../../src/data/seasons'
 import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
 import { blend, EGG_LINES, pick, SICK_LINE, voice } from '../../src/data/voice'
 import { GROWTH_STAGES, plantById, PLANTS } from '../../src/data/plants'

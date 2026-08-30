@@ -828,6 +828,12 @@ npm run test:watch
 
 `npm run build` typechecks, runs the suite, and only then emits `dist/`.
 
+The typecheck covers `test` as well as `src`. It did not always: adding a
+required field to `Metrics` should have been a compile error in the three test
+files that build one by hand, and instead it was fourteen runtime failures with
+`Cannot read properties of undefined`. A fixture that has drifted from the type
+it claims to be is exactly the thing a typechecker is for.
+
 The game is for children, so the failures that matter are not crashes but the
 quiet ones: a lost pet, a button that stops working, a screen with no way off
 it. Those take hours to reach by hand and seconds to reach in a harness, so
