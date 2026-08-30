@@ -51,5 +51,8 @@ export function plantableKind(yard: YardState, roll: number): PlantId | null {
   // Prefer something the yard has none of, so a garden ends up varied.
   const fresh = PLANTS.filter((p) => countOf(yard, p.id) === 0)
   const pool = fresh.length > 0 ? fresh : PLANTS
-  return pool[Math.floor(roll * pool.length) % pool.length]?.id ?? null
+  // Clamped rather than guarded: the plant list is never empty, so the only way
+  // to miss is a roll outside 0..1, and the fix for that is to bring it back in.
+  const index = Math.min(pool.length - 1, Math.max(0, Math.floor(roll * pool.length)))
+  return pool[index]!.id
 }

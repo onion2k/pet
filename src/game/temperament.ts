@@ -57,8 +57,9 @@ export function temperamentFrom(m: Metrics): TemperamentId {
     ['restful', m.sleep - TYPICAL.sleep],
   ]
   scores.sort((a, b) => b[1] - a[1])
-  const [top, second] = scores
-  if (!top || !second) return 'easygoing'
+  // Three entries, written out above, so the first two are always there.
+  const top = scores[0]!
+  const second = scores[1]!
   if (top[1] - second[1] < DISTINCT) return 'easygoing'
   return top[0]
 }

@@ -4,6 +4,8 @@ import { chooseBranch, speciesOf } from '../data/species'
 import type { Burst } from '../render/particles'
 import type { ButtonId } from '../render/shell'
 import type { SoundId } from '../engine/audio'
+import { random } from '../engine/random'
+import { now as clockNow } from '../engine/clock'
 import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution } from './actions'
 import { MINIGAMES, type GameSession } from './minigames'
 import { legacyOf, lineageOf, temperamentOf, type TemperamentId } from './temperament'
@@ -164,13 +166,29 @@ export class App {
   /** Blink phase for the selected icon, driven by update(). */
   blink = 0
 
+  /**
+   * The pet, where the caller has already established there is one.
+   *
+   * Almost every private method here can only run with a pet: the screens that
+   * reach them are unreachable without one, since booting with no pet lands on
+   * the naming screen and restarting goes straight back to it. Repeating a
+   * `if (!pet) return` in each of them read as caution but was really fifteen
+   * branches that could not be taken -- and a guard that cannot fire is a guard
+   * nobody can be sure still guards anything. The invariant is stated once,
+   * here, and the public entry points that genuinely may have no pet check for
+   * themselves.
+   */
+  private get living(): PetState {
+    return this.pet!
+  }
+
   constructor(private hooks: AppHooks) {
     this.save = load()
     this.save.counters.sessions += 1
     this.updateStreak()
     this.pet = this.save.pet
     if (this.pet) {
-      const result = reconcile(this.pet, Date.now(), this.daylight)
+      const result = reconcile(this.pet, clockNow(), this.daylight)
       this.syncDiscovered()
       this.returned(result.awayMs)
     }
@@ -184,8 +202,7 @@ export class App {
    * tab may have been ticking along at a trickle the whole time.
    */
   private returned(awayMs: number): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
     this.awayMs = awayMs
     if (awayMs < WELCOME_THRESHOLD_MS) return
     this.rollCurio()
@@ -208,7 +225,7 @@ export class App {
    */
   setVisible(visible: boolean): void {
     if (!visible) {
-      this.hiddenAt = Date.now()
+      this.hiddenAt = clockNow()
       // Persist now: the tab may never get another frame.
       save(this.save)
       return
@@ -216,7 +233,7 @@ export class App {
     const hiddenAt = this.hiddenAt
     this.hiddenAt = 0
     if (!hiddenAt || !this.pet) return
-    const now = Date.now()
+    const now = clockNow()
     reconcile(this.pet, now, this.daylight)
     this.returned(Math.max(0, now - hiddenAt))
   }
@@ -227,27 +244,32 @@ export class App {
    * without punishing absence is the whole tone of the game.
    */
   private updateStreak(): void {
+    const now = new Date(clockNow())
     const stamp = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const today = stamp(new Date())
+    const today = stamp(now)
     const streak = this.save.streak
     if (streak.lastDay === today) return
-    if (!streak.lastDay) {
-      streak.days = 1
-    } else {
-      const [y, m, d] = streak.lastDay.split('-').map(Number)
-      const then = new Date(y!, m! - 1, d!).getTime()
-      const gap = Math.round((Date.now() - then) / 86_400_000)
-      if (gap <= 1) streak.days += 1
-      else streak.days = Math.max(1, streak.days - (gap - 1))
-    }
+
+    // Counted in whole local days, from midnight to midnight. Measuring the
+    // elapsed milliseconds instead made the gap depend on the time of day: a
+    // player who came back every afternoon read as two days apart every time,
+    // and lost the streak they were in the middle of building.
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const [y, m, d] = streak.lastDay.split('-').map(Number)
+    const then = new Date(y!, (m ?? 1) - 1, d ?? 1).getTime()
+    const gap = Math.round((midnight - then) / 86_400_000)
+
+    // No last day, or one we cannot read: this visit starts the streak.
+    if (!streak.lastDay || !Number.isFinite(gap) || gap <= 0) streak.days = 1
+    else if (gap === 1) streak.days += 1
+    else streak.days = Math.max(1, streak.days - (gap - 1))
     streak.lastDay = today
   }
 
   /** Folds the current pet's discoveries into the lineage-wide list. */
   private syncDiscovered(): void {
-    if (!this.pet) return
-    for (const id of this.pet.discovered) {
+    for (const id of this.living.discovered) {
       if (!this.save.discovered.includes(id)) this.save.discovered.push(id)
     }
   }
@@ -258,15 +280,15 @@ export class App {
    * finds depends on the season and the weather it was found in.
    */
   private rollCurio(): void {
-    const pet = this.pet
-    if (!pet || pet.stage === 'egg') return
+    const pet = this.living
+    if (pet.stage === 'egg') return
     if (this.awayMs < CURIO_AWAY_MS) return
     if (this.found) return
-    if (Math.random() > CURIO_CHANCE) return
+    if (random() > CURIO_CHANCE) return
     // Whatever it turned up while nobody was watching is one of the ordinary
     // things. The seasonal and the deep finds are walked to, not waited for.
-    const curio = COMMON_CURIOS[Math.floor(Math.random() * COMMON_CURIOS.length)]
-    if (!curio) return
+    // The common list is never empty, so a roll inside 0..1 always lands.
+    const curio = COMMON_CURIOS[Math.floor(random() * COMMON_CURIOS.length)]!
     this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
     this.found = curio
     this.pushTicker(`${pet.name} found a ${curio.name}`)
@@ -278,8 +300,7 @@ export class App {
    * Either way the yard has to have room, and something has to be left to find.
    */
   private bringHome(legs: number): { what: string; announce: string } | null {
-    const pet = this.pet
-    if (!pet) return null
+    const pet = this.living
     if (legs >= 3) {
       const friend = this.befriendable()
       if (friend) {
@@ -305,7 +326,7 @@ export class App {
     const pool = VISITORS.filter(
       (v) => v.friend && v.seasons.includes(season) && !already.includes(v.id),
     )
-    return pool[Math.floor(Math.random() * pool.length)] ?? null
+    return pool[Math.floor(random() * pool.length)] ?? null
   }
 
   /**
@@ -315,14 +336,15 @@ export class App {
    */
   private plantSeed(): { seedName: string } | null {
     const yard = this.save.yard
-    const kind = plantableKind(yard, Math.random())
+    const kind = plantableKind(yard, random())
     if (!kind) return null
+    // There are more verge pitches than the yard has room for, and
+    // `plantableKind` has already refused a full yard, so a free one is certain.
     const taken = new Set(yard.plantings.map((p) => p.x))
-    const spot = VERGE_SLOTS.find((x) => !taken.has(x))
-    if (spot === undefined) return null
+    const spot = VERGE_SLOTS.find((x) => !taken.has(x))!
     const planting: Planting = { kind, x: spot, z: VERGE_Z, plantedAt: this.worldNow() }
     yard.plantings.push(planting)
-    return { seedName: plantById(kind)?.seedName ?? 'a seed' }
+    return { seedName: plantById(kind)!.seedName }
   }
 
   /**
@@ -331,8 +353,9 @@ export class App {
    * home more of what it already has.
    */
   private gather(ground: Ground, legs: number): string | null {
-    const supply = findSupply(ground.id, legs, Math.random())
-    if (!supply) return null
+    // Every ground has supplies from the first leg onward, and a trip is always
+    // at least one leg, so there is always something it could have picked up.
+    const supply = findSupply(ground.id, legs, random())!
     const held = this.save.larder[supply.id] ?? 0
     if (held >= LARDER_CAP) return null
     this.save.larder[supply.id] = held + 1
@@ -345,8 +368,7 @@ export class App {
    * else to do with it -- the decision was made out on the hill.
    */
   private bankTheFire(): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
     const held = this.save.larder[KINDLING] ?? 0
     if (held <= 0) {
       pet.warm = false
@@ -407,8 +429,7 @@ export class App {
 
   /** The pet says something, in its own voice, after the current line. */
   private sayAsPet(text: string): void {
-    if (!this.pet) return
-    this.pendingVoice = `${this.pet.name}: ${text}`
+    this.pendingVoice = `${this.living.name}: ${text}`
   }
 
   /**
@@ -473,7 +494,8 @@ export class App {
       this.tickerText = queued
     } else {
       const candidates = this.tickerCandidates()
-      this.tickerText = candidates[this.tickerRotation++ % candidates.length] ?? ''
+      // The rotation always has the weather and the sign-off in it at least.
+      this.tickerText = candidates[this.tickerRotation++ % candidates.length]!
     }
     this.tickerOffset = 0
   }
@@ -498,8 +520,7 @@ export class App {
    * has all four, so the menu is what the pet's age looks like from outside.
    */
   private openGrounds(): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
     if (this.grounds.length === 0) return this.say('not old enough', 'refuse')
     if (pet.asleep) return this.say(`${pet.name} is asleep`, 'refuse')
     if (pet.sick) return this.say('too poorly', 'refuse')
@@ -554,8 +575,7 @@ export class App {
   }
 
   private sendForaging(ground: Ground): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
     if (pet.stats.energy < ground.energy + 10) return this.say('too tired for that', 'refuse')
 
     this.mode = 'main'
@@ -583,8 +603,7 @@ export class App {
 
   /** Adds stat deltas, clamped, the same way the actions do. */
   private applyStats(delta: Partial<Stats>): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
     for (const [key, amount] of Object.entries(delta) as [StatKey, number][]) {
       pet.stats[key] = Math.max(0, Math.min(100, pet.stats[key] + amount))
     }
@@ -603,11 +622,11 @@ export class App {
         season: world.season.id,
         weather: world.weather,
         night: isNight(this.worldNow()),
-        speciesId: this.pet?.speciesId ?? 'blob',
+        speciesId: this.living.speciesId,
       }
     },
-    petName: () => this.pet?.name ?? '',
-    energy: () => this.pet?.stats.energy ?? 0,
+    petName: () => this.living.name,
+    energy: () => this.living.stats.energy,
     boons: () => this.boons,
     addWorldTime: (ms) => {
       this.save.worldOffset += ms
@@ -734,8 +753,8 @@ export class App {
 
   /** Whether the curio under the cursor has spares to trade. */
   get canTrade(): boolean {
-    const curio = CURIOS[this.curioIndex]
-    if (!curio) return false
+    // The cursor wraps rather than running off the end, so it always names one.
+    const curio = CURIOS[this.curioIndex]!
     return (this.save.curios[curio.id] ?? 0) > TRADE_COST - 1 && !!this.tradeFor
   }
 
@@ -745,9 +764,9 @@ export class App {
    * snowdrop that keeps not turning up.
    */
   private trade(): void {
-    const curio = CURIOS[this.curioIndex]
+    const curio = CURIOS[this.curioIndex]!
     const want = this.tradeFor
-    if (!curio || !want) return this.say('nothing left to want', 'refuse')
+    if (!want) return this.say('nothing left to want', 'refuse')
     const held = this.save.curios[curio.id] ?? 0
     if (held <= TRADE_COST) {
       return this.say(`needs ${TRADE_COST + 1} ${curio.name.toLowerCase()}s`, 'refuse')
@@ -789,7 +808,7 @@ export class App {
 
   /** The time the world is showing, which is what the pet lives by. */
   worldNow(): number {
-    return Date.now() + this.save.worldOffset + this.debugWorldOffset
+    return clockNow() + this.save.worldOffset + this.debugWorldOffset
   }
 
   /**
@@ -809,7 +828,8 @@ export class App {
   }
 
   get selectedIcon(): IconId {
-    return ICON_ORDER[this.iconIndex] ?? 'feed'
+    // As with the other rings, the index wraps and so is always in range.
+    return ICON_ORDER[this.iconIndex]!
   }
 
   /** 0..1 while C is being held on a screen that can be escaped. */
@@ -912,9 +932,13 @@ export class App {
   }
 
   /** 0..1 while B is being held on an adult's status screen. */
+  /**
+   * 0..1 while B is being held on an adult's status screen. The arm flag is
+   * only ever set on an adult, and nothing turns an adult back into a child, so
+   * it carries the stage check with it.
+   */
   get retireProgress(): number {
     if (!this.retireArmed || this.heldButton !== 'b' || this.mode !== 'status') return 0
-    if (this.pet?.stage !== 'adult') return 0
     return Math.min(1, this.heldSeconds / RETIRE_HOLD_SECONDS)
   }
 
@@ -923,14 +947,13 @@ export class App {
    * discoveries fold into the lineage, and the next egg inherits an heirloom.
    */
   private beginRetirement(): void {
-    const pet = this.pet
-    if (!pet || pet.stage !== 'adult') return
+    const pet = this.living
     this.heldButton = null
     this.heldSeconds = 0
     this.save.album.push({
       speciesId: pet.speciesId,
       name: pet.name,
-      retiredAt: Date.now(),
+      retiredAt: clockNow(),
       // How much of the board this life helped fill counts toward what it
       // leaves the next egg: a life spent looking is worth passing on.
       legacy: legacyOf(pet, this.curioTally.kinds / CURIO_COUNT),
@@ -988,7 +1011,7 @@ export class App {
       this.nameIndex = (this.nameIndex + 1) % NAMES.length
       this.hooks.sound('move')
     } else {
-      this.pet = newPet(NAMES[this.nameIndex]!, Date.now())
+      this.pet = newPet(NAMES[this.nameIndex]!, clockNow())
       // The heirloom: each retired ancestor leaves the next egg a little
       // better provisioned, capped so lineage helps but never trivialises.
       // What the ancestors are worth, not how many there were. Counting them
@@ -1025,8 +1048,7 @@ export class App {
   }
 
   private activate(icon: IconId): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
 
     switch (icon) {
       case 'feed':
@@ -1101,9 +1123,9 @@ export class App {
       this.hooks.sound('move')
       return
     }
-    const pet = this.pet
-    const food = menu[this.foodIndex]
-    if (!pet || !food) return
+    const pet = this.living
+    // The bought foods are always on the menu, so the cursor always names one.
+    const food = menu[this.foodIndex]!
 
     const result = feed(pet, food.id, seasonIdAt(this.worldNow()))
     this.say(result.message, result.ok ? 'eat' : 'refuse')
@@ -1111,7 +1133,8 @@ export class App {
       // Gathered food is spent rather than conjured, so the menu shortens as
       // the pet eats its way through what it carried home.
       if (food.gathered) {
-        const left = (this.save.larder[food.id] ?? 1) - 1
+        // Gathered food only reaches the menu while there is some of it.
+        const left = this.save.larder[food.id]! - 1
         if (left > 0) this.save.larder[food.id] = left
         else delete this.save.larder[food.id]
         this.foodIndex = Math.min(this.foodIndex, this.feedMenu.length - 1)
@@ -1154,8 +1177,7 @@ export class App {
    * resting it as the hours go by so the stat bars move while the sky does.
    */
   private advanceSleep(dt: number): void {
-    const pet = this.pet
-    if (!pet) return
+    const pet = this.living
 
     if (!pet.asleep && this.skipRemaining <= 0) {
       this.skipSpent = false
@@ -1211,12 +1233,7 @@ export class App {
       }
     }
     // Hold B on an adult's status screen to retire it.
-    if (
-      this.retireArmed &&
-      this.heldButton === 'b' &&
-      this.mode === 'status' &&
-      this.pet?.stage === 'adult'
-    ) {
+    if (this.retireArmed && this.heldButton === 'b' && this.mode === 'status') {
       this.heldSeconds += dt
       if (this.heldSeconds >= RETIRE_HOLD_SECONDS) {
         this.beginRetirement()

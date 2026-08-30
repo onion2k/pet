@@ -91,7 +91,10 @@ export function findCurio(
     remaining -= weigh(curio)
     if (remaining <= 0) return curio
   }
-  return pool[pool.length - 1] ?? null
+  // A roll of exactly 1, or one nudged past it by floating point, walks off the
+  // end of the running total. The pool cannot be empty here -- a positive total
+  // requires at least one entry -- so the last of it is the answer.
+  return pool[pool.length - 1]!
 }
 
 /** Which sets are complete, given what the lineage has found. */

@@ -1,0 +1,407 @@
+import { describe, expect, it } from 'vitest'
+import { harness, type Harness } from '../harness'
+import { emptySave, flushSave } from '../../src/game/save'
+import { GROUNDS } from '../../src/data/grounds'
+import { LARDER_CAP } from '../../src/game/larder'
+import { YARD_CAPACITY } from '../../src/game/yard'
+import { VERGE_SLOTS } from '../../src/data/biome'
+import { CURIOS, TRADE_COST } from '../../src/data/curios'
+
+/**
+ * The adult's job, through the app rather than through the Forage class: the
+ * menu of places, the trip itself, and what the trip changes about the save.
+ * The failure that matters most here is a pet that is sent out and never comes
+ * back -- the yard would be empty and every button would refuse.
+ */
+
+/** Runs frames until the trip is over, or fails loudly. */
+function runTrip(h: Harness, answer?: 'b' | 'c'): Harness {
+  for (let i = 0; i < 60 * 120; i++) {
+    if (answer && h.app.forageChoosing) h.tap(answer)
+    h.advance(1 / 60, 1 / 60)
+    if (h.app.mode === 'main' && h.app.forageBeats.length === 0 && !h.app.visual.foraging) {
+      return h
+    }
+  }
+  throw new Error('the pet never came home')
+}
+
+/** A grown pet with the energy for any ground. */
+function grownUp(options: Parameters<typeof harness>[0] = {}): Harness {
+  const h = harness(options).start().growTo('adult')
+  h.pet.stats.energy = 100
+  return h
+}
+
+/** Sends the pet to a named ground, whatever the cursor was on. */
+function sendTo(h: Harness, ground: string): Harness {
+  h.select('forage')
+  while (h.app.grounds[h.app.groundIndex]!.id !== ground) h.tap('c')
+  h.tap('b')
+  return h
+}
+
+describe('the grounds menu', () => {
+  it('refuses a pet too young to be sent anywhere', () => {
+    const h = harness().start().growTo('baby')
+    h.clearCalls().select('forage')
+    expect(h.app.mode).toBe('main')
+    expect(h.app.message).toBe('NOT OLD ENOUGH')
+  })
+
+  it('offers a child exactly one ground', () => {
+    const h = harness().start().growTo('child')
+    expect(h.app.grounds.map((g) => g.id)).toEqual(['wall'])
+    h.select('forage')
+    expect(h.app.mode).toBe('grounds')
+  })
+
+  it('offers an adult every ground', () => {
+    expect(grownUp().app.grounds).toEqual(GROUNDS)
+  })
+
+  it('has no grounds to offer when there is no pet', () => {
+    const h = harness().boot()
+    expect(h.app.grounds).toEqual([])
+  })
+
+  it('refuses a sleeping pet', () => {
+    const h = grownUp()
+    h.pet.asleep = true
+    h.clearCalls().select('forage')
+    expect(h.app.message).toContain('ASLEEP')
+  })
+
+  it('refuses a poorly pet', () => {
+    const h = grownUp()
+    h.pet.sick = true
+    h.clearCalls().select('forage')
+    expect(h.app.message).toBe('TOO POORLY')
+  })
+
+  it('refuses a pet that is already out', () => {
+    const h = grownUp()
+    h.select('forage')
+    h.tap('b')
+    h.advance(0.5)
+    h.clearCalls().select('forage')
+    expect(h.app.message).toBe('ALREADY OUT')
+  })
+
+  it('moves through the menu both ways and wraps', () => {
+    const h = grownUp()
+    h.select('forage')
+    h.tap('c')
+    expect(h.app.groundIndex).toBe(1)
+    h.tap('a').tap('a')
+    expect(h.app.groundIndex).toBe(GROUNDS.length - 1)
+  })
+
+  it('clamps the cursor when a shorter menu is opened', () => {
+    const h = grownUp()
+    h.select('forage')
+    while (h.app.groundIndex !== GROUNDS.length - 1) h.tap('c')
+    h.holdBack()
+    // A younger pet has one ground; the cursor must not point past it.
+    h.pet.stage = 'child'
+    h.select('forage')
+    expect(h.app.groundIndex).toBeLessThan(h.app.grounds.length)
+    expect(() => h.tap('b')).not.toThrow()
+  })
+
+  it('reads each ground against the day, which is the whole choice', () => {
+    const h = grownUp()
+    for (const ground of h.app.grounds) {
+      expect(['good', 'fair', 'poor']).toContain(h.app.prospect(ground))
+    }
+  })
+
+  it('refuses to send a pet that has not the energy for the walk', () => {
+    const h = grownUp()
+    h.pet.stats.energy = 5
+    h.select('forage')
+    h.clearCalls().tap('b')
+    expect(h.app.message).toBe('TOO TIRED FOR THAT')
+    expect(h.app.mode).toBe('grounds')
+  })
+})
+
+describe('a trip', () => {
+  it('sends the pet off, at a cost, and says so', () => {
+    const h = grownUp()
+    const before = h.pet.stats.energy
+    h.select('forage')
+    h.clearCalls().tap('b')
+    expect(h.app.mode).toBe('main')
+    expect(h.pet.stats.energy).toBeLessThan(before)
+    expect(h.app.tickerText).toContain('HAS GONE LOOKING')
+  })
+
+  it('puts the trip screen up while the pet is out of sight', () => {
+    const h = grownUp()
+    h.select('forage')
+    h.tap('b')
+    h.until('the trip screen', () => h.app.mode === 'forage')
+    expect(h.app.forageBeats.length).toBeGreaterThan(0)
+    expect(h.app.visual.foraging).toBe(true)
+  })
+
+  it('comes home, from every ground, on any dice', () => {
+    for (const ground of GROUNDS) {
+      for (let seed = 0; seed < 4; seed++) {
+        const h = grownUp({ random: seed })
+        sendTo(h, ground.id)
+        runTrip(h)
+        expect(h.app.mode, `${ground.id} seed ${seed}`).toBe('main')
+        expect(h.app.visual.foraging).toBe(false)
+        expect(h.app.forageDim).toBe(0)
+      }
+    }
+  })
+
+  it('winds the world clock on by the time the trip took', () => {
+    const h = grownUp()
+    const before = h.app.worldOffset
+    h.select('forage')
+    h.tap('b')
+    runTrip(h)
+    expect(h.app.worldOffset).toBeGreaterThan(before)
+  })
+
+  it('lets the player send it on further, at a price', () => {
+    const h = grownUp()
+    sendTo(h, 'hill')
+    h.until('the prompt', () => h.app.forageChoosing, 60)
+    const cost = h.app.foragePushCost
+    const energy = h.pet.stats.energy
+    expect(cost).toBeGreaterThan(0)
+    expect(h.app.forageChooseProgress).toBeGreaterThan(0)
+    h.clearCalls().tap('b')
+    expect(h.pet.stats.energy).toBe(energy - cost)
+    expect(h.soundsPlayed()).toContain('confirm')
+  })
+
+  it('lets the player call it home', () => {
+    const h = grownUp()
+    sendTo(h, 'hill')
+    h.until('the prompt', () => h.app.forageChoosing, 60)
+    h.clearCalls().tap('c')
+    expect(h.soundsPlayed()).toContain('cancel')
+    runTrip(h)
+    expect(h.app.mode).toBe('main')
+  })
+
+  it('refuses to push a pet with nothing left to spend, without stranding it', () => {
+    const h = grownUp()
+    sendTo(h, 'hill')
+    h.until('the prompt', () => h.app.forageChoosing, 60)
+    h.pet.stats.energy = 0
+    h.clearCalls().tap('b')
+    expect(h.app.message).toBe('TOO TIRED TO GO ON')
+    runTrip(h)
+    expect(h.app.mode).toBe('main')
+  })
+
+  it('ignores a button that means nothing while the pet is out', () => {
+    const h = grownUp()
+    h.select('forage')
+    h.tap('b')
+    h.until('the trip screen', () => h.app.mode === 'forage')
+    const beats = h.app.forageBeats.length
+    h.tap('a')
+    expect(h.app.forageBeats.length).toBe(beats)
+    expect(h.app.mode).toBe('forage')
+  })
+
+  it('finishes its walk home even when an evolution interrupts it', () => {
+    const h = grownUp()
+    h.pet.temperament = 'devoted'
+    h.select('forage')
+    h.tap('b')
+    h.until('the trip screen', () => h.app.mode === 'forage')
+    // The pet comes of age mid-trip.
+    h.pet.ageMs = 1e12
+    for (let i = 0; i < 60 * 120 && h.app.visual.foraging; i++) {
+      if (h.app.mode === 'evolve') h.tap('b')
+      h.advance(1 / 60, 1 / 60)
+    }
+    expect(h.app.visual.foraging).toBe(false)
+  })
+
+  it('can bring back a curio, which lands on the collection board', () => {
+    // Every roll at zero: no mishap, a find, and the luck check passes.
+    const h = grownUp({ random: () => 0 })
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    expect(Object.keys(h.app.curioCounts).length).toBe(1)
+    expect(h.app.curioTally.total).toBe(1)
+    expect(h.app.forageFound).not.toBeUndefined()
+  })
+
+  it('saves what it brought home', () => {
+    const h = grownUp({ random: () => 0 })
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    flushSave()
+    expect(Object.keys(h.stored()!.curios).length).toBe(1)
+  })
+})
+
+describe('what the trip changes', () => {
+  /** Sends the pet out over and over, answering the prompt the same way. */
+  function forageRepeatedly(h: Harness, trips: number, answer: 'b' | 'c', until = () => false) {
+    for (let trip = 0; trip < trips && !until(); trip++) {
+      h.pet.stats.energy = 100
+      h.pet.sick = false
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, answer)
+    }
+    return h
+  }
+
+  it('fills the larder, and never past its cap', () => {
+    const h = forageRepeatedly(grownUp({ random: () => 0.3 }), 24, 'c')
+    const larder = h.app.larder
+    expect(Object.keys(larder).length).toBeGreaterThan(0)
+    for (const [id, count] of Object.entries(larder)) {
+      expect(count, id).toBeGreaterThan(0)
+      expect(count, id).toBeLessThanOrEqual(LARDER_CAP)
+    }
+  })
+
+  it('plants a seed on a pushed trip, and the yard starts it small', () => {
+    // Under the yard chance of 0.35, so a pushed trip brings a seed back.
+    const h = grownUp({ random: () => 0.3 })
+    forageRepeatedly(h, 16, 'b', () => h.app.planted.length > 0)
+    expect(h.app.planted.length).toBeGreaterThan(0)
+    const planting = h.app.planted[0]!
+    expect(planting.growth).toBe(0)
+    expect(VERGE_SLOTS).toContain(planting.x)
+  })
+
+  it('never plants more than the yard holds, or two things on one spot', () => {
+    const h = forageRepeatedly(grownUp({ random: () => 0.3 }), 40, 'b')
+    expect(h.app.planted.length).toBeLessThanOrEqual(YARD_CAPACITY)
+    expect(h.app.planted.length).toBeLessThanOrEqual(VERGE_SLOTS.length)
+    const spots = h.app.planted.map((p) => p.x)
+    expect(new Set(spots).size).toBe(spots.length)
+  })
+
+  it('keeps the yard when the pet is retired, since a garden outlives a life', () => {
+    const h = grownUp({ random: () => 0.3 })
+    forageRepeatedly(h, 16, 'b', () => h.app.planted.length > 0)
+    const planted = h.app.planted.length
+    expect(planted).toBeGreaterThan(0)
+    h.select('status').holdRetire()
+    h.tap('b')
+    expect(h.app.planted).toHaveLength(planted)
+  })
+
+  it('never befriends the same visitor twice', () => {
+    const h = forageRepeatedly(grownUp({ random: () => 0.3 }), 40, 'b')
+    expect(new Set(h.app.regulars).size).toBe(h.app.regulars.length)
+  })
+
+  it('leaves the pet no worse off than tired, however many trips it makes', () => {
+    const h = forageRepeatedly(grownUp({ random: () => 0.3 }), 30, 'b')
+    // Every stat still inside its bounds: a trip must never corrupt a stat.
+    for (const value of Object.values(h.pet.stats)) {
+      expect(value).toBeGreaterThanOrEqual(0)
+      expect(value).toBeLessThanOrEqual(100)
+    }
+  })
+})
+
+describe('the collection board', () => {
+  const withCurios = (curios: Record<string, number>) =>
+    harness({ save: { ...emptySave(), curios } }).start()
+
+  const cursorTo = (h: Harness, id: string) => {
+    h.select('status')
+    h.tap('a')
+    while (CURIOS[h.app.curioIndex]!.id !== id) h.tap('c')
+    return h
+  }
+
+  it('moves through the board both ways and wraps', () => {
+    const h = harness().start()
+    h.select('status')
+    h.tap('a')
+    expect(h.app.mode).toBe('curios')
+    h.tap('c')
+    expect(h.app.curioIndex).toBe(1)
+    h.tap('a').tap('a')
+    expect(h.app.curioIndex).toBe(CURIOS.length - 1)
+  })
+
+  it('reports the tally', () => {
+    expect(withCurios({ pebble: 3, feather: 1 }).app.curioTally).toEqual({ kinds: 2, total: 4 })
+    expect(withCurios({}).app.curioTally).toEqual({ kinds: 0, total: 0 })
+  })
+
+  it('reports which sets the lineage has completed', () => {
+    const stones = Object.fromEntries(
+      CURIOS.filter((c) => c.set === 'stones').map((c) => [c.id, 1]),
+    )
+    expect(withCurios(stones).app.boons).toEqual(['stones'])
+    expect(withCurios({}).app.boons).toEqual([])
+  })
+
+  it('offers the rarest missing thing as what spares would buy', () => {
+    const h = withCurios({ pebble: 5 })
+    expect(h.app.tradeFor).not.toBeNull()
+    expect(h.app.tradeFor!.id).not.toBe('pebble')
+  })
+
+  it('trades three spares for one of what the board is missing', () => {
+    const h = cursorTo(withCurios({ pebble: 5 }), 'pebble')
+    expect(h.app.canTrade).toBe(true)
+    const want = h.app.tradeFor!
+    h.clearCalls().tap('b')
+    expect(h.app.curioCounts.pebble).toBe(5 - TRADE_COST)
+    expect(h.app.curioCounts[want.id]).toBe(1)
+    expect(h.burstsFired()).toContain('sparkle')
+  })
+
+  it('refuses a trade the player cannot afford, and says what it would cost', () => {
+    const h = cursorTo(withCurios({ pebble: 2 }), 'pebble')
+    expect(h.app.canTrade).toBe(false)
+    h.clearCalls().tap('b')
+    expect(h.app.message).toContain(`NEEDS ${TRADE_COST + 1}`)
+    expect(h.app.curioCounts.pebble).toBe(2)
+  })
+
+  it('refuses a trade that would spend the last of a kind', () => {
+    const h = cursorTo(withCurios({ pebble: TRADE_COST }), 'pebble')
+    h.tap('b')
+    expect(h.app.curioCounts.pebble).toBe(TRADE_COST)
+  })
+
+  it('refuses a trade on a curio the board has none of', () => {
+    const h = cursorTo(withCurios({ pebble: 5 }), 'geode')
+    expect(h.app.canTrade).toBe(false)
+    h.tap('b')
+    expect(h.app.curioCounts.geode).toBeUndefined()
+  })
+
+  it('has nothing left to want once the board is complete', () => {
+    const full = Object.fromEntries(CURIOS.map((c) => [c.id, 5]))
+    const h = withCurios(full)
+    expect(h.app.tradeFor).toBeNull()
+    expect(h.app.canTrade).toBe(false)
+    h.select('status')
+    h.tap('a')
+    h.clearCalls().tap('b')
+    expect(h.app.message).toBe('NOTHING LEFT TO WANT')
+  })
+
+  it('saves a trade, so it survives the tab closing', () => {
+    const h = cursorTo(withCurios({ pebble: 5 }), 'pebble')
+    h.tap('b')
+    flushSave()
+    expect(h.stored()!.curios.pebble).toBe(5 - TRADE_COST)
+  })
+})

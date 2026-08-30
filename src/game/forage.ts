@@ -2,6 +2,7 @@ import { beat, type JourneyContext, type Leg } from '../data/journey'
 import { findCurio, type Curio } from '../data/curios'
 import { luckOf, type Ground } from '../data/grounds'
 import type { CurioSet } from '../data/curios'
+import { random } from '../engine/random'
 import type { Burst } from '../render/particles'
 import type { Stats } from './types'
 
@@ -259,8 +260,9 @@ export class Forage {
    */
   private say(leg: Leg): void {
     this.timer = BEAT_SECONDS
-    const ctx = this.ctx
-    if (!ctx) return
+    // Both are set by `begin`, and nothing tells a trip anything before it has
+    // begun, so a beat always has a world to happen in.
+    const ctx = this.ctx!
     let line = beat(leg, ctx)
     for (let tries = 0; tries < 5 && this.beats.includes(line); tries++) {
       line = beat(leg, ctx)
@@ -275,24 +277,23 @@ export class Forage {
    */
   private settle(): void {
     this.timer = BEAT_SECONDS
-    const ctx = this.ctx
-    const ground = this.ground
+    const ctx = this.ctx!
+    const ground = this.ground!
     const name = this.host.petName()
-    if (!ctx || !ground) return
 
     const extra = this.legs - 1
     // What the collection is worth. Every set makes the pet better at the job
     // that fills the board, so finishing one pays out every trip after it.
     const boons = this.host.boons()
     const mishapOdds = extra * MISHAP_PER_LEG * (boons.includes('stones') ? STONES_MISHAP : 1)
-    const mishap = Math.random() < mishapOdds ? pickMishap() : null
+    const mishap = random() < mishapOdds ? pickMishap() : null
     const bonus =
       (boons.includes('blooms') ? BLOOMS_LUCK : 0) + (boons.includes('weather') ? WEATHER_LUCK : 0)
     const luck = Math.min(
       0.95,
       luckOf(ground, ctx.season, ctx.weather) + extra * LUCK_PER_LEG + bonus,
     )
-    const curio = findCurio(ctx.season, ctx.weather, Math.random(), ground.favours, this.legs)
+    const curio = findCurio(ctx.season, ctx.weather, random(), ground.favours, this.legs)
 
     this.host.applyStats({ happiness: 6 })
     if (mishap) this.host.applyStats(mishap.effect)
@@ -300,7 +301,7 @@ export class Forage {
     // A deep trip can turn up something that changes the yard rather than the
     // board. Tried before the curio, and falls straight through to it when the
     // yard is full or there is nothing left to win over.
-    if (extra > 0 && !mishap?.spoils && Math.random() < YARD_CHANCE) {
+    if (extra > 0 && !mishap?.spoils && random() < YARD_CHANCE) {
       const brought = this.host.bringHome(this.legs)
       if (brought) {
         this.beats.push(
@@ -316,11 +317,11 @@ export class Forage {
     // Supplies are picked up on the way rather than looked for, so they ride
     // along with whatever the trip was actually about -- including a bad one.
     const supply =
-      !mishap?.spoils && Math.random() < SUPPLY_CHANCE
+      !mishap?.spoils && random() < SUPPLY_CHANCE
         ? this.host.gather(ground, this.legs)
         : null
 
-    const empty = mishap?.spoils || !curio || Math.random() >= luck
+    const empty = mishap?.spoils || !curio || random() >= luck
     if (empty) {
       const line = mishap ? mishap.line : 'comes home empty handed'
       this.beats.push(supply ? `${line}, but with ${supply}` : line)
@@ -342,4 +343,4 @@ export class Forage {
   }
 }
 
-const pickMishap = () => MISHAPS[Math.floor(Math.random() * MISHAPS.length)]!
+const pickMishap = () => MISHAPS[Math.floor(random() * MISHAPS.length)]!

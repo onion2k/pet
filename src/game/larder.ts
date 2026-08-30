@@ -49,7 +49,9 @@ export function findSupply(ground: GroundId, depth: number, roll: number): Suppl
     remaining -= supply.weight
     if (remaining <= 0) return supply
   }
-  return pool[pool.length - 1] ?? null
+  // As in `findCurio`: a positive total guarantees a non-empty pool, so a roll
+  // that walks off the end lands on the last of it.
+  return pool[pool.length - 1]!
 }
 
 /** The foraged foods the pet actually has some of, for the feed menu. */

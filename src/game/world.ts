@@ -62,8 +62,9 @@ export interface WorldState {
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
+/** Both call sites pass a real span, so there is no zero to divide by. */
 const smoothstep = (a: number, b: number, x: number) => {
-  const t = clamp01((x - a) / (b - a || 1))
+  const t = clamp01((x - a) / (b - a))
   return t * t * (3 - 2 * t)
 }
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
@@ -80,7 +81,12 @@ function hash(n: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
-function pickWeather(season: Season, roll: number): WeatherId {
+/**
+ * Which spell of weather a roll lands on. Exported so its edges can be pinned
+ * down: a season with no weather listed at all has to come out clear rather
+ * than undefined, since every caller paints a sky from the answer.
+ */
+export function pickWeather(season: Season, roll: number): WeatherId {
   const entries = Object.entries(season.weather) as [WeatherId, number][]
   const total = entries.reduce((sum, [, weight]) => sum + weight, 0)
   let remaining = roll * total

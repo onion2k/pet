@@ -684,6 +684,59 @@ three buttons and draws itself onto the same low-res HUD canvas.
 **Balance.** Every tuning number lives in `src/game/tuning.ts`. `TIME_SCALE`
 fast-forwards the whole simulation for playtesting.
 
+## Tests
+
+```bash
+npm test              # the whole suite, about a second
+npm run test:coverage # the same, with a coverage report
+npm run test:watch
+```
+
+`npm run build` typechecks, runs the suite, and only then emits `dist/`.
+
+The game is for children, so the failures that matter are not crashes but the
+quiet ones: a lost pet, a button that stops working, a screen with no way off
+it. Those take hours to reach by hand and seconds to reach in a harness, so
+almost everything is tested through one.
+
+**The seams.** Three things the game cannot be tested around are behind
+swappable implementations: `engine/random.ts` (every die the game rolls),
+`engine/clock.ts` (the wall clock) and the storage backend in `game/save.ts`. In
+play they are `Math.random`, `Date.now` and `localStorage`; under test they are
+a seeded generator, a clock wound by hand, and a plain object. Nothing else in
+`src/game` or `src/data` reaches for a global.
+
+**The harness** (`test/harness.ts`) is the whole game with the shell taken off.
+`App` already talks to the renderer through five callbacks and reads back two
+flags, so the harness drives that same interface: real button presses, real
+frames, a real save file, and no canvas anywhere. A pet's entire life runs in a
+few milliseconds, which is what makes it affordable to test the situations that
+actually worry a player rather than fragments of them — a weekend away, a night
+skipped, a game quit halfway, four thousand presses in a row.
+
+```ts
+const h = harness().start().growTo('adult')   // hatched, raised, grown up
+h.select('forage').tap('b')                    // sent out over the hill
+h.until('the prompt', () => h.app.forageChoosing)
+h.tap('b')                                     // pushed on one more leg
+```
+
+**What is covered.** `src/game`, `src/data` and the two engine seams are at 100%
+of statements, branches, functions and lines, enforced as a threshold rather
+than reported. `src/render` and `main.ts` are excluded: they are WebGL, canvas
+and DOM wiring, and a faked GL context would prove nothing about a shader while
+making the number a lie. The pure helpers that live among them are tested
+directly. Browser end-to-end tests are deliberately not here yet.
+
+Getting to 100% turned up two real bugs and a pile of defensive code that could
+not fire. The care streak compared elapsed milliseconds against local midnight,
+so anyone who played after about noon read as two days since yesterday and lost
+the streak they were building; it counts whole local days now. A save that was
+the right version but the wrong shape — truncated, hand-edited, written by a
+build since rolled back — went through migration untouched and crashed on the
+first frame that read the missing field; `load` now repairs one field by field,
+so the worst case is a lost setting rather than a lost pet.
+
 ## Layout
 
 ```
@@ -691,8 +744,12 @@ src/
   data/       voxel models, species graph, foods, pixel font, menu icons
   game/       simulation, save/migration, actions, branching metrics, minigames
   render/     ogl scene, voxel mesh builder, shell geometry, bloom, HUD canvas
-  engine/     input hit-testing, WebAudio beeper
+  engine/     input hit-testing, WebAudio beeper, the clock and dice seams
   ui/         screen drawing
+test/
+  harness.ts  the game driven by button presses, with no renderer
+  unit/       one module at a time
+  integration/ whole flows: a life, a day's care, a forage, getting around
 ```
 
 In dev builds `window.__pet` exposes `{ app, hud, shell, step, advance }` so the
