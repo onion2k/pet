@@ -139,7 +139,10 @@ const PACKS: Record<string, string[]> = {
 
 /** One beat of a trip, drawn from the leg, the ground, and the day it happened on. */
 export function beat(leg: Leg, ctx: JourneyContext): string {
-  const ground = BY_GROUND[ctx.ground][leg]
+  // A ground with no lines of its own -- a new one, or one a save names that
+  // this build does not know -- falls back to the shared pool rather than
+  // throwing. The trip is still told; it just does not name the place.
+  const ground = BY_GROUND[ctx.ground]?.[leg]
   const pool = [...(ground ?? BY_LEG[leg])]
   pool.push(...(BY_WEATHER[leg][ctx.weather] ?? []))
   if (ctx.night) pool.push(...AT_NIGHT[leg])

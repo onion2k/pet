@@ -3,7 +3,7 @@ import { chooseBranch, speciesOf, type BranchContext } from '../data/species'
 import type { SeasonId } from '../data/seasons'
 import { metrics } from './metrics'
 import { temperamentFrom, temperamentOf, withLineage } from './temperament'
-import type { PetState, Stats, StatKey } from './types'
+import type { PetState, Stage, Stats, StatKey } from './types'
 import { HEALTH_FLOOR, STAGE_DURATION } from './tuning'
 import { isNight } from './world'
 
@@ -122,21 +122,19 @@ export function readyToEvolve(pet: PetState): boolean {
   return pet.ageMs - stageStart >= duration
 }
 
-/** Cumulative age at which the pet entered its current stage. */
-function stageStartAge(pet: PetState): number {
-  switch (pet.stage) {
-    case 'egg':
-      return 0
-    case 'baby':
-      return STAGE_DURATION.egg
-    case 'child':
-      return STAGE_DURATION.egg + STAGE_DURATION.baby
-    case 'adult':
-      return STAGE_DURATION.egg + STAGE_DURATION.baby + STAGE_DURATION.child
-    default:
-      return Infinity
-  }
+/**
+ * Cumulative age at which the pet entered its current stage. A table rather
+ * than a switch: every stage has an answer, so there is no unreachable default
+ * for a reader to wonder about.
+ */
+const STAGE_START: Record<Stage, number> = {
+  egg: 0,
+  baby: STAGE_DURATION.egg,
+  child: STAGE_DURATION.egg + STAGE_DURATION.baby,
+  adult: STAGE_DURATION.egg + STAGE_DURATION.baby + STAGE_DURATION.child,
 }
+
+const stageStartAge = (pet: PetState): number => STAGE_START[pet.stage]
 
 /** Applies the earned branch, if any. Returns what happened so the UI can celebrate it. */
 export function evolve(pet: PetState, ctx: BranchContext): Evolution | null {

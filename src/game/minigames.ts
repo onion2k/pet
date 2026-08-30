@@ -2,6 +2,7 @@ import type { Hud } from '../render/hud'
 import type { ButtonId } from '../render/shell'
 import type { Burst } from '../render/particles'
 import type { SoundId } from '../engine/audio'
+import { random } from '../engine/random'
 
 export interface GameFeedback {
   sound: SoundId
@@ -70,7 +71,7 @@ const guessGame: Minigame = {
   create(): GameSession {
     let round = 0
     let wins = 0
-    let target: -1 | 1 = Math.random() < 0.5 ? -1 : 1
+    let target: -1 | 1 = random() < 0.5 ? -1 : 1
     let reveal = 0
     let lastCorrect = false
     let pick: -1 | 1 | 0 = 0
@@ -108,7 +109,7 @@ const guessGame: Minigame = {
           this.won = wins >= NEEDED
           return { sound: this.won ? 'win' : 'lose', burst: this.won ? 'star' : undefined }
         }
-        target = Math.random() < 0.5 ? -1 : 1
+        target = random() < 0.5 ? -1 : 1
         return null
       },
       draw(hud) {
@@ -148,7 +149,7 @@ const rhythmGame: Minigame = {
     let lastCorrect = false
 
     const nextRound = () => {
-      zoneCentre = 0.2 + Math.random() * 0.6
+      zoneCentre = 0.2 + random() * 0.6
       zoneWidth = Math.max(0.09, 0.22 - round * 0.025)
       speed = 1.1 + round * 0.28
       position = 0
@@ -257,7 +258,7 @@ const memoryGame: Minigame = {
     let resultTimer = 0
 
     const extend = () => {
-      sequence.push(buttons[Math.floor(Math.random() * 3)]!)
+      sequence.push(buttons[Math.floor(random() * 3)]!)
       showIndex = 0
       slotTimer = 0
       readyTimer = RECALL_READY
@@ -351,7 +352,8 @@ const memoryGame: Minigame = {
 
         // During playback the lamp is lit for RECALL_LIT of its slot, then dark.
         const playing = phase === 'show' && slotTimer > RECALL_GAP
-        const lit = playing ? (sequence[showIndex] ?? null) : phase === 'show' ? null : flash
+        // `playing` is only true mid-playback, where showIndex is in range.
+        const lit = playing ? sequence[showIndex]! : phase === 'show' ? null : flash
 
         const labels: ButtonId[] = ['a', 'b', 'c']
         labels.forEach((id, i) => {
