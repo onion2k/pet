@@ -70,18 +70,19 @@ export function temperamentOf(pet: PetState): Temperament | null {
 }
 
 /**
- * What a life is worth to the one after it, 0..1. Two things count: how well
- * the pet was kept, and how long it was allowed to be grown up. A pet retired
- * the moment it came of age passes on almost nothing however doted on, which is
- * what stops retiring being free.
+ * What a life is worth to the one after it, 0..1. Three things count: how well
+ * the pet was kept, how long it was allowed to be grown up, and how much of the
+ * world it saw. A pet retired the moment it came of age passes on almost
+ * nothing however doted on, which is what stops retiring being free -- so every
+ * term is gated on having lived.
  */
-export function legacyOf(pet: PetState): number {
+export function legacyOf(pet: PetState, explored = 0): number {
   const grownFor = Math.max(0, pet.ageMs - ADULT_FROM)
   const lived = Math.min(1, grownFor / FULL_LIFE)
   const kept = metrics(pet).care
   // No bonus for being an elder: reaching one already requires a full grown
   // life, so such a pet scores the maximum on the time alone.
-  return Math.min(1, lived * 0.6 + kept * lived * 0.4)
+  return Math.min(1, lived * 0.55 + kept * lived * 0.35 + explored * lived * 0.1)
 }
 
 /**

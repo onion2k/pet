@@ -18,6 +18,13 @@ export interface Food {
   color: string
   /** Shown under the icon on the feed menu. */
   note: string
+  /**
+   * Foraged rather than conjured. A gathered food is free and counts toward the
+   * diet like any other, but there is only ever as much of it as the pet has
+   * carried home -- so it appears on the menu when there is some and not
+   * otherwise.
+   */
+  gathered?: boolean
 }
 
 export const FOODS: Food[] = [
@@ -64,6 +71,35 @@ export const FOODS: Food[] = [
     effect: { hunger: 20, happiness: 28, health: -3, energy: 8 },
     color: '#ffb3d9',
     note: 'A proper treat.',
+  },
+  {
+    id: 'berries',
+    gathered: true,
+    served: 'cold',
+    name: 'Bramble Berries',
+    axis: 'sweet',
+    effect: { hunger: 16, happiness: 9 },
+    color: '#7a2f5e',
+    note: 'Brought home. Tart.',
+  },
+  {
+    id: 'roots',
+    gathered: true,
+    served: 'hot',
+    name: 'Wild Roots',
+    axis: 'veg',
+    effect: { hunger: 22, health: 7 },
+    color: '#c08a4a',
+    note: 'Brought home. Earthy.',
+  },
+  {
+    id: 'honeycomb',
+    gathered: true,
+    name: 'Honeycomb',
+    axis: 'sweet',
+    effect: { hunger: 18, happiness: 22, energy: 6 },
+    color: '#ffc94d',
+    note: 'Brought home. Worth it.',
   },
   {
     id: 'medicine',

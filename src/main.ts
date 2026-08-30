@@ -423,6 +423,8 @@ function step(dt: number): void {
     roam: { x: ROAM_HALF_X, z: ROAM_HALF_Z },
     door: { x: terrain.shape.shelter.lamp.x, z: terrain.shape.shelter.lamp.z },
     announce: (text) => app.pushTicker(text),
+    planted: app.planted,
+    regulars: app.regulars,
   })
   petView.setPlaything(visitors.playthingAt())
 
@@ -510,6 +512,13 @@ function frame(now: number): void {
 }
 
 requestAnimationFrame(frame)
+
+// The tab going away is the player going away: the app measures the absence
+// from here rather than from the last frame it happened to get, since a hidden
+// tab is still handed the occasional one.
+document.addEventListener('visibilitychange', () => {
+  app.setVisible(document.visibilityState === 'visible')
+})
 
 if (import.meta.env.DEV) {
   // Lets a test harness advance the game deterministically without waiting on

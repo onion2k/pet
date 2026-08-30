@@ -54,6 +54,12 @@ export interface Visitor {
   height: number
   motion: VisitorMotion
   spot: VisitorSpot
+  /**
+   * What to call it in a sentence, if the pet can win it over on a long trip --
+   * after which it turns up whenever its season does. Only the living ones: a
+   * sled cannot be befriended however far the pet walks.
+   */
+  friend?: string
 }
 
 const ball: VoxelModel = {
@@ -362,6 +368,7 @@ const fireflies: VoxelModel = {
 export const VISITORS: Visitor[] = [
   {
     id: 'fireflies',
+    friend: 'the fireflies',
     arrival: 'fireflies are out over the meadow',
     seasons: ['spring', 'summer'],
     chance: 0.5,
@@ -373,11 +380,11 @@ export const VISITORS: Visitor[] = [
     spot: 'roam',
   },
   { id: 'ball', arrival: 'a ball has turned up in the yard', seasons: ['summer', 'autumn'], chance: 0.5, model: ball, height: 0.44, motion: 'roll', spot: 'roam' },
-  { id: 'rabbit', arrival: 'a rabbit is grazing on the verge', seasons: ['spring', 'summer'], chance: 0.4, model: rabbit, height: 0.74, motion: 'hop', spot: 'verge' },
+  { id: 'rabbit', friend: 'a rabbit', arrival: 'a rabbit is grazing on the verge', seasons: ['spring', 'summer'], chance: 0.4, model: rabbit, height: 0.74, motion: 'hop', spot: 'verge' },
   { id: 'snowman', arrival: 'somebody has built a snowman', seasons: ['winter'], chance: 0.55, model: snowman, height: 1.4, motion: 'still', spot: 'verge' },
   { id: 'flowers', arrival: 'wildflowers have come up', seasons: ['spring'], chance: 0.65, model: flowers, height: 0.64, motion: 'still', spot: 'verge' },
   { id: 'pumpkin', arrival: 'a carved lantern sits by the door', seasons: ['autumn'], chance: 0.5, model: pumpkin, height: 0.64, motion: 'still', spot: 'door' },
-  { id: 'butterfly', arrival: 'a butterfly is doing the rounds', seasons: ['spring', 'summer'], chance: 0.45, model: butterfly, height: 0.32, motion: 'flutter', spot: 'roam' },
+  { id: 'butterfly', friend: 'a butterfly', arrival: 'a butterfly is doing the rounds', seasons: ['spring', 'summer'], chance: 0.45, model: butterfly, height: 0.32, motion: 'flutter', spot: 'roam' },
   { id: 'leafpile', arrival: 'the leaves have blown into a pile', seasons: ['autumn'], chance: 0.5, model: leafpile, height: 0.44, motion: 'still', spot: 'verge' },
   { id: 'sled', arrival: 'a sled has been left out', seasons: ['winter'], chance: 0.4, model: sled, height: 0.42, motion: 'still', spot: 'verge' },
 ]

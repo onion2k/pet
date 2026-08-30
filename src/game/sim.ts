@@ -1,6 +1,10 @@
 import { temperamentOf } from './temperament'
 import type { PetState, Stats, StatKey } from './types'
 import {
+  AWAY_FLOOR,
+  AWAY_FULL_RATE_MS,
+  AWAY_HEALTH_FLOOR,
+  AWAY_SLOW_PACE,
   CATCHUP_CHUNK_MS,
   COMFORTABLE,
   CRITICAL,
@@ -13,6 +17,7 @@ import {
   RECOVERED_THRESHOLD,
   SICK_THRESHOLD,
   TIME_SCALE,
+  WARM_NIGHT,
 } from './tuning'
 
 const HOUR = 3_600_000
@@ -63,6 +68,10 @@ function clampStats(stats: Stats): void {
 /**
  * Advance one pet by `elapsedMs` of wall-clock time. Called both for live frames
  * and, in chunks, for catching up on time spent with the app closed.
+ *
+ * `pace` scales how much of that time the pet's body actually feels; the
+ * offline catch-up winds it down over a long absence. Age is deliberately left
+ * out of it -- the pet grows at wall-clock speed however slowly it is living.
  */
 function step(
   pet: PetState,
@@ -70,16 +79,23 @@ function step(
   at: number,
   isDay: Daylight,
   age = true,
+  pace = 1,
 ): void {
-  const hours = (elapsedMs * TIME_SCALE) / HOUR
-  const seconds = (elapsedMs * TIME_SCALE) / 1000
+  const hours = (elapsedMs * TIME_SCALE * pace) / HOUR
+  const seconds = (elapsedMs * TIME_SCALE * pace) / 1000
   const rates = pet.asleep ? DECAY_ASLEEP : DECAY_AWAKE
   const { stats } = pet
 
   // The egg has no metabolism — it just waits to hatch.
   if (pet.stage !== 'egg') {
     const bias = decayBias(pet)
-    for (const key of DRAINING_KEYS) stats[key] += rates[key] * hours * bias[key]
+    // A fire banked for the night slows what the night takes. It does nothing
+    // for the rest that sleep already gives, only for what it costs.
+    const warmth = pet.asleep && pet.warm ? WARM_NIGHT : 1
+    for (const key of DRAINING_KEYS) {
+      const rate = rates[key]
+      stats[key] += rate * hours * bias[key] * (rate < 0 ? warmth : 1)
+    }
   }
   clampStats(stats)
 
@@ -104,16 +120,25 @@ function step(
     pet.sick = false
   }
 
-  if (suffering) pet.care.neglectSeconds += seconds
-  else if (DRAINING_KEYS.every((k) => stats[k] >= COMFORTABLE)) {
-    pet.care.thrivingSeconds += seconds
+  // How the pet was raised is a record of the time you were there for, plus the
+  // first few hours of any absence. Past that the counters stop: a weekend away
+  // still tells on the pet's condition, but it is not held against its
+  // upbringing, and it cannot swamp a lifetime of care in one night.
+  if (pace >= 1) {
+    if (suffering) pet.care.neglectSeconds += seconds
+    else if (DRAINING_KEYS.every((k) => stats[k] >= COMFORTABLE)) {
+      pet.care.thrivingSeconds += seconds
+    }
+    if (exhausted && !pet.asleep) pet.sleep.overtiredSeconds += seconds
   }
-  if (exhausted && !pet.asleep) pet.sleep.overtiredSeconds += seconds
 
   if (age) pet.ageMs += elapsedMs * TIME_SCALE
   // A sleeping pet wakes itself once it is rested and the sun is up — sleeping
   // off a full night should end at dawn, not in the small hours.
-  if (pet.asleep && stats.energy >= 100 && isDay(at)) pet.asleep = false
+  if (pet.asleep && stats.energy >= 100 && isDay(at)) {
+    pet.asleep = false
+    pet.warm = false
+  }
 }
 
 /**
@@ -125,6 +150,18 @@ function step(
  */
 export function sleepThrough(pet: PetState, hours: number): void {
   step(pet, (hours * HOUR) / TIME_SCALE, 0, NEVER, false)
+}
+
+/**
+ * Softens an offline chunk. A stat may fall to the away floor and no further,
+ * but is never lifted above where the chunk found it -- so this cushions an
+ * absence without ever handing back stats the pet had already spent.
+ */
+function cushion(stats: Stats, before: Stats): void {
+  for (const key of DRAINING_KEYS) {
+    stats[key] = Math.max(stats[key], Math.min(before[key], AWAY_FLOOR))
+  }
+  stats.health = Math.max(stats.health, Math.min(before.health, AWAY_HEALTH_FLOOR))
 }
 
 /** How much of the away time actually got simulated, for the welcome-back message. */
@@ -146,25 +183,33 @@ export function reconcile(pet: PetState, now: number, isDay: Daylight): CatchUp 
   let simulated = 0
   for (let i = 0; i < chunks; i++) {
     const slice = Math.min(CATCHUP_CHUNK_MS, awayMs - simulated)
+    // The first hours away are lived at full rate; after that the pet paces
+    // itself, so being gone overnight is a setback rather than a disaster.
+    const pace = simulated < AWAY_FULL_RATE_MS ? 1 : AWAY_SLOW_PACE
+    const before = { ...pet.stats }
     simulated += slice
     // Each chunk is tested at its own moment, so a pet left asleep still wakes
     // at the dawn it would have woken at rather than sleeping through the lot.
-    step(pet, slice, pet.lastTick + simulated, isDay)
+    step(pet, slice, pet.lastTick + simulated, isDay, true, pace)
+    cushion(pet.stats, before)
   }
   pet.lastTick = now
   return { awayMs, simulatedMs: simulated, truncated: wanted > chunks }
 }
 
-/** Advance the live simulation. Call once per animation frame. */
-export function tick(pet: PetState, now: number, isDay: Daylight): void {
+/**
+ * Advance the live simulation. Call once per animation frame. Returns the
+ * catch-up when the gap was big enough to have been an absence -- a suspended
+ * tab, a shut laptop -- so the caller can welcome the player back instead of
+ * silently swallowing the missing hours.
+ */
+export function tick(pet: PetState, now: number, isDay: Daylight): CatchUp | null {
   const elapsed = Math.max(0, now - pet.lastTick)
   // A tab that was backgrounded for a while goes through the chunked path instead.
-  if (elapsed > CATCHUP_CHUNK_MS) {
-    reconcile(pet, now, isDay)
-    return
-  }
+  if (elapsed > CATCHUP_CHUNK_MS) return reconcile(pet, now, isDay)
   step(pet, elapsed, now, isDay)
   pet.lastTick = now
+  return null
 }
 
 /** 0..1 wellbeing, used to pick idle animations and drive the mood lighting. */

@@ -1,7 +1,8 @@
 import type { PetState, SaveFile } from './types'
+import { emptyYard } from './yard'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 5
 
 /**
  * Migrations run in order for every version below the current one. Adding a
@@ -23,6 +24,11 @@ const MIGRATIONS: Record<number, (raw: any) => any> = {
     counters: { sessions: 0, retirements: 0 },
     shell: 'plum',
   }),
+  // 3 -> 4 adds the yard: what the pet has planted and what it has befriended.
+  // An existing save starts with an empty one, which is where it already was.
+  3: (raw) => ({ ...raw, yard: { plantings: [], strays: [] } }),
+  // 4 -> 5 adds the larder. Nothing has been foraged yet, so it starts bare.
+  4: (raw) => ({ ...raw, larder: {} }),
 }
 
 export function newPet(name: string, now: number): PetState {
@@ -57,6 +63,8 @@ export function emptySave(): SaveFile {
     streak: { days: 0, lastDay: '' },
     counters: { sessions: 0, retirements: 0 },
     shell: 'plum',
+    yard: emptyYard(),
+    larder: {},
   }
 }
 

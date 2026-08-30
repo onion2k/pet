@@ -1,4 +1,6 @@
 import type { TemperamentId } from './temperament'
+import type { Larder } from './larder'
+import type { YardState } from './yard'
 /** All persistent game state. Anything not in here is derived or ephemeral. */
 
 export type StatKey = 'hunger' | 'happiness' | 'energy' | 'hygiene' | 'health'
@@ -73,6 +75,11 @@ export interface PetState {
   asleep: boolean
   sick: boolean
   care: CareRecord
+  /**
+   * Sleeping by a banked fire. Set when the pet turns in with kindling to
+   * spend, cleared when it wakes, and the reason a warm night costs it less.
+   */
+  warm?: boolean
   diet: DietRecord
   play: PlayRecord
   sleep: SleepRecord
@@ -114,4 +121,8 @@ export interface SaveFile {
   counters: { sessions: number; retirements: number }
   /** Shell colour id. */
   shell: string
+  /** What has been planted and befriended. Outlives the pet that brought it home. */
+  yard: YardState
+  /** Foraged food and fuel, id -> count. The adult's supply line. */
+  larder: Larder
 }
