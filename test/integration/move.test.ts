@@ -104,6 +104,66 @@ describe('moving', () => {
     expect(h.app.biome.id).toBe('woodland')
   })
 
+  it('walks the pet back on once it is over, which is easy to forget', () => {
+    // This is the bug that shipped. Moving covers a very long frame by sending
+    // the pet off out of sight, and `walkOff` is documented as one-way: the pet
+    // keeps going until it vanishes and only `resetPosition` brings the stage
+    // back. The move finished perfectly and left an empty yard.
+    //
+    // Nothing here can see a mesh, so what is asserted is the promise the
+    // renderer is held to: every departure that is not a retirement is answered
+    // by an arrival.
+    const h = moveTo(grownUp(), 'woodland')
+    const departures = h.calls.filter((c) => c.kind === 'depart').length
+    const arrivals = h.calls.filter((c) => c.kind === 'arrive').length
+    expect(departures).toBe(1)
+    expect(arrivals).toBe(1)
+  })
+
+  it('does not bring the pet back before the ground is ready for it', () => {
+    const h = grownUp()
+    h.select('status')
+    h.holdMove()
+    h.tap('c')
+    h.tap('b')
+    h.frames(2)
+    expect(h.calls.some((c) => c.kind === 'depart')).toBe(true)
+    expect(h.calls.some((c) => c.kind === 'arrive')).toBe(false)
+    h.advance(3)
+    expect(h.calls.some((c) => c.kind === 'arrive')).toBe(true)
+  })
+
+  it('leaves a retiring pet walked off, since that one is meant to be one-way', () => {
+    const h = grownUp()
+    h.select('status').holdRetire()
+    h.advance(4)
+    expect(h.calls.some((c) => c.kind === 'depart')).toBe(true)
+    expect(h.calls.some((c) => c.kind === 'arrive')).toBe(false)
+  })
+
+  it('brings the pet back once per move, however many moves there are', () => {
+    const h = grownUp()
+    moveTo(h, 'woodland')
+    moveTo(h, 'beach')
+    moveTo(h, 'meadow')
+    const departures = h.calls.filter((c) => c.kind === 'depart').length
+    const arrivals = h.calls.filter((c) => c.kind === 'arrive').length
+    expect(departures).toBe(3)
+    expect(arrivals).toBe(3)
+  })
+
+  it('does not send the pet anywhere when the move is refused', () => {
+    const h = grownUp()
+    h.pet.stats.energy = 5
+    h.select('status')
+    h.holdMove()
+    h.tap('c')
+    h.tap('b')
+    h.advance(3)
+    expect(h.calls.some((c) => c.kind === 'depart')).toBe(false)
+    expect(h.app.biome.id).toBe('meadow')
+  })
+
   it('takes the pet out of sight while the new ground is built', () => {
     const h = grownUp()
     h.select('status')

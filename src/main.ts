@@ -179,6 +179,7 @@ const app = new App({
     petView.setModel(speciesOf(speciesId).model, animate)
   },
   depart: () => petView.walkOff(),
+  arrive: () => petView.resetPosition(),
 })
 beeper.setMuted(app.muted)
 

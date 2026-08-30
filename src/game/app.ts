@@ -139,8 +139,14 @@ export interface AppHooks {
   pop(strength?: number): void
   /** Called when the pet's form changes so the renderer can swap geometry. */
   form(speciesId: string, animate: boolean): void
-  /** Called when a pet retires, so the renderer can walk it off into the meadow. */
+  /** Called when a pet retires, or moves house, so the renderer can walk it off. */
   depart(): void
+  /**
+   * Called when a pet that walked off is due back -- after a move. Every
+   * `depart` that is not a retirement has to be answered by one of these, or
+   * the pet keeps walking until it vanishes and never returns.
+   */
+  arrive(): void
 }
 
 export class App {
@@ -1202,7 +1208,9 @@ export class App {
     const leaving = this.biome
     this.save.home = biome.id
     const left = gardenAt(this.save.yard, leaving.id).length
-    this.hooks.form(this.living.speciesId, false)
+    // The pet walked off to cover the rebuild; this is what walks it back on.
+    // Without it the move finishes perfectly and the yard is simply empty.
+    this.hooks.arrive()
     this.hooks.sound('confirm')
     this.pushTicker(`${this.living.name} has moved to ${biome.name.toLowerCase()}`)
     // Only said when there was something to leave. A player who never planted
