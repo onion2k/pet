@@ -19,6 +19,21 @@ export type VisitorId =
   | 'butterfly'
   | 'leafpile'
   | 'sled'
+  | 'moth'
+  | 'glowworms'
+  | 'deer'
+  | 'bluebells'
+
+/**
+ * The jobs a living visitor does, so a biome can fill them with its own.
+ *
+ * Objects are not in here: a ball is a ball wherever the pet lives, and a sled
+ * is left out by whoever leaves sleds out. It is the creatures and the flowers
+ * that make one place feel unlike another, and two of these roles carry a yard
+ * game -- which is the point. A game asks for a role rather than for a named
+ * visitor, so every biome can play all five while none of them looks alike.
+ */
+export type VisitorRole = 'flitter' | 'glow' | 'grazer' | 'bloom'
 
 /** How a visitor moves, if at all. */
 export type VisitorMotion = 'still' | 'hop' | 'flutter' | 'roll'
@@ -365,11 +380,103 @@ const fireflies: VoxelModel = {
   layers: [rows(`g`)],
 }
 
+const moth: VoxelModel = {
+  palette: { b: '#4a4038', w: '#cfc4a8', m: '#9c8f74' },
+  layers: [
+    rows(`
+      ..b..
+      ..b..
+      ..b..`),
+    rows(`
+      ww.ww
+      mm.mm
+      .....`),
+  ],
+}
+
+const glowworms: VoxelModel = {
+  palette: { g: '#b6ff9a' },
+  emissive: ['g'],
+  layers: [rows(`g`)],
+}
+
+const deer: VoxelModel = {
+  palette: { b: '#a97e4f', t: '#c9a273', k: '#1b1720', h: '#6f523a' },
+  layers: [
+    rows(`
+      .....
+      .b.b.
+      .....
+      .b.b.
+      .....`),
+    rows(`
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.`),
+    rows(`
+      .ttt.
+      ttttt
+      ttttt
+      ttttt
+      .ttt.`),
+    rows(`
+      .....
+      ..b..
+      ..b..
+      .bbb.
+      .....`),
+    rows(`
+      .....
+      .....
+      .....
+      .bbb.
+      .kbk.`),
+    rows(`
+      .....
+      .....
+      .....
+      h...h
+      .....`),
+  ],
+}
+
+const bluebells: VoxelModel = {
+  palette: { g: '#3f7f3a', w: '#356f30', b: '#7d8ce8', v: '#9a86e0' },
+  layers: [
+    rows(`
+      .....
+      .g.g.
+      ..g..
+      .g.g.
+      .....`),
+    rows(`
+      .....
+      .w.w.
+      ..w..
+      .w.w.
+      .....`),
+    rows(`
+      .....
+      .b.v.
+      ..w..
+      .v.b.
+      .....`),
+    rows(`
+      .....
+      .....
+      ..b..
+      .....
+      .....`),
+  ],
+}
+
 export const VISITORS: Visitor[] = [
   {
     id: 'fireflies',
     friend: 'the fireflies',
-    arrival: 'fireflies are out over the meadow',
+    arrival: 'fireflies are out over the long grass',
     seasons: ['spring', 'summer'],
     chance: 0.5,
     hours: [20, 4],
@@ -387,4 +494,33 @@ export const VISITORS: Visitor[] = [
   { id: 'butterfly', friend: 'a butterfly', arrival: 'a butterfly is doing the rounds', seasons: ['spring', 'summer'], chance: 0.45, model: butterfly, height: 0.32, motion: 'flutter', spot: 'roam' },
   { id: 'leafpile', arrival: 'the leaves have blown into a pile', seasons: ['autumn'], chance: 0.5, model: leafpile, height: 0.44, motion: 'still', spot: 'verge' },
   { id: 'sled', arrival: 'a sled has been left out', seasons: ['winter'], chance: 0.4, model: sled, height: 0.42, motion: 'still', spot: 'verge' },
+  {
+    id: 'glowworms',
+    friend: 'the glow-worms',
+    arrival: 'glow-worms are lit along the bank',
+    seasons: ['spring', 'summer'],
+    chance: 0.5,
+    hours: [20, 4],
+    expected: 'something will be out after dark',
+    model: glowworms,
+    height: 0.14,
+    motion: 'flutter',
+    spot: 'roam',
+  },
+  { id: 'moth', friend: 'a moth', arrival: 'a moth is blundering about', seasons: ['spring', 'summer'], chance: 0.45, model: moth, height: 0.32, motion: 'flutter', spot: 'roam' },
+  { id: 'deer', friend: 'a deer', arrival: 'a deer has come down to the clearing', seasons: ['spring', 'summer'], chance: 0.4, model: deer, height: 1.1, motion: 'hop', spot: 'verge' },
+  { id: 'bluebells', arrival: 'the bluebells are out', seasons: ['spring'], chance: 0.65, model: bluebells, height: 0.64, motion: 'still', spot: 'verge' },
+]
+
+/**
+ * The ones that turn up wherever the pet lives. Everything else is a role its
+ * biome fills, so moving house changes who is out there without ever changing
+ * what there is to do.
+ */
+export const UNIVERSAL_VISITORS: VisitorId[] = [
+  'ball',
+  'snowman',
+  'pumpkin',
+  'leafpile',
+  'sled',
 ]

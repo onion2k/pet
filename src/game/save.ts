@@ -1,9 +1,10 @@
 import type { PetState, SaveFile } from './types'
+import { BIOMES, knownBiome, type BiomeId } from '../data/biome'
 import type { PlayAxis } from '../data/yardgames'
-import { emptyYard } from './yard'
+import { emptyYard, type Planting } from './yard'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 /**
  * The slice of `localStorage` the save needs, behind a seam. A test supplies a
@@ -121,6 +122,17 @@ const MIGRATIONS: Record<number, (raw: any) => any> = {
     ...raw,
     pet: raw.pet ? { ...raw.pet, play: { ...raw.pet.play, byAxis: emptyPlayAxes() } } : raw.pet,
   }),
+  // 6 -> 7 lets the family move house. Everyone who already has a pet has been
+  // living in the meadow, so that is where their garden stays -- the yard's one
+  // flat list of plantings becomes the meadow's, and every other place is bare.
+  6: (raw) => ({
+    ...raw,
+    home: 'meadow',
+    yard: {
+      gardens: { meadow: raw.yard?.plantings ?? [] },
+      strays: raw.yard?.strays ?? [],
+    },
+  }),
 }
 
 /** A pet that has never been played with out in the yard. */
@@ -158,6 +170,7 @@ export function emptySave(): SaveFile {
     streak: { days: 0, lastDay: '' },
     counters: { sessions: 0, retirements: 0 },
     shell: 'plum',
+    home: 'meadow',
     yard: emptyYard(),
     larder: {},
   }
@@ -174,6 +187,17 @@ const bool = (v: unknown, fallback: boolean): boolean =>
 const arr = <T>(v: unknown, fallback: T[]): T[] => (Array.isArray(v) ? (v as T[]) : fallback)
 const rec = <T>(v: unknown, fallback: Record<string, T>): Record<string, T> =>
   isRecord(v) ? (v as Record<string, T>) : fallback
+
+/** The plantings at one place, dropping anything that is not a list of them. */
+const gardens = (v: unknown): Partial<Record<BiomeId, Planting[]>> => {
+  if (!isRecord(v)) return {}
+  const out: Partial<Record<BiomeId, Planting[]>> = {}
+  for (const biome of BIOMES) {
+    const found = v[biome.id]
+    if (Array.isArray(found)) out[biome.id] = found as Planting[]
+  }
+  return out
+}
 
 /**
  * Fills in anything a hand-edited or half-written save is missing.
@@ -205,7 +229,8 @@ function repair(data: Record<string, unknown>): SaveFile {
       retirements: num(counters.retirements, 0),
     },
     shell: str(data.shell, base.shell),
-    yard: { plantings: arr(yard.plantings, []), strays: arr(yard.strays, []) },
+    home: knownBiome(data.home),
+    yard: { gardens: gardens(yard.gardens), strays: arr(yard.strays, []) },
     larder: rec(data.larder, base.larder),
   }
 }

@@ -1,5 +1,5 @@
 import { blend, pick } from './voice'
-import type { GroundId } from './grounds'
+import type { GroundRole } from './grounds'
 import type { SeasonId, WeatherId } from './seasons'
 
 /**
@@ -17,7 +17,10 @@ import type { SeasonId, WeatherId } from './seasons'
 export type Leg = 'out' | 'middle' | 'home'
 
 export interface JourneyContext {
-  ground: GroundId
+  /** Which of the four jobs the ground does. Its lines are written per role. */
+  role: GroundRole
+  /** The ground itself, lower case, to slot into the role's lines. */
+  place: string
   season: SeasonId
   weather: WeatherId
   night: boolean
@@ -52,30 +55,35 @@ const HOME = [
 const BY_LEG: Record<Leg, string[]> = { out: OUT, middle: MIDDLE, home: HOME }
 
 /**
- * Where it actually went. The ground's own lines replace the generic pool
- * rather than joining it, so a trip to the creek always reads as a trip to the
- * creek -- having chosen where to send it, the player should be told it went.
+ * Where it actually went. The role's own lines replace the generic pool rather
+ * than joining it, so a trip to a wet ground always reads as a wet trip --
+ * having chosen where to send it, the player should be told it went.
+ *
+ * These are written per role rather than per ground so that a new biome costs
+ * four names rather than a fresh set of journey lines. `{place}` is filled with
+ * the ground's own, which is what keeps the creek and the streambed distinct
+ * where it matters: at the moment the pet sets off for one of them.
  */
-const BY_GROUND: Record<GroundId, Partial<Record<Leg, string[]>>> = {
-  wall: {
-    out: ['goes no further than the old wall', 'ambles down to the old wall'],
-    middle: ['works along the foot of the wall', 'pokes about in the loose stones'],
-    home: ['is back before you can miss it', 'wanders home along the wall'],
+const BY_ROLE: Record<GroundRole, Partial<Record<Leg, string[]>>> = {
+  near: {
+    out: ['goes no further than {place}', 'ambles down to {place}'],
+    middle: ['works along the foot of it', 'pokes about in the loose stones'],
+    home: ['is back before you can miss it', 'wanders home the short way'],
   },
-  creek: {
-    out: ['heads down to the creek', 'follows the water downhill'],
+  wet: {
+    out: ['heads down to {place}', 'follows the water downhill'],
     middle: ['wades in up to its knees', 'turns over the wet stones'],
     home: ['comes up dripping from the water', 'squelches back up the bank'],
   },
-  hollow: {
-    out: ['drops down into the hollow', 'picks its way into the hollow'],
+  sheltered: {
+    out: ['drops down into {place}', 'picks its way into {place}'],
     middle: ['rummages under the leaf mould', 'goes where the light does not'],
-    home: ['climbs back out of the hollow', 'comes up out of the dark'],
+    home: ['climbs back out into the open', 'comes up out of the dark'],
   },
-  hill: {
-    out: ['starts the long climb', 'sets off up the hill'],
+  far: {
+    out: ['starts the long climb to {place}', 'sets off for {place}'],
     middle: ['stops at the top to look at it all', 'follows the ridge a good way'],
-    home: ['comes down the hill at a trot', 'freewheels most of the way home'],
+    home: ['comes down at a trot', 'freewheels most of the way home'],
   },
 }
 
@@ -139,13 +147,14 @@ const PACKS: Record<string, string[]> = {
 
 /** One beat of a trip, drawn from the leg, the ground, and the day it happened on. */
 export function beat(leg: Leg, ctx: JourneyContext): string {
-  // A ground with no lines of its own -- a new one, or one a save names that
-  // this build does not know -- falls back to the shared pool rather than
-  // throwing. The trip is still told; it just does not name the place.
-  const ground = BY_GROUND[ctx.ground]?.[leg]
-  const pool = [...(ground ?? BY_LEG[leg])]
+  // A role with no lines for this leg -- and any role a save names that this
+  // build does not know -- falls back to the shared pool rather than throwing.
+  // The trip is still told; it just does not name the place.
+  const role = BY_ROLE[ctx.role]?.[leg]
+  const pool = [...(role ?? BY_LEG[leg])]
   pool.push(...(BY_WEATHER[leg][ctx.weather] ?? []))
   if (ctx.night) pool.push(...AT_NIGHT[leg])
   if (leg === 'middle') pool.push(...(BY_SEASON[ctx.season] ?? []))
-  return leg === 'middle' ? blend(pool, PACKS[ctx.speciesId]) : pick(pool)
+  const line = leg === 'middle' ? blend(pool, PACKS[ctx.speciesId]) : pick(pool)
+  return line.replace('{place}', ctx.place)
 }

@@ -1,5 +1,5 @@
 import type { WeatherId } from './seasons'
-import type { VisitorId } from './visitors'
+import type { VisitorId, VisitorRole } from './visitors'
 import type { Stage } from '../game/types'
 
 /**
@@ -26,10 +26,23 @@ export type YardGameId = 'fetch' | 'chase' | 'dive' | 'hill' | 'catch'
  */
 export type PlayAxis = 'chase' | 'romp' | 'quiet'
 
+/**
+ * What has to be out there for a game to be on the menu: either one particular
+ * thing, or whoever fills a role here.
+ *
+ * Three of the five are already scarce by season -- leaves in autumn, a sled in
+ * winter, something flitting in spring and summer. Gating them by place as well
+ * would leave a player with a healthy adult and nothing to do, so a game that
+ * wants a creature asks for the *role* and lets the biome say who fills it. The
+ * wood has a moth where the meadow has a butterfly, and CHASE is playable in
+ * both. It is the same trick the props play with their palette characters.
+ */
+export type YardGameNeed = { visitor: VisitorId } | { role: VisitorRole }
+
 export interface YardGame {
   id: YardGameId
   /** What has to be in the yard for this to be on the menu. */
-  visitor: VisitorId
+  needs: YardGameNeed
   title: string
   /** Shown under the title, in the feed and forage menus' voice. */
   note: string
@@ -47,7 +60,7 @@ export interface YardGame {
 export const YARD_GAMES: YardGame[] = [
   {
     id: 'fetch',
-    visitor: 'ball',
+    needs: { visitor: 'ball' },
     title: 'FETCH',
     note: 'Send it, and call it back.',
     hint: 'B TO WIND UP',
@@ -58,7 +71,7 @@ export const YARD_GAMES: YardGame[] = [
   },
   {
     id: 'chase',
-    visitor: 'butterfly',
+    needs: { role: 'flitter' },
     title: 'CHASE',
     note: 'It will not sit still.',
     hint: 'A/C MOVE',
@@ -71,7 +84,7 @@ export const YARD_GAMES: YardGame[] = [
   },
   {
     id: 'dive',
-    visitor: 'leafpile',
+    needs: { visitor: 'leafpile' },
     title: 'DIVE IN',
     note: 'Best while they are dry.',
     hint: 'A/B/C PICK',
@@ -82,7 +95,7 @@ export const YARD_GAMES: YardGame[] = [
   },
   {
     id: 'hill',
-    visitor: 'sled',
+    needs: { visitor: 'sled' },
     title: 'THE HILL',
     note: 'A climb, then the quick way down.',
     hint: 'A/C STEER',
@@ -93,7 +106,7 @@ export const YARD_GAMES: YardGame[] = [
   },
   {
     id: 'catch',
-    visitor: 'fireflies',
+    needs: { role: 'glow' },
     title: 'CATCH THEM',
     note: 'Only while they are out.',
     hint: 'A/B/C CATCH',
@@ -105,6 +118,10 @@ export const YARD_GAMES: YardGame[] = [
     axis: 'quiet',
   },
 ]
+
+/** Who this game needs in the yard, given who fills each role where the pet lives. */
+export const visitorFor = (game: YardGame, roles: Record<VisitorRole, VisitorId>): VisitorId =>
+  'visitor' in game.needs ? game.needs.visitor : roles[game.needs.role]
 
 export const yardGameById = (id: YardGameId): YardGame => {
   const found = YARD_GAMES.find((g) => g.id === id)

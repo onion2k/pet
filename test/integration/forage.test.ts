@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { harness, type Harness } from '../harness'
 import { emptySave, flushSave } from '../../src/game/save'
-import { GROUNDS } from '../../src/data/grounds'
+import { MEADOW_GROUNDS } from '../../src/data/grounds'
 import { LARDER_CAP } from '../../src/game/larder'
 import { YARD_CAPACITY } from '../../src/game/yard'
 import { VERGE_SLOTS } from '../../src/data/biome'
@@ -42,9 +42,17 @@ function grownUp(options: Parameters<typeof harness>[0] = {}): Harness {
 /** Sends the pet to a named ground, whatever the cursor was on. */
 function sendTo(h: Harness, ground: string): Harness {
   h.select('forage')
-  while (h.app.grounds[h.app.groundIndex]!.id !== ground) h.tap('c')
-  h.tap('b')
-  return h
+  // Bounded rather than looped until it matches: a ground the pet cannot
+  // actually be sent to -- one belonging to somewhere it does not live -- used
+  // to spin here until the heap gave out instead of failing the test.
+  for (let step = 0; step < h.app.grounds.length; step++) {
+    if (h.app.grounds[h.app.groundIndex]!.id === ground) {
+      h.tap('b')
+      return h
+    }
+    h.tap('c')
+  }
+  throw new Error(`no ${ground} on this menu`)
 }
 
 describe('the grounds menu', () => {
@@ -63,7 +71,7 @@ describe('the grounds menu', () => {
   })
 
   it('offers an adult every ground', () => {
-    expect(grownUp().app.grounds).toEqual(GROUNDS)
+    expect(grownUp().app.grounds).toEqual(MEADOW_GROUNDS)
   })
 
   it('has no grounds to offer when there is no pet', () => {
@@ -100,13 +108,13 @@ describe('the grounds menu', () => {
     h.tap('c')
     expect(h.app.groundIndex).toBe(1)
     h.tap('a').tap('a')
-    expect(h.app.groundIndex).toBe(GROUNDS.length - 1)
+    expect(h.app.groundIndex).toBe(MEADOW_GROUNDS.length - 1)
   })
 
   it('clamps the cursor when a shorter menu is opened', () => {
     const h = grownUp()
     h.select('forage')
-    while (h.app.groundIndex !== GROUNDS.length - 1) h.tap('c')
+    while (h.app.groundIndex !== h.app.grounds.length - 1) h.tap('c')
     h.holdBack()
     // A younger pet has one ground; the cursor must not point past it.
     h.pet.stage = 'child'
@@ -153,7 +161,7 @@ describe('a trip', () => {
   })
 
   it('comes home, from every ground, on any dice', () => {
-    for (const ground of GROUNDS) {
+    for (const ground of MEADOW_GROUNDS) {
       for (let seed = 0; seed < 4; seed++) {
         const h = grownUp({ random: seed })
         sendTo(h, ground.id)

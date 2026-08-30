@@ -10,13 +10,13 @@ import {
   type Prospect,
 } from '../../src/data/grounds'
 import { foodById, FOODS } from '../../src/data/foods'
-import { YARD_GAMES } from '../../src/data/yardgames'
+import { visitorFor, YARD_GAMES } from '../../src/data/yardgames'
 import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
 import { PLAY_MIN_ENERGY } from '../../src/game/app'
 import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
 import { blend, EGG_LINES, pick, SICK_LINE, voice } from '../../src/data/voice'
 import { GROWTH_STAGES, plantById, PLANTS } from '../../src/data/plants'
-import { VISITORS } from '../../src/data/visitors'
+import { VISITORS, type VisitorRole } from '../../src/data/visitors'
 import { SHELLS, shellById } from '../../src/data/shells'
 import { ICON_LABEL, ICON_ORDER, ICON_SIZE, iconRows } from '../../src/data/icons'
 import { glyph, textWidth } from '../../src/data/font'
@@ -66,24 +66,47 @@ describe('grounds', () => {
     }
   })
 
-  it('opens exactly one ground to a child, so the job grows with the pet', () => {
-    expect(groundsFor('child')).toHaveLength(1)
-    expect(groundsFor('child')[0]!.id).toBe('wall')
+  it('opens exactly one ground to a child, wherever it lives', () => {
+    for (const biome of BIOMES) {
+      const open = groundsFor(biome.grounds, 'child')
+      expect(open, biome.id).toHaveLength(1)
+      expect(open[0]!.role, biome.id).toBe('near')
+    }
   })
 
   it('opens every ground to an adult', () => {
-    expect(groundsFor('adult')).toEqual(GROUNDS)
+    for (const biome of BIOMES) {
+      expect(groundsFor(biome.grounds, 'adult')).toEqual(biome.grounds)
+    }
   })
 
   it('opens none to an egg or a baby, which cannot be sent anywhere', () => {
-    for (const stage of ['egg', 'baby'] as Stage[]) expect(groundsFor(stage)).toEqual([])
+    for (const stage of ['egg', 'baby'] as Stage[]) {
+      expect(groundsFor(MEADOW.grounds, stage)).toEqual([])
+    }
+  })
+
+  it('gives every biome one ground of each role, so nowhere is a trap', () => {
+    for (const biome of BIOMES) {
+      const roles = biome.grounds.map((g) => g.role).sort()
+      expect(roles, biome.id).toEqual(['far', 'near', 'sheltered', 'wet'])
+    }
+  })
+
+  it('keeps ground ids unique across biomes, since the larder keys off them', () => {
+    const ids = GROUNDS.map((g) => g.id)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 
   it('makes the near ground the cheapest, so it is the sensible fallback', () => {
-    const wall = groundById('wall')
-    for (const ground of GROUNDS) {
-      if (ground.id === 'wall') continue
-      expect(ground.energy).toBeGreaterThan(wall.energy)
+    // Per biome, since the near ground is only a fallback against the three
+    // the pet could go to instead of it.
+    for (const biome of BIOMES) {
+      const near = biome.grounds.find((g) => g.role === 'near')!
+      for (const ground of biome.grounds) {
+        if (ground.role === 'near') continue
+        expect(ground.energy, `${biome.id}/${ground.id}`).toBeGreaterThan(near.energy)
+      }
     }
   })
 
@@ -214,7 +237,8 @@ describe('foods', () => {
 
 describe('journey', () => {
   const ctx = (overrides: Partial<JourneyContext> = {}): JourneyContext => ({
-    ground: 'wall',
+    role: 'near',
+    place: 'the old wall',
     season: 'spring',
     weather: 'clear',
     night: false,
@@ -225,15 +249,26 @@ describe('journey', () => {
   const LEGS: Leg[] = ['out', 'middle', 'home']
 
   it('says something for every leg, ground, season and weather', () => {
-    for (const ground of GROUNDS.map((g) => g.id)) {
+    for (const ground of GROUNDS) {
       for (const season of SEASON_IDS) {
         for (const weather of WEATHERS) {
           for (const night of [false, true]) {
             for (const leg of LEGS) {
-              const line = beat(leg, ctx({ ground, season, weather, night }))
-              expect(line.length, `${leg}/${ground}/${season}/${weather}`).toBeGreaterThan(0)
+              const line = beat(leg, ctx({ role: ground.role, place: ground.place, season, weather, night }))
+              expect(line.length, `${leg}/${ground.id}/${season}/${weather}`).toBeGreaterThan(0)
             }
           }
+        }
+      }
+    }
+  })
+
+  it('leaves no placeholder unfilled, whichever ground the pet went to', () => {
+    for (const ground of GROUNDS) {
+      for (const leg of LEGS) {
+        for (let i = 0; i < 60; i++) {
+          const line = beat(leg, ctx({ role: ground.role, place: ground.place }))
+          expect(line, `${leg}/${ground.id}`).not.toContain('{place}')
         }
       }
     }
@@ -251,17 +286,31 @@ describe('journey', () => {
     // Having chosen where to send the pet, the player should be told it went
     // there -- so 'sets off up the lane' must never appear for the creek.
     const generic = ['sets off up the lane', 'takes the path past the wall', 'heads for the far hedgerow']
-    for (const ground of GROUNDS.map((g) => g.id)) {
+    for (const ground of GROUNDS) {
       const lines = new Set<string>()
-      for (let i = 0; i < 400; i++) lines.add(beat('out', ctx({ ground })))
-      for (const line of generic) expect(lines.has(line), `${ground}: ${line}`).toBe(false)
+      for (let i = 0; i < 400; i++) {
+        lines.add(beat('out', ctx({ role: ground.role, place: ground.place })))
+      }
+      for (const line of generic) expect(lines.has(line), `${ground.id}: ${line}`).toBe(false)
     }
   })
 
   it('names the place for grounds whose lines say so', () => {
     const lines = new Set<string>()
-    for (let i = 0; i < 400; i++) lines.add(beat('out', ctx({ ground: 'creek' })))
+    for (let i = 0; i < 400; i++) {
+      lines.add(beat('out', ctx({ role: 'wet', place: 'the creek' })))
+    }
     expect([...lines].every((l) => l.includes('creek') || l.includes('water'))).toBe(true)
+  })
+
+  it('tells the two biomes" wet grounds apart, since only the place differs', () => {
+    const named = (place: string) => {
+      const lines = new Set<string>()
+      for (let i = 0; i < 400; i++) lines.add(beat('out', ctx({ role: 'wet', place })))
+      return [...lines]
+    }
+    expect(named('the creek').some((l) => l.includes('the creek'))).toBe(true)
+    expect(named('the streambed').some((l) => l.includes('the streambed'))).toBe(true)
   })
 
   it('adds weather lines to the pool rather than replacing it', () => {
@@ -496,7 +545,7 @@ describe('visitors', () => {
   })
 
   it('only lets the living ones be befriended', () => {
-    const alive = ['fireflies', 'rabbit', 'butterfly']
+    const alive = ['fireflies', 'rabbit', 'butterfly', 'moth', 'glowworms', 'deer']
     for (const visitor of VISITORS) {
       if (visitor.friend) expect(alive, visitor.id).toContain(visitor.id)
     }
@@ -769,8 +818,48 @@ describe('seasons', () => {
 describe('biome', () => {
   it('has a meadow, and it is on the list', () => {
     expect(BIOMES).toContain(MEADOW)
-    expect(MEADOW.propDensity).toBeGreaterThan(0)
-    expect(MEADOW.propDensity).toBeLessThanOrEqual(1)
+  })
+
+  it('scatters something, but not everything, wherever the pet lives', () => {
+    for (const biome of BIOMES) {
+      expect(biome.propDensity, biome.id).toBeGreaterThan(0)
+      expect(biome.propDensity, biome.id).toBeLessThanOrEqual(1)
+      expect(biome.props.length, biome.id).toBeGreaterThan(0)
+    }
+  })
+
+  it('keeps biome ids unique, since the save keys the gardens off them', () => {
+    const ids = BIOMES.map((b) => b.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('fills every living role everywhere, with visitors that exist', () => {
+    const known = new Set(VISITORS.map((v) => v.id))
+    for (const biome of BIOMES) {
+      for (const role of ['flitter', 'glow', 'grazer', 'bloom'] as VisitorRole[]) {
+        const filled = biome.visitors[role]
+        expect(filled, `${biome.id}/${role}`).toBeTruthy()
+        expect(known.has(filled), `${biome.id}/${role}: ${filled}`).toBe(true)
+      }
+    }
+  })
+
+  it('only tints materials that exist, or the shader would sample a hole', () => {
+    for (const biome of BIOMES) {
+      for (const name of Object.keys(biome.materials ?? {})) {
+        expect(MATERIALS, biome.id).toContain(name)
+      }
+    }
+  })
+
+  it('gives each place its own scenery, or moving would only change the paint', () => {
+    for (const a of BIOMES) {
+      for (const b of BIOMES) {
+        if (a.id === b.id) continue
+        const mine = new Set(a.props.map((p) => p.id))
+        expect([...b.props].some((p) => !mine.has(p.id)), `${a.id} vs ${b.id}`).toBe(true)
+      }
+    }
   })
 
   it('carries one light slot per lantern, plus the shelter"s and one spare', () => {
@@ -786,9 +875,34 @@ describe('biome', () => {
 })
 
 describe('the yard games', () => {
-  it('each name a visitor that exists', () => {
+  it('each name something that exists, wherever the pet lives', () => {
+    const known = VISITORS.map((v) => v.id)
     for (const game of YARD_GAMES) {
-      expect(VISITORS.map((v) => v.id)).toContain(game.visitor)
+      for (const biome of BIOMES) {
+        expect(known, `${game.id}/${biome.id}`).toContain(visitorFor(game, biome.visitors))
+      }
+    }
+  })
+
+  it('is playable in every biome, so moving house never closes a game', () => {
+    // Three of the five are already scarce by season. Gating them by place as
+    // well would leave a player with a healthy adult and nothing to do.
+    for (const game of YARD_GAMES) {
+      for (const biome of BIOMES) {
+        const visitor = VISITORS.find((v) => v.id === visitorFor(game, biome.visitors))!
+        expect(visitor.seasons.length, `${game.id}/${biome.id}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('gives the same game the same seasons wherever it is played', () => {
+    // A moth has to stand in for a butterfly exactly, or moving house would
+    // quietly move when a game is available rather than only who is in it.
+    for (const game of YARD_GAMES) {
+      const seasons = BIOMES.map((biome) =>
+        [...VISITORS.find((v) => v.id === visitorFor(game, biome.visitors))!.seasons].sort().join(),
+      )
+      expect(new Set(seasons).size, game.id).toBe(1)
     }
   })
 
@@ -805,7 +919,7 @@ describe('the yard games', () => {
     // day it was ever on the menu.
     for (const game of YARD_GAMES) {
       if (!game.weather) continue
-      const visitor = VISITORS.find((v) => v.id === game.visitor)!
+      const visitor = VISITORS.find((v) => v.id === visitorFor(game, MEADOW.visitors))!
       const possible = new Set(
         visitor.seasons.flatMap((id) =>
           Object.entries(SEASONS.find((s) => s.id === id)!.weather)
@@ -861,7 +975,7 @@ describe('the yard games', () => {
       ...SEASONS.map(
         (season) =>
           YARD_GAMES.filter((game) => {
-            const visitor = VISITORS.find((v) => v.id === game.visitor)!
+            const visitor = VISITORS.find((v) => v.id === visitorFor(game, MEADOW.visitors))!
             return visitor.seasons.includes(season.id)
           }).length,
       ),
