@@ -1,6 +1,8 @@
 import { foodById, type Food } from '../data/foods'
 import { chooseBranch, speciesOf, type BranchContext } from '../data/species'
 import type { SeasonId } from '../data/seasons'
+import type { PlayAxis } from '../data/yardgames'
+import type { Prospect } from '../data/grounds'
 import { metrics } from './metrics'
 import { temperamentFrom, temperamentOf, withLineage } from './temperament'
 import type { PetState, Stage, Stats, StatKey } from './types'
@@ -92,17 +94,41 @@ export function readiness(pet: PetState): number {
   return clamp(0.35 + rested * 0.4 + fed * 0.25, 0, 1)
 }
 
-/** Called once a minigame finishes, whatever the game was. */
-export function recordPlay(pet: PetState, won: boolean, streak: number): void {
+/**
+ * What a yard game is worth against the day it was played on. A game on a good
+ * day beats anything on the standing menu; the same game on a bad one is worth
+ * less than staying in, which is what makes the read on the menu something the
+ * player spends rather than something they merely read. Chasing a butterfly
+ * through the rain is still chasing a butterfly -- it is just not much of an
+ * afternoon.
+ */
+const PROSPECT_WORTH: Record<Prospect, number> = { good: 1.35, fair: 1.2, poor: 0.7 }
+
+/** What the running about costs and counts as, when it happened in the yard. */
+export interface YardStake {
+  axis: PlayAxis
+  energy: number
+  prospect: Prospect
+}
+
+/**
+ * Called once a minigame finishes, whatever the game was.
+ *
+ * A yard game names the axis it counts toward and what the running about costs
+ * on top of the ordinary tiring, and is worth what the day makes it worth.
+ */
+export function recordPlay(pet: PetState, won: boolean, streak: number, yard?: YardStake): void {
   pet.play.gamesPlayed += 1
   if (won) pet.play.gamesWon += 1
   pet.play.bestStreak = Math.max(pet.play.bestStreak, streak)
+  if (yard) pet.play.byAxis[yard.axis] += 1
   const keen = readiness(pet)
   const lively = temperamentOf(pet)?.id === 'lively' ? 1.25 : 1
+  const outside = yard ? PROSPECT_WORTH[yard.prospect] : 1
   apply(pet.stats, {
-    happiness: (won ? 20 : 6) * keen * lively,
+    happiness: (won ? 20 : 6) * keen * lively * outside,
     // Tiring either way, and more so when it had little to give.
-    energy: -8 * (2 - keen),
+    energy: -8 * (2 - keen) - (yard?.energy ?? 0),
     hunger: -4,
   })
 }

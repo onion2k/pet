@@ -164,7 +164,8 @@ measures of how the pet was raised, and the highest score wins:
 
 - **care** — time spent with a stat bottomed out, plus a penalty per illness
 - **diet** — the ratio of sweet / protein / veg / junk meals eaten
-- **play** — minigame win rate weighted by how often you actually played
+- **play** — minigame win rate weighted by how often you actually played, and,
+  for games played out in the yard, which sort of play it was
 - **sleep** — whether bedtimes landed while the world's sun was down
 
 Egg → Blobbit → one of three children → one of six adults. Eleven forms, and two
@@ -582,6 +583,108 @@ the energy a food happens to give made Fries summery and Cake warming, and
 handed Medicine a seasonal bonus for being a meal it is not — it was healing
 thirty percent better in July.
 
+### Playing with what is out there
+
+PLAY was the one lever that read nothing. Feeding swings with the season and
+steers the diet axes, foraging reads the ground against the day, and playing was
+the same three abstract games in July and January — while the yard it happened
+in went unmentioned. Visitors were announced on the ticker and then were
+scenery.
+
+So the thing in the yard is the game. Five of them, each asking for something
+the others do not:
+
+| Game | Needs | Wants | Asks for |
+| --- | --- | --- | --- |
+| FETCH | the ball | nothing in particular | effort — tap to wind up the kick, and it sags if you stop |
+| CHASE | the butterfly | clear weather | prediction — it leans one way, and sometimes that lean is a lie |
+| DIVE IN | the leaf pile | dry leaves | tracking — keep your eye on the deep drift while they swirl |
+| THE HILL | the sled | snow | steering — down the hill, past what is in the way |
+| CATCH THEM | the fireflies | a clear night | reaction — whichever lights, press its button |
+
+That table is the feature. A game tied to what turned up today is only worth
+having if it plays unlike the three that are always there, so no two of the
+eight share a verb — and a test asserts it, by insisting no two games share a
+hint line.
+
+The row is built to the forage menu's shape — a name, a note, a read on today,
+and what it costs — because that is already this game's way of saying *here is a
+choice that depends on the day*. What a yard game must **not** do is restate its
+visitor's season: whether the ball is out there already carries summer and
+autumn, and saying it again would make the read a tautology that always looked
+promising. A yard game reads the part presence leaves open — the weather, and
+the hour. CATCH THEM needs no rule about darkness at all: the fireflies keep
+their own hours, and a game is not offered for something that cannot be seen.
+Which does mean the one way to catch them is to keep the pet up past its
+bedtime, and the sleep metric will remember that you did.
+
+**The read has to change something, or it is decoration.** A ground's prospect
+scales the odds of finding anything; a yard game's scales what the game is
+worth. On a good day it beats anything on the standing menu, on a fair day it
+still edges it, and on a bad one it is worth less than staying in — for the same
+energy. Chasing a butterfly through the rain is still chasing a butterfly; it is
+just not much of an afternoon.
+
+The three abstract games stay, as the tail of the menu. A day with nothing out
+there is a quieter day, not a locked door. Only the selected row carries its
+detail, the way the feed menu does, so the list grows by a line rather than a
+block — it has to, because a summer night can put the ball, the butterfly and
+the fireflies out at once, and six full-height rows would run off the bottom of
+the screen.
+
+A yard game also counts toward a **play axis** — `chase`, `romp` or `quiet` —
+kept on the pet the way meals are kept against the diet axes. Only yard games
+score there: the abstract three are the same game whatever the day, so they say
+nothing about how a pet was raised beyond how often it was played with.
+
+That axis is a **second route to a form**. The branch rules already scored
+themselves against what a pet was fed; now they read what it was played with
+too, and three forms have a way in through the yard that they did not have
+before:
+
+| Route | Opened by | Because |
+| --- | --- | --- |
+| Blobbit → Spikelet | `romp` | leaf piles and sledding make a rough child |
+| Spikelet → Blazeon | `chase` | a pet raised chasing things becomes a competitor |
+| Sproutling → Lumenox | `quiet` | the fireflies are the night game |
+
+The last is the neatest of the three, because catching fireflies already costs
+what a Lumenox is: nights the pet was kept up for.
+
+Two properties keep this from being either a gimmick or a wrecking ball. It is
+**a route rather than a tiebreaker** — a pet with the same diet and the same
+amount of play still branches differently for what the play *was*. And it is
+**worth less than how the pet was actually kept** — a wholly neglected pet does
+not become a Blazeon on the strength of a ball. Both are asserted rather than
+asserted-about.
+
+The reading is damped by how many yard games there were, because a share on its
+own cannot tell one afternoon from a habit: a single game chasing a butterfly
+would otherwise read as a pet wholly given over to it. Four is the point at
+which it counts in full — lower than the diet's six, since a meal is always
+available and a yard game needs something to have turned up. The upshot is the
+property that made this safe to add at all: **a pet that has never played
+outside scores zero on every axis**, so every rule reads exactly what it read
+before.
+
+`PLAY CHASE` sits beside `DIET PROTEIN` on the status screen, and the BECOMING
+line underneath already accounts for it — so a habit forming in the yard is
+visible while it can still be steered, which is the same promise the diet makes.
+
+Making any of this possible meant moving one thing. Who is in the yard today was
+settled inside the renderer, so the game could not know what was out there — and
+a yard the game cannot see is a yard it cannot offer you anything to do with.
+The roll is game state that the renderer happens to draw, so it lives in
+`src/game/visitors.ts` now and the renderer asks. Both sides call the same
+function rather than keeping a copy each, because two rolls that drifted apart
+would put a game on the menu for a visitor nobody could see.
+
+Every game has to be able to end on its own. A game owns all three buttons while
+it runs, so one that waits for a press that never comes is a pet that can no
+longer be fed — DIVE IN shipped that way for an afternoon and the test for it
+caught it. A firefly left to fade is a miss, an unanswered leaf pile is a miss,
+and every round has a beat it resolves on whether or not anybody is watching.
+
 ### Visitors
 
 Some days there is something in the yard: a ball to knock about, a rabbit
@@ -698,6 +801,16 @@ for how often it appears and a `spacing` for how much room it needs.
 **A new food.** Add it to `src/data/foods.ts` with a `DietAxis` and stat deltas.
 Anything with an axis shows up on the feed menu and counts toward branching;
 `axis: null` is medicine.
+
+**A new yard game.** Add a row to `src/data/yardgames.ts` naming the visitor it
+needs, the stage it wants and what it costs, and a `Minigame` under the same id
+in `YARD_SESSIONS`. Give it a `weather` only if it genuinely minds — its
+visitor's seasons are already doing that work. Costs must stay under fifteen,
+which is what the PLAY icon insists a pet has before it will open the menu at
+all. Use `scoreboard`, `settle` and `betweenRounds` for the five-rounds-win-three
+bookkeeping rather than writing it out again, make sure every round can resolve
+without a press, and give it a verb none of the other seven has — the data tests
+check the last of those by comparing hint lines.
 
 **A new minigame.** Implement `Minigame` in `src/game/minigames.ts`. It gets the
 three buttons and draws itself onto the same low-res HUD canvas.

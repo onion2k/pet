@@ -16,6 +16,7 @@ import {
   setIdSource,
   setStorage,
   wipe,
+  emptyPlayAxes,
 } from '../../src/game/save'
 import type { SaveFile } from '../../src/game/types'
 
@@ -69,7 +70,7 @@ describe('newPet', () => {
     const pet = newPet('PIP', 0)
     expect(pet.care).toEqual({ neglectSeconds: 0, thrivingSeconds: 0, sicknessCount: 0 })
     expect(pet.diet).toEqual({ sweet: 0, protein: 0, veg: 0, junk: 0, meals: 0 })
-    expect(pet.play).toEqual({ gamesPlayed: 0, gamesWon: 0, bestStreak: 0 })
+    expect(pet.play).toEqual({ gamesPlayed: 0, gamesWon: 0, bestStreak: 0, byAxis: emptyPlayAxes() })
     expect(pet.sleep).toEqual({ onTimeSleeps: 0, lateSleeps: 0, overtiredSeconds: 0 })
   })
 

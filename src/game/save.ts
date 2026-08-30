@@ -1,8 +1,9 @@
 import type { PetState, SaveFile } from './types'
+import type { PlayAxis } from '../data/yardgames'
 import { emptyYard } from './yard'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 /**
  * The slice of `localStorage` the save needs, behind a seam. A test supplies a
@@ -114,7 +115,16 @@ const MIGRATIONS: Record<number, (raw: any) => any> = {
   3: (raw) => ({ ...raw, yard: { plantings: [], strays: [] } }),
   // 4 -> 5 adds the larder. Nothing has been foraged yet, so it starts bare.
   4: (raw) => ({ ...raw, larder: {} }),
+  // 5 -> 6 counts play by axis. An existing pet was played with, but never out
+  // in the yard, so it leans nowhere -- which is what a zeroed count means.
+  5: (raw) => ({
+    ...raw,
+    pet: raw.pet ? { ...raw.pet, play: { ...raw.pet.play, byAxis: emptyPlayAxes() } } : raw.pet,
+  }),
 }
+
+/** A pet that has never been played with out in the yard. */
+export const emptyPlayAxes = (): Record<PlayAxis, number> => ({ chase: 0, romp: 0, quiet: 0 })
 
 export function newPet(name: string, at: number): PetState {
   return {
@@ -130,7 +140,7 @@ export function newPet(name: string, at: number): PetState {
     sick: false,
     care: { neglectSeconds: 0, thrivingSeconds: 0, sicknessCount: 0 },
     diet: { sweet: 0, protein: 0, veg: 0, junk: 0, meals: 0 },
-    play: { gamesPlayed: 0, gamesWon: 0, bestStreak: 0 },
+    play: { gamesPlayed: 0, gamesWon: 0, bestStreak: 0, byAxis: emptyPlayAxes() },
     sleep: { onTimeSleeps: 0, lateSleeps: 0, overtiredSeconds: 0 },
     discovered: ['egg'],
   }

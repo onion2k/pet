@@ -4,6 +4,7 @@ import { LAMP_COUNT, VERGE_SLOTS, VERGE_Z } from '../data/biome'
 import { VISITORS, type Visitor, type VisitorId } from '../data/visitors'
 import { plantById, type PlantId } from '../data/plants'
 import type { SeasonId } from '../data/seasons'
+import { hash2, idSeed, isPresent, withinHours } from '../game/visitors'
 import { buildVoxelGeometry } from './voxel-mesh'
 
 const vertex = /* glsl */ `
@@ -182,19 +183,6 @@ const ROLL_DRAG = 1.35
 /** How much speed survives a bounce off the edge of the roaming band. */
 const BOUNCE = 0.55
 
-/** Deterministic 0..1 from a pair of integers. Same shape as the terrain's. */
-function hash2(a: number, b: number): number {
-  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x165667b1, 0xc2b2ae35)
-  h = Math.imul(h ^ (h >>> 15), 0x27d4eb2f)
-  return ((h ^ (h >>> 13)) >>> 0) / 4294967296
-}
-
-const idSeed = (id: VisitorId): number => {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193)
-  return h >>> 0
-}
-
 export function createVisitors(gl: OGLRenderingContext, groundY: number): Visitors {
   const root = new Transform()
   // Scratch, so rolling does not allocate every frame.
@@ -305,10 +293,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     for (const entry of entries) {
       const { visitor } = entry
       const seed = idSeed(visitor.id)
-      // A befriended stray is no longer a matter of luck: it comes whenever its
-      // season does. That is what befriending it bought.
-      const chance = context.regulars.includes(visitor.id) ? 1 : visitor.chance
-      const here = visitor.seasons.includes(context.season) && hash2(context.day, seed) < chance
+      // Who is here is the game's to settle, not the renderer's -- the yard has
+      // to be something the game can offer you, not only something drawn.
+      const here = isPresent(visitor.id, context.day, context.season, context.regulars)
       entry.chosen = here
       entry.foretold = false
       // Anything without a window is simply here for the day.
@@ -415,14 +402,8 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       }
 
       for (const entry of entries) {
-        const window = entry.visitor.hours
-        if (window) {
-          // A window may run through midnight, so the test wraps with it.
-          const [from, to] = window
-          const open =
-            from <= to
-              ? context.hour >= from && context.hour < to
-              : context.hour >= from || context.hour < to
+        if (entry.visitor.hours) {
+          const open = withinHours(entry.visitor.id, context.hour)
           const was = entry.present
           entry.present = entry.chosen && open
           // Foretold once, while it is still expected rather than here. That

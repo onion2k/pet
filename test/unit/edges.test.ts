@@ -86,6 +86,8 @@ describe('every branch score is a number', () => {
     diet: { sweet: 0.25, protein: 0.25, veg: 0.25, junk: 0.25 },
     dietLean: null,
     play: 0.5,
+    playAxes: { chase: 0.33, romp: 0.33, quiet: 0.33 },
+    playLean: null,
     sleep: 0.5,
   }
 

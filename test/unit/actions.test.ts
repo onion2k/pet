@@ -465,3 +465,44 @@ describe('evolve', () => {
 })
 
 resetIdSource()
+
+describe('a game played out in the yard', () => {
+  const played = (yard?: Parameters<typeof recordPlay>[3]) => {
+    const pet = newPet('PIP', 0)
+    pet.stage = 'child'
+    pet.stats.happiness = 40
+    pet.stats.energy = 80
+    recordPlay(pet, true, 1, yard)
+    return pet
+  }
+
+  it('counts toward the axis it is, and nothing else', () => {
+    const pet = played({ axis: 'romp', energy: 5, prospect: 'fair' })
+    expect(pet.play.byAxis).toEqual({ chase: 0, romp: 1, quiet: 0 })
+  })
+
+  it('leaves the axes alone when the game was one of the standing three', () => {
+    expect(played().play.byAxis).toEqual({ chase: 0, romp: 0, quiet: 0 })
+  })
+
+  it('costs the running about on top of the ordinary tiring', () => {
+    const inside = played()
+    const outside = played({ axis: 'chase', energy: 8, prospect: 'fair' })
+    expect(inside.stats.energy - outside.stats.energy).toBeCloseTo(8, 5)
+  })
+
+  it('is worth more on a good day than on a bad one', () => {
+    // The read on the menu has to change something, or it is decoration.
+    const good = played({ axis: 'chase', energy: 5, prospect: 'good' })
+    const poor = played({ axis: 'chase', energy: 5, prospect: 'poor' })
+    expect(good.stats.happiness).toBeGreaterThan(poor.stats.happiness)
+  })
+
+  it('beats the standing menu on a good day and loses to it on a bad one', () => {
+    const inside = played()
+    const good = played({ axis: 'chase', energy: 5, prospect: 'good' })
+    const poor = played({ axis: 'chase', energy: 5, prospect: 'poor' })
+    expect(good.stats.happiness).toBeGreaterThan(inside.stats.happiness)
+    expect(poor.stats.happiness).toBeLessThan(inside.stats.happiness)
+  })
+})

@@ -10,6 +10,10 @@ import {
   type Prospect,
 } from '../../src/data/grounds'
 import { foodById, FOODS } from '../../src/data/foods'
+import { YARD_GAMES } from '../../src/data/yardgames'
+import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
+import { VISITORS } from '../../src/data/visitors'
+import { SEASONS } from '../../src/data/seasons'
 import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
 import { blend, EGG_LINES, pick, SICK_LINE, voice } from '../../src/data/voice'
 import { GROWTH_STAGES, plantById, PLANTS } from '../../src/data/plants'
@@ -779,5 +783,83 @@ describe('biome', () => {
     // exceed the slots available, or a seed would be silently dropped.
     expect(VERGE_SLOTS.length).toBeGreaterThanOrEqual(4)
     expect(new Set(VERGE_SLOTS).size).toBe(VERGE_SLOTS.length)
+  })
+})
+
+describe('the yard games', () => {
+  it('each name a visitor that exists', () => {
+    for (const game of YARD_GAMES) {
+      expect(VISITORS.map((v) => v.id)).toContain(game.visitor)
+    }
+  })
+
+  it('never restate the season their visitor already carries', () => {
+    // Whether the thing is out there already carries the season. Saying it
+    // again would make the read on the menu a tautology.
+    for (const game of YARD_GAMES) {
+      expect(Object.keys(game)).not.toContain('seasons')
+    }
+  })
+
+  it('want weather the seasons their visitor comes in can actually bring', () => {
+    // A game wanting snow off a summer visitor would read as NOT TODAY every
+    // day it was ever on the menu.
+    for (const game of YARD_GAMES) {
+      if (!game.weather) continue
+      const visitor = VISITORS.find((v) => v.id === game.visitor)!
+      const possible = new Set(
+        visitor.seasons.flatMap((id) =>
+          Object.entries(SEASONS.find((s) => s.id === id)!.weather)
+            .filter(([, odds]) => (odds ?? 0) > 0)
+            .map(([w]) => w),
+        ),
+      )
+      for (const wanted of game.weather) expect([...possible]).toContain(wanted)
+    }
+  })
+
+  it('cost less than the PLAY icon insists a pet has', () => {
+    // The icon refuses a pet under fifteen; a game that cost more than that
+    // could be opened and never started.
+    for (const game of YARD_GAMES) expect(game.energy).toBeLessThan(15)
+  })
+
+  it('have a session behind every row', () => {
+    for (const game of YARD_GAMES) expect(YARD_SESSIONS[game.id]).toBeDefined()
+  })
+
+  it('say the same thing on the menu as in the game', () => {
+    // The title and the hint exist in both places; drift between them shows up
+    // as a game that renames itself the moment you start it.
+    for (const game of YARD_GAMES) {
+      const session = YARD_SESSIONS[game.id]!
+      expect(session.title).toBe(game.title)
+      expect(session.hint).toBe(game.hint)
+    }
+  })
+
+  it('ask for something different in each one', () => {
+    // A yard game earns its place by playing unlike the three that are always
+    // there. Two games sharing a hint are two games sharing a verb.
+    const hints = [...YARD_GAMES.map((g) => g.hint), ...MINIGAMES.map((g) => g.hint)]
+    expect(new Set(hints).size).toBe(hints.length)
+  })
+
+  it('never fill the menu past the bottom of the screen', () => {
+    // The selected row is the tall one and the rest are a line each, so what
+    // bounds the menu is how many rows there can be at once. A summer night is
+    // the worst case: the ball, the butterfly and the fireflies all at home.
+    const mostAtOnce = Math.max(
+      ...SEASONS.map(
+        (season) =>
+          YARD_GAMES.filter((game) => {
+            const visitor = VISITORS.find((v) => v.id === game.visitor)!
+            return visitor.seasons.includes(season.id)
+          }).length,
+      ),
+    )
+    // 22px in, a tall row of 27 and the rest at 10, above the record line at 130.
+    const rows = mostAtOnce + MINIGAMES.length
+    expect(22 + 27 + (rows - 1) * 10).toBeLessThanOrEqual(130)
   })
 })

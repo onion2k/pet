@@ -6,11 +6,12 @@ import type { ButtonId } from '../render/shell'
 import type { SoundId } from '../engine/audio'
 import { random } from '../engine/random'
 import { now as clockNow } from '../engine/clock'
-import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution } from './actions'
-import { MINIGAMES, type GameSession } from './minigames'
+import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution, type YardStake } from './actions'
+import { MINIGAMES, YARD_SESSIONS, type GameSession, type Minigame } from './minigames'
+import { YARD_GAMES, type YardGame } from '../data/yardgames'
 import { legacyOf, lineageOf, temperamentOf, type TemperamentId } from './temperament'
 import { metrics, type Metrics } from './metrics'
-import { load, newPet, save, saveSoon, wipe } from './save'
+import { emptyPlayAxes, load, newPet, save, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
 import { Forage } from './forage'
 import { growthOf, plantableKind, type Planting } from './yard'
@@ -20,7 +21,8 @@ import { VISITORS, type VisitorId } from '../data/visitors'
 import { VERGE_SLOTS, VERGE_Z } from '../data/biome'
 import type { PlantedThing } from '../render/visitors'
 import { groundsFor, prospectOf, type Ground, type Prospect } from '../data/grounds'
-import { hoursUntilSunrise, isNight, seasonIdAt, worldAt, WORLD_HOUR_MS } from './world'
+import { DAY_MS, hoursUntilSunrise, isNight, seasonIdAt, worldAt, worldHour, WORLD_HOUR_MS } from './world'
+import { visitorsPresent, withinHours } from './visitors'
 import {
   COMMON_CURIOS,
   completedSets,
@@ -36,7 +38,7 @@ import { SPECIES_COUNT } from '../data/species'
 import type { SeasonId, WeatherId } from '../data/seasons'
 import { SHELLS, shellById, type ShellColour } from '../data/shells'
 import { SICK_LINE, voice } from '../data/voice'
-import type { PetState, SaveFile, StatKey, Stats } from './types'
+import type { PetState, PlayRecord, SaveFile, Stage, StatKey, Stats } from './types'
 
 export type Mode =
   | 'boot'
@@ -52,6 +54,16 @@ export type Mode =
   | 'playing'
   | 'evolve'
   | 'retire'
+
+/** One row of the play menu: something out in the yard, or one of the three. */
+export type PlayOption =
+  | { kind: 'yard'; game: YardGame; minigame: Minigame }
+  | { kind: 'plain'; minigame: Minigame }
+
+/** Stages in order, so a game can ask whether the pet is old enough yet. */
+const STAGE_ORDER: Stage[] = ['egg', 'baby', 'child', 'adult']
+const reached = (stage: Stage, from: Stage): boolean =>
+  STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf(from)
 
 export const NAMES = ['PIP', 'BOB', 'ZED', 'MOSS', 'NIM', 'TOFU', 'KIRA', 'DUSK']
 
@@ -119,6 +131,8 @@ export class App {
   curioIndex = 0
   nameIndex = 0
   session: GameSession | null = null
+  /** Which menu row the running session came from, for what it counts toward. */
+  playing: PlayOption | null = null
   evolution: Evolution | null = null
   /** Who is being seen off, while the retirement screen is up. */
   retiring: { name: string; speciesName: string } | null = null
@@ -410,6 +424,23 @@ export class App {
     return this.save.yard.strays
   }
 
+  /** Which world day it is. The visitors' dice are rolled from it. */
+  get worldDay(): number {
+    return Math.floor(this.worldNow() / DAY_MS)
+  }
+
+  /**
+   * Who is in the yard right now -- today's roll, narrowed to those whose hour
+   * has come. The renderer settles the same question from the same function, so
+   * what the game offers you and what you can see out there agree.
+   */
+  get inTheYard(): VisitorId[] {
+    const hour = worldHour(this.worldNow())
+    return visitorsPresent(this.worldDay, seasonIdAt(this.worldNow()), this.regulars).filter((id) =>
+      withinHours(id, hour),
+    )
+  }
+
   /** Queues a one-off announcement; it runs after the current line finishes. */
   pushTicker(text: string): void {
     this.tickerQueue.push(text.toUpperCase())
@@ -542,6 +573,51 @@ export class App {
   prospect(ground: Ground): Prospect {
     const world = worldAt(this.worldNow())
     return prospectOf(ground, world.season.id, world.weather)
+  }
+
+  /**
+   * What there is to play today: whatever is out in the yard that this pet is
+   * old enough for, then the three abstract games. The yard games come first
+   * because they are the ones that will not be there tomorrow, and the abstract
+   * three are kept as the tail so PLAY is never an empty menu -- a day with
+   * nothing out there is a quieter day, not a locked door.
+   */
+  get playMenu(): PlayOption[] {
+    const pet = this.pet
+    const here = this.inTheYard
+    const yard: PlayOption[] = pet
+      ? YARD_GAMES.filter(
+          (game) => here.includes(game.visitor) && reached(pet.stage, game.from),
+        ).map((game) => ({ kind: 'yard' as const, game, minigame: YARD_SESSIONS[game.id] }))
+      : []
+    return [...yard, ...MINIGAMES.map((minigame) => ({ kind: 'plain' as const, minigame }))]
+  }
+
+  /**
+   * What the running session counts toward, if it was something out in the
+   * yard. Read off the row it was started from rather than the yard as it is
+   * now, so a visitor whose hour ends mid-game still pays for the game played.
+   */
+  private get yardStake(): YardStake | undefined {
+    const option = this.playing
+    if (option?.kind !== 'yard') return undefined
+    return {
+      axis: option.game.axis,
+      energy: option.game.energy,
+      // Read now rather than at the row: a game begun in the sun and finished
+      // in the rain was played on the day it was played on.
+      prospect: this.playProspect(option.game),
+    }
+  }
+
+  /**
+   * How a yard game looks today. Its season is already settled by whether the
+   * visitor turned up at all, so this reads the part that is still open: the
+   * weather.
+   */
+  playProspect(game: YardGame): Prospect {
+    const world = worldAt(this.worldNow())
+    return prospectOf({ weather: game.weather }, world.season.id, world.weather)
   }
 
   /**
@@ -697,8 +773,8 @@ export class App {
   }
 
   /** Games played, won and the best run, for the games screen. */
-  get playRecord(): { gamesPlayed: number; gamesWon: number; bestStreak: number } {
-    return this.pet?.play ?? { gamesPlayed: 0, gamesWon: 0, bestStreak: 0 }
+  get playRecord(): PlayRecord {
+    return this.pet?.play ?? { gamesPlayed: 0, gamesWon: 0, bestStreak: 0, byAxis: emptyPlayAxes() }
   }
 
   /** Which forms the lineage has met, for the album. */
@@ -999,12 +1075,13 @@ export class App {
     const session = this.session
     if (session && this.pet) {
       if (session.resolved > 0) {
-        recordPlay(this.pet, false, session.streak)
+        recordPlay(this.pet, false, session.streak, this.yardStake)
         this.say('gave up', 'lose')
       } else {
         this.say('never mind', 'cancel')
       }
       this.session = null
+      this.playing = null
     } else {
       this.hooks.sound('cancel')
     }
@@ -1068,6 +1145,9 @@ export class App {
         if (pet.stage === 'egg') return this.say('not yet', 'refuse')
         if (pet.asleep) return this.say(`${pet.name} is asleep`, 'refuse')
         if (pet.stats.energy < 15) return this.say('too tired', 'refuse')
+        // The menu is as long as the yard is full, so a selection left over
+        // from a busier day has to be brought back inside it.
+        this.gameIndex = Math.min(this.gameIndex, this.playMenu.length - 1)
         this.mode = 'games'
         this.hooks.sound('confirm')
         return
@@ -1157,17 +1237,25 @@ export class App {
   }
 
   private pressGames(button: ButtonId): void {
+    // Read once: the menu is derived from a yard that can change under it, and
+    // moving on one length while selecting from another lands off the end.
+    const menu = this.playMenu
+    if (menu.length === 0) return
     if (button === 'a') {
-      this.gameIndex = (this.gameIndex + MINIGAMES.length - 1) % MINIGAMES.length
+      this.gameIndex = (this.gameIndex + menu.length - 1) % menu.length
       this.hooks.sound('move')
       return
     }
     if (button === 'c') {
-      this.gameIndex = (this.gameIndex + 1) % MINIGAMES.length
+      this.gameIndex = (this.gameIndex + 1) % menu.length
       this.hooks.sound('move')
       return
     }
-    this.session = MINIGAMES[this.gameIndex]!.create()
+    // No cost gate of its own: the PLAY icon already refuses a pet with less
+    // than fifteen, which is more than fetch asks. A dearer game will want one.
+    const option = menu[Math.min(this.gameIndex, menu.length - 1)]!
+    this.playing = option
+    this.session = option.minigame.create()
     this.sessionElapsed = 0
     this.mode = 'playing'
     this.hooks.sound('confirm')
@@ -1287,7 +1375,7 @@ export class App {
         if (feedback.burst) this.hooks.burst(feedback.burst, 14)
       }
       if (this.session.done) {
-        recordPlay(pet, this.session.won, this.session.streak)
+        recordPlay(pet, this.session.won, this.session.streak, this.yardStake)
         this.say(this.session.won ? `${pet.name} won!` : 'better luck next time', this.session.won ? 'win' : 'lose')
         this.sayAsPet(voice.game(this.session.won, pet.speciesId))
         if (this.session.won) {
@@ -1295,6 +1383,7 @@ export class App {
           this.hooks.pop(1)
         }
         this.session = null
+        this.playing = null
         this.mode = 'main'
         this.persist()
       }

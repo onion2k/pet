@@ -29,6 +29,8 @@ const reading = (m: Partial<Metrics> = {}): Metrics => ({
   diet: { sweet: 0, protein: 0, veg: 0, junk: 0 },
   dietLean: null,
   play: 0.52,
+  playAxes: { chase: 0, romp: 0, quiet: 0 },
+  playLean: null,
   sleep: 0.55,
   ...m,
 })
