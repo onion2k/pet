@@ -11,6 +11,7 @@ import { DAY_MS, tintPalette, worldAt, type Rgb } from './game/world'
 import { legacyOf, temperamentFrom } from './game/temperament'
 import { evolve, feed, readyToEvolve, recordPlay } from './game/actions'
 import { PaletteTexture } from './render/palette'
+import { createSea } from './render/sea'
 import { createWeather } from './render/weather'
 import { createBackdrop } from './render/backdrop'
 import { createTerrain } from './render/terrain'
@@ -101,6 +102,10 @@ const seasonPalette = new PaletteTexture(gl)
 let terrainSeed = groundSeed(booted.id, homeId)
 const terrain = createTerrain(gl, terrainSeed, biome, seasonPalette)
 terrain.root.setParent(screenScene)
+
+const sea = createSea(gl)
+sea.root.setParent(screenScene)
+sea.setShore(biome.shore)
 
 const weather = createWeather(gl)
 weather.root.setParent(screenScene)
@@ -322,6 +327,7 @@ function step(dt: number): void {
     homeId = app.biome.id
     biome = app.biome
     terrain.rebuild(terrainSeed, biome)
+    sea.setShore(biome.shore)
     petView.root.position.y = terrain.shape.groundY
     // New ground means the shelter may have moved to the other side.
     petView.setShelter({ ...terrain.shape.shelter, lamps: terrain.shape.lamps })
@@ -384,6 +390,11 @@ function step(dt: number): void {
   petView.setLighting(lighting)
   terrain.setLighting({ ...lighting, haze: world.haze })
   terrain.setSick(visual.sick ? 1 : 0)
+  // The water takes the sky it is under rather than a colour of its own: the
+  // whole trick of the far water is that it agrees with what is above it.
+  sea.setLighting({ ...lighting, haze: world.haze, sky: world.sky.top })
+  sea.setSick(visual.sick ? 1 : 0)
+  sea.update(elapsed)
 
   // The lanterns come up as the sun goes down, and go out once the pet is in
   // bed -- the yard is lit for the pet, not for the player. Their positions are
@@ -548,6 +559,7 @@ if (import.meta.env.DEV) {
       shell,
       orbit,
       terrain,
+      sea,
       // A function, not the value: the biome changes when the family moves, and
       // a snapshot taken at boot would go on reporting the meadow forever.
       biome: () => biome,
