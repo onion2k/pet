@@ -8,7 +8,7 @@ import { random } from '../engine/random'
 import { now as clockNow } from '../engine/clock'
 import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution, type YardStake } from './actions'
 import { MINIGAMES, YARD_SESSIONS, type GameSession, type Minigame } from './minigames'
-import { YARD_GAMES, type YardGame } from '../data/yardgames'
+import { YARD_GAMES, type YardGame, type YardGameId } from '../data/yardgames'
 import { legacyOf, lineageOf, temperamentOf, type TemperamentId } from './temperament'
 import { metrics, type Metrics } from './metrics'
 import { emptyPlayAxes, load, newPet, save, saveSoon, wipe } from './save'
@@ -64,6 +64,13 @@ export type PlayOption =
 const STAGE_ORDER: Stage[] = ['egg', 'baby', 'child', 'adult']
 const reached = (stage: Stage, from: Stage): boolean =>
   STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf(from)
+
+/**
+ * What the PLAY icon insists a pet has before it will open the menu. Shared
+ * rather than written twice: the pet must not be able to ask for a game the
+ * icon will then refuse it, and no yard game may cost more than this.
+ */
+export const PLAY_MIN_ENERGY = 15
 
 export const NAMES = ['PIP', 'BOB', 'ZED', 'MOSS', 'NIM', 'TOFU', 'KIRA', 'DUSK']
 
@@ -133,6 +140,15 @@ export class App {
   session: GameSession | null = null
   /** Which menu row the running session came from, for what it counts toward. */
   playing: PlayOption | null = null
+  /**
+   * Yard games already played since the app opened. The pet stops asking about
+   * one once you have taken the hint, which is the difference between the
+   * ticker pointing something out and the ticker nagging.
+   *
+   * Deliberately not saved: the yard is rolled fresh every world day, and a pet
+   * that mentioned the ball yesterday should be free to mention it again today.
+   */
+  private playedThisSession = new Set<YardGameId>()
   evolution: Evolution | null = null
   /** Who is being seen off, while the retirement screen is up. */
   retiring: { name: string; speciesName: string } | null = null
@@ -493,6 +509,16 @@ export class App {
         const line = need ? voice.need(need, pet.speciesId) : undefined
         if (line) out.push(`${pet.name}: ${line}`)
       }
+      // Something out in the yard it has not had a go at yet. One line even
+      // when three things are out, for the same reason only one arrival a day
+      // is announced: a run of them buries everything else the ticker has.
+      const going = this.playMenu.filter(
+        (option) => option.kind === 'yard' && !this.playedThisSession.has(option.game.id),
+      )
+      const spare = going[Math.floor(random() * going.length)]
+      if (spare?.kind === 'yard' && pet.stats.energy >= PLAY_MIN_ENERGY) {
+        out.push(`${pet.name}: ${voice.yard(spare.game.id, pet.speciesId)}`)
+      }
       out.push(`${pet.name}: ${voice.monologue(night, world.weather, pet.speciesId)}`)
       if (night) out.push('THE SUN IS DOWN... BEDTIME?')
     }
@@ -598,6 +624,11 @@ export class App {
    * yard. Read off the row it was started from rather than the yard as it is
    * now, so a visitor whose hour ends mid-game still pays for the game played.
    */
+  /** Remembers a yard game has been had, so the pet stops mentioning it. */
+  private noteYardPlayed(): void {
+    if (this.playing?.kind === 'yard') this.playedThisSession.add(this.playing.game.id)
+  }
+
   private get yardStake(): YardStake | undefined {
     const option = this.playing
     if (option?.kind !== 'yard') return undefined
@@ -1080,6 +1111,9 @@ export class App {
       } else {
         this.say('never mind', 'cancel')
       }
+      // Started counts as taken the hint, even abandoned: the pet asked, you
+      // went out, and it has no business asking again this session.
+      this.noteYardPlayed()
       this.session = null
       this.playing = null
     } else {
@@ -1144,7 +1178,7 @@ export class App {
       case 'play': {
         if (pet.stage === 'egg') return this.say('not yet', 'refuse')
         if (pet.asleep) return this.say(`${pet.name} is asleep`, 'refuse')
-        if (pet.stats.energy < 15) return this.say('too tired', 'refuse')
+        if (pet.stats.energy < PLAY_MIN_ENERGY) return this.say('too tired', 'refuse')
         // The menu is as long as the yard is full, so a selection left over
         // from a busier day has to be brought back inside it.
         this.gameIndex = Math.min(this.gameIndex, this.playMenu.length - 1)
@@ -1382,6 +1416,7 @@ export class App {
           this.hooks.burst('heart', 18)
           this.hooks.pop(1)
         }
+        this.noteYardPlayed()
         this.session = null
         this.playing = null
         this.mode = 'main'

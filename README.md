@@ -625,6 +625,25 @@ still edges it, and on a bad one it is worth less than staying in — for the sa
 energy. Chasing a butterfly through the rain is still chasing a butterfly; it is
 just not much of an afternoon.
 
+**The pet asks.** The yard already announces an arrival — *a ball has turned up
+in the yard* — but that is the device reporting, it happens once, and it says
+nothing about there being a game in it. So the pet mentions it too, in the first
+person and in its own species' voice, alongside everything else it muses about:
+*THE BALL! THE BALL IS OUT!* from a Blazeon, *THERE'S A BALL OUT THERE. NOT THAT
+I CARE.* from a Grumphal, and a Lumenox asking you to stay up because the
+fireflies are here. Without it the extra row on the PLAY menu is only ever found
+by a player who thought to look at PLAY twice.
+
+It is an invitation and not a nag. One line even when three things are out, for
+the same reason only one arrival a day is announced. It stops the moment you
+take the hint — starting a game counts, even one abandoned, because the pet
+asked and you went out. It is never said about a game the PLAY icon would then
+refuse, which is the one way the line could actively mislead; `PLAY_MIN_ENERGY`
+is shared between the two rather than written twice, and a test insists no yard
+game costs more than it. What it does *not* do is survive the session: the yard
+is rolled fresh every world day, and a pet that mentioned the ball yesterday
+should be free to mention it again today.
+
 The three abstract games stay, as the tail of the menu. A day with nothing out
 there is a quieter day, not a locked door. Only the selected row carries its
 detail, the way the feed menu does, so the list grows by a line rather than a
