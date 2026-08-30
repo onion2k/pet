@@ -1,6 +1,6 @@
-import { CURIOS, CURIO_COUNT } from '../data/curios'
+import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
 import { textWidth } from '../data/font'
-import { FOODS } from '../data/foods'
+import { PROSPECT_LABEL, type Prospect } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
 import { speciesOf, SPECIES_COUNT, SPECIES_LIST } from '../data/species'
 import { MINIGAMES } from '../game/minigames'
@@ -17,6 +17,9 @@ const ACCENT = '#ffd93d'
 const GOOD = '#8fe36a'
 const BAD = '#ff6b4a'
 const COOL = '#7fd6ff'
+
+/** How each read on a ground is coloured, worst to best. */
+const PROSPECT_INK: Record<Prospect, string> = { poor: '#6b4a52', fair: DIM, good: GOOD }
 
 /** Height of the icon strips. The lower one is taller because it carries the label. */
 const TOP_BAND = 16
@@ -149,17 +152,30 @@ function drawMain(hud: Hud, app: App): void {
 }
 
 function drawFeed(hud: Hud, app: App): void {
-  const menu = FOODS.filter((f) => f.axis !== null)
+  const menu = app.feedMenu
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   hud.textCentered(hud.width / 2, 8, 'FEED', ACCENT)
 
+  // Gathered food shares the list with the bought sort and is only distinguished
+  // by the count beside it: a meal is a meal, and running out is the whole
+  // difference between them. Only the selected row carries its note, so the
+  // list grows by a line rather than a block as the larder fills.
+  let y = 22
   menu.forEach((food, i) => {
-    const y = 24 + i * 22
     const selected = app.foodIndex === i
-    if (selected) hud.rect(6, y - 4, hud.width - 12, 20, '#1b2338')
+    const height = selected ? 19 : 10
+    if (selected) hud.rect(6, y - 4, hud.width - 12, height, '#1b2338')
     hud.text(12, y, food.name.toUpperCase(), selected ? INK : DIM)
-    hud.text(12, y + 8, food.note.toUpperCase(), selected ? DIM : '#33384d')
-    if (selected) hud.text(4, y, '>', ACCENT)
+    if (selected) {
+      hud.text(4, y, '>', ACCENT)
+      hud.text(12, y + 8, food.note.toUpperCase(), DIM)
+    }
+    const held = app.larder[food.id]
+    if (held) {
+      const tag = `x${held}`
+      hud.text(hud.width - 12 - textWidth(tag), y, tag, selected ? COOL : '#33384d')
+    }
+    y += height
   })
 
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B EAT', DIM)
@@ -294,10 +310,10 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
       hud.rect(22, hud.height - 12, Math.round(width * progress), 3, ACCENT)
       hud.textCentered(hud.width / 2, hud.height - 20, 'RETIRING...', ACCENT)
     } else {
-      hud.textCentered(hud.width / 2, hud.height - 10, 'HOLD B TO RETIRE', '#96a0c8')
+      hud.textCentered(hud.width / 2, hud.height - 10, 'A CURIOS   HOLD B RETIRE', '#96a0c8')
     }
   } else {
-    hud.textCentered(hud.width / 2, hud.height - 10, 'ANY KEY TO CLOSE', '#3a4058')
+    hud.textCentered(hud.width / 2, hud.height - 10, 'A CURIOS   C CLOSE', '#3a4058')
   }
 }
 
@@ -403,6 +419,129 @@ function drawWelcome(hud: Hud, app: App): void {
   hud.textCentered(hud.width / 2, hud.height - 20, 'PRESS ANY BUTTON', DIM)
 }
 
+/**
+ * The trip, told while the pet is out of sight. Opaque, because the picture
+ * behind it is a yard with nothing in it -- and because the screen shader cuts
+ * the HUD to black along with the scene, so a forage that stayed dimmed could
+ * not say anything at all.
+ *
+ * Beats arrive one at a time and stay, so by the end the screen holds the whole
+ * short story of where the pet went rather than a single result line.
+ */
+/**
+ * The collection, with something to do on it. Spares used to be a number in the
+ * corner of a glyph and nothing more; here they are a currency, so a season the
+ * player keeps missing stops being a wall the year takes an hour to come round.
+ */
+function drawCurios(hud: Hud, app: App): void {
+  hud.rect(0, 0, hud.width, hud.height, panel(0.045))
+  const tally = app.curioTally
+  hud.textCentered(hud.width / 2, 8, `CURIOS ${tally.kinds}/${CURIO_COUNT}`, ACCENT)
+
+  const counts = app.curioCounts
+  CURIOS.forEach((curio, i) => {
+    const x = 20 + (i % 4) * 40
+    const y = 20 + Math.floor(i / 4) * 32
+    const held = counts[curio.id] ?? 0
+    const selected = app.curioIndex === i
+    if (selected) hud.rect(x - 6, y - 4, 32, 28, '#1b2338')
+    hud.glyph(x, y, curio.glyph.split('/'), held > 0 ? curio.colour : MISSING, 2)
+    if (held > 1) hud.text(x + 18, y + 9, String(Math.min(9, held)), '#8b95c0')
+  })
+
+  const held = CURIOS[app.curioIndex]
+  const count = held ? (counts[held.id] ?? 0) : 0
+  hud.textCentered(hud.width / 2, 88, (held?.name ?? '').toUpperCase(), count > 0 ? INK : DIM)
+  hud.textCentered(hud.width / 2, 98, count > 0 ? `HAVE ${count}` : 'NOT FOUND', DIM)
+
+  // What the sets are worth, which is the reason to finish one. Kept clear of
+  // the hold-to-go-back strip, which owns the last fourteen rows.
+  const boons = app.boons
+  hud.rect(20, 110, hud.width - 40, 1, '#22283c')
+  CURIO_SETS.forEach((set, i) => {
+    const done = boons.includes(set.id)
+    const y = 116 + i * 8
+    hud.text(20, y, set.name.toUpperCase(), done ? GOOD : DIM)
+    hud.text(72, y, done ? set.boon.toUpperCase() : '---', done ? COOL : '#33384d')
+  })
+
+  const want = app.tradeFor
+  const footer = hud.height - 26
+  if (!want) hud.textCentered(hud.width / 2, footer, 'THE BOARD IS FULL', GOOD)
+  else if (app.canTrade) {
+    const line = `B TRADE ${TRADE_COST} FOR ${want.name.toUpperCase()}`
+    hud.textCentered(hud.width / 2, footer, line, ACCENT)
+  } else {
+    hud.textCentered(hud.width / 2, footer, `${TRADE_COST} SPARES TRADE UP`, DIM)
+  }
+}
+
+/**
+ * Where to send it. Built on the feed menu's shape -- A/C to pick, B to go --
+ * because a second list should not be a second thing to learn.
+ *
+ * The read on the right of each row is the point of the screen: it turns what
+ * the player knows about the season and the weather into something they spend.
+ */
+function drawGrounds(hud: Hud, app: App): void {
+  const menu = app.grounds
+  hud.rect(0, 0, hud.width, hud.height, panel(0.045))
+  hud.textCentered(hud.width / 2, 8, 'WHERE TO?', ACCENT)
+
+  menu.forEach((ground, i) => {
+    const y = 26 + i * 26
+    const selected = app.groundIndex === i
+    if (selected) hud.rect(6, y - 4, hud.width - 12, 24, '#1b2338')
+    hud.text(12, y, ground.name.toUpperCase(), selected ? INK : DIM)
+    hud.text(12, y + 8, ground.note.toUpperCase(), selected ? DIM : '#33384d')
+    const read = app.prospect(ground)
+    hud.text(12, y + 16, PROSPECT_LABEL[read].toUpperCase(), PROSPECT_INK[read])
+    // What it costs, against the name, so the trade is on one line.
+    const cost = `-${ground.energy}`
+    hud.text(hud.width - 12 - textWidth(cost), y, cost, selected ? COOL : '#33384d')
+    if (selected) hud.text(4, y, '>', ACCENT)
+  })
+
+  hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B GO', DIM)
+}
+
+function drawForage(hud: Hud, app: App): void {
+  const pet = app.pet
+  if (!pet) return
+  hud.rect(0, 0, hud.width, hud.height, panel(0))
+  hud.textCentered(hud.width / 2, 14, pet.name, ACCENT)
+
+  const beats = app.forageBeats
+  // Wide enough that almost every beat is a single line: the trip reads as a
+  // handful of sentences, and a wrap mid-sentence breaks the rhythm of it. A
+  // pushed trip runs to six lines, so the gap closes up to make room.
+  const gap = beats.length > 4 ? 3 : 8
+  let y = 40
+  beats.forEach((text, i) => {
+    // The newest line is the one being read; the ones above it have already
+    // happened and step back for it.
+    const last = i === beats.length - 1
+    wrapped(text.toUpperCase(), 34).forEach((line) => {
+      hud.textCentered(hud.width / 2, y, line, last ? INK : DIM)
+      y += 9
+    })
+    y += gap
+  })
+
+  const found = app.forageFound
+  if (found) hud.glyph(hud.width / 2 - 8, y + 2, found.glyph.split('/'), found.colour, 2)
+
+  // Push your luck. The bar is the answer running out, and running out means
+  // coming home -- so looking away is a decision the game makes for you kindly.
+  if (app.forageChoosing) {
+    const bottom = hud.height - 26
+    hud.textCentered(hud.width / 2, bottom, `B GO ON (-${app.foragePushCost})   C HOME`, ACCENT)
+    const width = hud.width - 60
+    hud.rect(30, bottom + 12, width, 2, '#1c1c2c')
+    hud.rect(30, bottom + 12, Math.round(width * app.forageChooseProgress), 2, ACCENT)
+  }
+}
+
 function drawName(hud: Hud, app: App): void {
   hud.rect(0, 0, hud.width, hud.height, panel(0.08, '6,6,12'))
   hud.textCentered(hud.width / 2, 34, 'NAME YOUR PET', DIM)
@@ -471,6 +610,17 @@ export function drawScreen(hud: Hud, app: App, world: WorldState): void {
     case 'feed':
       drawFeed(hud, app)
       drawBackPrompt(hud, app)
+      break
+    case 'grounds':
+      drawGrounds(hud, app)
+      drawBackPrompt(hud, app)
+      break
+    case 'curios':
+      drawCurios(hud, app)
+      drawBackPrompt(hud, app)
+      break
+    case 'forage':
+      drawForage(hud, app)
       break
     case 'games':
       drawGames(hud, app)

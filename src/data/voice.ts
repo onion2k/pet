@@ -12,12 +12,13 @@ import type { WeatherId } from './seasons'
  * braggart, a stoic, a garden mystic — whatever it was raised into.
  */
 
-const pick = <T>(pool: T[]): T => pool[Math.floor(Math.random() * pool.length)]!
+export const pick = <T>(pool: T[]): T => pool[Math.floor(Math.random() * pool.length)]!
 
 /** How often a species line wins over a generic one, when the pack has any. */
 const PACK_BIAS = 0.6
 
-function blend<T>(base: T[], extra: T[] | undefined): T {
+/** Draws from a shared pool, favouring a species' own lines when it has any. */
+export function blend<T>(base: T[], extra: T[] | undefined): T {
   if (extra && extra.length > 0 && Math.random() < PACK_BIAS) return pick(extra)
   return pick(base)
 }

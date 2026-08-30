@@ -25,8 +25,8 @@ you are tapping or typing:
 | B | `B`, `Enter`, `Space` | Select, confirm, act |
 | C | `C`, `→`, `Esc` | Next icon / back |
 
-Six icons ring the screen: feed, play, clean, medicine, sleep and status. An
-icon blinks red when the matching stat is critical.
+Seven icons ring the screen: feed, play, clean, forage, medicine, sleep and
+status. An icon blinks red when the matching stat is critical.
 
 A news ticker crawls along the bottom of the screen, above the lower icons: the
 weather, a season on its way, the lineage's standing goals, and breaking news —
@@ -77,14 +77,24 @@ Care keeps a pet well; the lineage is why you keep coming back.
 - **The collection.** FOUND x/12 counts species reached across every
   generation. One form, Aurorix, exists only for a well-cared-for child
   evolved while the world is in winter.
-- **Curios.** Left alone for twenty minutes or more, the pet usually finds
-  something — and most finds are gated by season or weather (a snowdrop needs
-  winter, a dewdrop needs rain), so completing CURIOS x/8 takes visits at
-  different times. They are kept on a **collection board** filling the right of
-  the status screen: every curio has a slot, found ones in their own colour,
-  the rest as flat silhouettes, with a tally under any the pet has found more
-  than once. Showing the gaps is the point — the board says what is still out
-  there without saying when to come back for it.
+- **Foraging.** The pet's own job, and the main way the board gets filled. A
+  child can be sent as far as the old wall; an adult can be sent anywhere. See
+  **Sending the pet out**, below.
+- **Curios.** Most finds are gated by season or weather (a snowdrop needs
+  winter, a dewdrop needs rain) and the rarest is gated on how far the pet was
+  pushed, so completing CURIOS x/8 takes visits at different times and trips
+  that went badly. They live on a **collection board** — reached with A from the
+  status screen — where every curio has a slot, found ones in their own colour
+  and the rest as flat silhouettes. Showing the gaps is the point.
+
+  The board has a verb: **three spares trade up** for whichever curio is still
+  missing, so a season you keep failing to catch stops being a wall the year
+  takes an hour to come round. It is grouped into three sets — stones, blooms,
+  weather — and finishing one is a standing reward that makes the pet better at
+  the job that fills the board: surer footed on a long trip, sharper eyed for a
+  find, or able to read the sky. Being left alone for twenty minutes or more
+  still turns something up now and then, but only one of the ordinary things,
+  and only a quarter of the time: absence is the consolation, not the equal.
 - **The album.** A second board under the curios, one slot per form, each drawn
   in its own body colour taken straight from its voxel model so the board and
   the creature always agree. Forms the family has never grown show as
@@ -104,6 +114,26 @@ closed. On load, `reconcile()` replays the gap in five-minute chunks rather than
 applying one big delta, so a long absence follows the same curves a live session
 would. The pet cannot die — health bottoms out at `HEALTH_FLOOR` and it just
 gets sick, sad, and stops thriving until you put it right.
+
+**A long absence is a setback, not a catastrophe.** The first three hours away
+run at the live rate — the pet is simply carrying on without you. After that it
+paces itself at `AWAY_SLOW_PACE`, and offline decay can carry a stat down to
+`AWAY_FLOOR` and no further (health to `AWAY_HEALTH_FLOOR`, which is just below
+sick). Come back after a night and the pet is hungry; come back after a weekend
+and it is hungry, filthy and unwell, and a meal, a bath and a dose put it right.
+The cushion only ever stops a stat falling — it never hands back one the pet had
+already spent. Those same slowed-down hours are left out of the care counters
+entirely, so a weekend away tells on the pet's condition without being held
+against how it was raised.
+
+**Being away is measured from the page, not from the last frame.** A hidden tab
+is still handed the odd animation frame in some browsers, which is enough to
+keep `lastTick` current and make an eight-hour absence look like the minute
+since the last one. So `visibilitychange` records when the page went away and
+the app reports the gap from there. A catch-up big enough to have been an
+absence also counts as one even if the tab never reported itself hidden — the
+welcome screen, the pet's greeting and the curio roll all fire on a returning
+tab, not only on a fresh load.
 
 ### Branching
 
@@ -288,6 +318,12 @@ bedded down just before dawn it gets barely any sleep at all and is up again
 almost at once, free to go back to bed. It wakes when the night ends whether or
 not that was long enough to fill its energy.
 
+**Sleep is restorative.** A sleeping pet's metabolism slows right down rather
+than easing off a little — a night costs it a fraction of the hunger and grime
+the same hours awake would — and its happiness climbs while it dreams. So a full
+night ends with the pet rested, cheerful and ready for breakfast, instead of
+waking to a screen of empty bars that the sleep itself emptied.
+
 **It also wakes on its own the rest of the time**, once it is rested and the sun
 is up — so a nap never ends in the small hours. The same rule applies while the
 app is closed: a pet left asleep wakes at the dawn it would have woken at,
@@ -402,26 +438,104 @@ and a full one passes on the lot.
 
 ### Foraging
 
-A grown pet can be sent out to look for something. The whole decision is *when*:
-what can be found is gated on the season and the weather, so a snowdrop wants a
-winter afternoon and a toadstool an autumn one, and the knowledge the player has
-built up about the year becomes something to act on rather than wait for. It
-comes back with something about three times in four, judged on the world it
-comes home to — which is the world the player chose by picking their moment.
+Sending the pet out used to be one button, ten seconds of black screen and a
+weighted roll. The README claimed the whole decision was *when* to send it, and
+the code never gave that decision anywhere to land. It is now four things: a
+choice of ground, a trip that is told, a risk you can take on purpose, and a
+supply line back into the rest of the game.
 
-It is told as a cut rather than a wait. The pet trots off to the right and over
-the hill, the picture fades to black and holds three seconds while the world
-clock gains two hours, then fades back up with the pet walking in — about ten
-seconds all told, against three real minutes of watching an empty yard. The time
-it was away is real, and the sky has moved for it; it simply is not spent in
-front of the player. The camera stops following the pet once it is over the
-hill, and a pet that is not there keeps its thoughts to itself.
+**Where to send it.** Four grounds, on a menu built to the feed menu's shape —
+A/C to pick, B to go — each wanting a different sort of day.
+
+| Ground | From | Costs | Wants | Turns up |
+| --- | --- | --- | --- | --- |
+| The Old Wall | child | 6 | nothing in particular | pebbles |
+| The Creek | adult | 10 | rain, or a mist | dewdrops, pebbles |
+| The Hollow | adult | 9 | autumn | toadstools, blossom |
+| The Long Hill | adult | 14 | clear weather | feathers, geodes |
+
+Every row carries a read on today — LOOKS PROMISING, WORTH A TRY, NOT TODAY —
+worked out from the ground against the live season and weather, and the same
+read settles the trip when it comes home. That line is the load-bearing part of
+the whole feature: it turns what the player knows about the year into something
+they spend. A ground with no preference is always fair, which is what makes the
+near ground the sensible fallback on a day when nothing else looks good. The
+child's single ground is also how the job grows with the pet rather than
+arriving all at once at the last stage.
+
+**The trip is told, not waited out.** The pet trots off over the hill and the
+picture fades to black as before — that part was always worth watching — but the
+black now hands over to a screen of its own, and the walk arrives a beat at a
+time: setting out, the middle of it, the way home, what it came back with. Beats
+are drawn from the ground, the season, the weather, whether it is dark, and the
+species' own pack, so a Grumphal sighs at the state of the path where a Warden
+checks the boundary as it goes. This had to be a screen rather than a dimmed
+picture: `uDim` in the screen shader multiplies the finished frame, HUD and
+ticker included, so a forage that stayed dimmed could not say anything at all.
+The trip screen is opaque, so handing over from a black picture to a black panel
+is a change of what is drawn rather than anything the eye can catch.
+
+**Push your luck.** Halfway through, the trip asks: `B GO ON   C HOME`, with a
+bar counting down. Nobody answering means coming home, so looking away is never
+punished and never blocks. Each extra leg costs energy, makes a find likelier,
+and raises the chance of a mishap — home caked in mud, limping and footsore,
+late and empty, or caught out and looking it. A mishap that does not spoil the
+find is said alongside it, because the whole point of pushing on is coming back
+muddy and pleased with yourself. Three legs is as far as it goes, and it is the
+only way to reach the rarest finds: the geode, the seeds, the strays.
+
+**What it brings back.** Curios for the board; supplies for the larder; and on a
+long trip, something that changes the yard. Supplies are picked up *on the way*
+rather than looked for, so they ride along with whatever the trip was actually
+about — including a bad one, which is what stops a wasted trip feeling wasted.
+
+- **Food.** Bramble berries, wild roots, honeycomb. They appear on the feed menu
+  beside the bought food with a count beside them, are free, count toward the
+  diet axes like any other meal, and vanish from the menu when they run out. So
+  a grown pet feeds itself, and can be raised toward a particular form on what
+  it finds rather than on what it is handed.
+- **Kindling.** Spent automatically when the pet turns in, and a banked fire
+  costs it `WARM_NIGHT` of what the night would otherwise take. The rest sleep
+  already gives is untouched — only the draining rates are scaled — so a warm
+  night is a pet that wakes up in better shape, not one that wakes up sooner.
+- **Seeds and strays.** See **The yard remembers**, below.
 
 It is the one job the game asks of an adult, and the icon strip grew a seventh
 button for it. That strip was written for three icons a row; it now lays out
 whatever it is given, so the extra one did not quietly fall off the end.
 
+### The yard remembers
+
+Everything else in the yard is either scenery stamped into the terrain when the
+pet changes, or a visitor rolled fresh each world day. A **planting** is
+neither: the pet carries a seed home from a long trip, puts it straight in the
+ground on one of the verge pitches, and it grows a stage a world day until it is
+a bramble, a young tree, or a moonflower that lights itself after dark.
+
+Plantings take the visitors' meshes, shader and lamp lighting but none of their
+dice — they are where they were put and they never leave. Their meshes are
+rebuilt only when something is planted or grows, not per frame, so a yard full
+of trees costs nothing to keep standing. Routing them through the visitors
+rather than the terrain is deliberate: props are baked into the terrain mesh at
+`scatterProps`, and a 40ms rebuild is too much to spend on a seed going in.
+
+A **stray** is the other kind: on the longest trip the pet can win over
+something living — a rabbit, a butterfly, the fireflies — after which it turns
+up whenever its season does instead of only sometimes. That is what befriending
+it bought.
+
+Both live on the save rather than on the pet, so they outlive the pet that
+brought them home. Retiring ends a life, not a garden — and a yard that is
+slowly filling with things a family walked out and found is the one part of the
+world that is a record rather than a seed.
+
 ### Inheritance
+
+What a life is worth to the one after it counts three things: how long the pet
+was allowed to be grown up, how well it was kept, and how much of the collection
+it helped fill. Every term is gated on having lived, so retiring a pet the
+moment it comes of age still passes on almost nothing — but a life spent looking
+is worth passing on.
 
 A family leans the way its forebears did. Retired ancestors are weighed by what
 their lives were worth, and if one temperament carries the weight it nudges the

@@ -2,6 +2,7 @@ import { Mesh, Program, Quat, Transform, Vec3 } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT, VERGE_SLOTS, VERGE_Z } from '../data/biome'
 import { VISITORS, type Visitor, type VisitorId } from '../data/visitors'
+import { plantById, type PlantId } from '../data/plants'
 import type { SeasonId } from '../data/seasons'
 import { buildVoxelGeometry } from './voxel-mesh'
 
@@ -153,6 +154,23 @@ export interface VisitorContext {
   door: { x: number; z: number }
   /** Called when something new turns up, so it can be put on the ticker. */
   announce(name: string): void
+  /**
+   * What has been planted, and how grown each one is. Plantings are not rolled
+   * for and never leave, so they take the same meshes and lighting as the
+   * visitors but none of the dice.
+   */
+  planted: PlantedThing[]
+  /** Visitors the pet befriended: they turn up whenever their season comes round. */
+  regulars: VisitorId[]
+}
+
+/** One planting, as the renderer needs it: what, where, and how far along. */
+export interface PlantedThing {
+  kind: PlantId
+  x: number
+  z: number
+  /** Which growth stage's model to draw. */
+  growth: number
 }
 
 /** How close the pet has to get to send the ball on its way. */
@@ -235,6 +253,47 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     return entry
   })
 
+  /**
+   * Plantings, which take the visitors' meshes and lighting but none of their
+   * dice: they are where they were put, they never leave, and they only change
+   * when something is planted or grows a stage. Rebuilt on that change rather
+   * than per frame, so a yard full of trees costs nothing to keep standing.
+   */
+  interface PlantEntry {
+    mesh: Mesh
+    node: Transform
+  }
+  let plants: PlantEntry[] = []
+  let plantedKey = ''
+
+  const buildPlants = (things: PlantedThing[], groundY: number): void => {
+    for (const entry of plants) {
+      entry.node.setParent(null)
+      entry.mesh.geometry.remove()
+    }
+    plants = []
+    for (const thing of things) {
+      const stage = plantById(thing.kind)?.stages[thing.growth]
+      if (!stage) continue
+      const built = buildVoxelGeometry(gl, stage.model, stage.height)
+      const mesh = new Mesh(gl, { geometry: built.geometry, program })
+      const node = new Transform()
+      node.position.set(thing.x, groundY, thing.z)
+      node.setParent(root)
+      mesh.setParent(node)
+      // Sharing the visitors' program means sharing its fade uniform, and a
+      // planting is always fully there.
+      mesh.onBeforeRender(() => {
+        program.uniforms.uFade.value = 1
+      })
+      plants.push({ mesh, node })
+    }
+  }
+
+  /** What the yard is planted with, as one string, to spot a change cheaply. */
+  const keyOf = (things: PlantedThing[]): string =>
+    things.map((t) => `${t.kind}:${t.growth}:${t.x.toFixed(2)}:${t.z.toFixed(2)}`).join('|')
+
   let lastDay = Number.NaN
   let lastSeason: SeasonId | null = null
   /** Who was here last time round, so arrivals can be announced once each. */
@@ -246,8 +305,10 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     for (const entry of entries) {
       const { visitor } = entry
       const seed = idSeed(visitor.id)
-      const here =
-        visitor.seasons.includes(context.season) && hash2(context.day, seed) < visitor.chance
+      // A befriended stray is no longer a matter of luck: it comes whenever its
+      // season does. That is what befriending it bought.
+      const chance = context.regulars.includes(visitor.id) ? 1 : visitor.chance
+      const here = visitor.seasons.includes(context.season) && hash2(context.day, seed) < chance
       entry.chosen = here
       entry.foretold = false
       // Anything without a window is simply here for the day.
@@ -327,6 +388,12 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         }))
     },
     update(dt, context) {
+      const key = keyOf(context.planted)
+      if (key !== plantedKey) {
+        plantedKey = key
+        buildPlants(context.planted, context.groundY)
+      }
+
       if (context.day !== lastDay || context.season !== lastSeason) {
         const first = Number.isNaN(lastDay)
         lastDay = context.day
