@@ -11,7 +11,7 @@ import {
   tradeTarget,
   type CurioSet,
 } from '../../src/data/curios'
-import { SEASONS, type SeasonId, type WeatherId } from '../../src/data/seasons'
+import { SEASONS, type WeatherId } from '../../src/data/seasons'
 
 /**
  * The collection board. It is the game's long game, so the rules that decide

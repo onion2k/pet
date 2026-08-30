@@ -108,7 +108,7 @@ describe('playing fetch', () => {
   const playOut = (h: ReturnType<typeof withBall>, limit = 80) => {
     for (let i = 0; i < limit && h.app.mode === 'playing'; i++) {
       h.frames(6)
-      h.tap((['a', 'b', 'c'] as const)[i % 3])
+      h.tap((['a', 'b', 'c'] as const)[i % 3]!)
       h.advance(1.2)
     }
     return h
