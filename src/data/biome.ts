@@ -1,21 +1,203 @@
+import {
+  BEACH_GROUNDS,
+  HILL_GROUNDS,
+  MEADOW_GROUNDS,
+  VILLAGE_GROUNDS,
+  WOODLAND_GROUNDS,
+  type Ground,
+} from './grounds'
+import {
+  BEACH_PROPS,
+  HILL_PROPS,
+  MEADOW_PROPS,
+  VILLAGE_PROPS,
+  WOODLAND_PROPS,
+  type Prop,
+} from './props'
+import type { Material } from './seasons'
+import type { VisitorId, VisitorRole } from './visitors'
+
+export type BiomeId = 'meadow' | 'woodland' | 'beach' | 'hill' | 'village'
+
 /**
- * A patch of ground for the pet to live on, and the scenery scattered over it.
- * Shelter will follow as further props on the same grid.
+ * A place for the pet to live: the scenery scattered over it, where it can be
+ * sent to forage, and who turns up in the yard.
+ *
+ * It is deliberately not just a repaint. A biome that only changed the colours
+ * would be wallpaper, and the player would pick one once and forget it. Because
+ * the grounds and the visitors come with the house, moving somewhere is a
+ * decision about what the next stretch of play is made of -- which is the same
+ * reason PLAY was rebuilt to read the yard instead of ignoring it.
  */
+/**
+ * Water at the back of the patch.
+ *
+ * It has to be *on* the patch rather than beyond it. The ground fades into the
+ * sky with depth -- by the patch's far edge the haze is already eight parts in
+ * ten -- so a sea parked past the edge would be the colour of the sky and
+ * nothing else. The ground falls away instead, and the water fills what it
+ * leaves, which puts the waterline in the band that is still crisp and lets the
+ * far water melt into the horizon on its own.
+ */
+export interface Shore {
+  /** World z the ground starts falling away. Behind the shelter, never in it. */
+  from: number
+  /** Height in voxels the seabed settles to. Below `level`. */
+  floor: number
+  /** Height in voxels the water surface sits at. Below the clearing's. */
+  level: number
+  /** Water over sand, and water over nothing. */
+  shallow: string
+  deep: string
+}
+
 export interface Biome {
-  id: string
+  id: BiomeId
   name: string
-  /** Chance a given scatter slot grows something. Colours come from the season. */
+  /** What the ticker calls it, shouted: 'THE MEADOW', 'THE WOOD'. */
+  prose: string
+  /** One line under the name when choosing where to move. */
+  note: string
+  /** Chance a given scatter slot grows something. */
   propDensity: number
+  /** What gets scattered over it. */
+  props: Prop[]
+  /** Its four grounds, one per role. */
+  grounds: Ground[]
+  /** Who fills each living role here. Objects turn up everywhere regardless. */
+  visitors: Record<VisitorRole, VisitorId>
+  /**
+   * Painted over the season's palette rather than replacing it, so a wood is
+   * still recognisably wintry in winter. Four seasons times five places would
+   * be twenty palettes to author and keep in step; this is one small override
+   * per place, and it costs no geometry -- the materials are indices, and the
+   * colours behind them are swapped on the texture every frame anyway.
+   */
+  materials?: Partial<Record<Material, string>>
+  /** Water at the back, if this place has any. */
+  shore?: Shore
 }
 
 export const MEADOW: Biome = {
   id: 'meadow',
   name: 'Meadow',
+  prose: 'THE MEADOW',
+  note: 'Open ground. Wide sky.',
   propDensity: 0.66,
+  props: MEADOW_PROPS,
+  grounds: MEADOW_GROUNDS,
+  visitors: { flitter: 'butterfly', glow: 'fireflies', grazer: 'rabbit', bloom: 'flowers' },
 }
 
-export const BIOMES: Biome[] = [MEADOW]
+export const WOODLAND: Biome = {
+  id: 'woodland',
+  name: 'Woodland',
+  prose: 'THE WOOD',
+  note: 'Close cover. Good for blooms.',
+  // Denser than the meadow, which is what makes it read as a wood rather than
+  // as a meadow with trees in it.
+  propDensity: 0.82,
+  props: WOODLAND_PROPS,
+  grounds: WOODLAND_GROUNDS,
+  visitors: { flitter: 'moth', glow: 'glowworms', grazer: 'deer', bloom: 'bluebells' },
+  materials: {
+    surfaceA: '#3f6b38',
+    surfaceB: '#4a7a3e',
+    soil: '#4a3a2a',
+    foliageDark: '#2f5c2c',
+    foliageLight: '#598a3d',
+    wood: '#5c4530',
+  },
+}
+
+export const BEACH: Biome = {
+  id: 'beach',
+  name: 'Beach',
+  prose: 'THE SHORE',
+  note: 'Open sand. Sun and salt.',
+  // Sparse: an empty beach is the point of a beach, and marram in every slot
+  // would read as a meadow that had been recoloured.
+  propDensity: 0.42,
+  props: BEACH_PROPS,
+  grounds: BEACH_GROUNDS,
+  visitors: { flitter: 'tern', glow: 'seafire', grazer: 'crab', bloom: 'seapinks' },
+  // Starts behind the shelter -- which stands at z -2.45 and would otherwise
+  // have its feet in the water -- and runs out to the patch's edge.
+  shore: {
+    from: -3.7,
+    floor: 1,
+    level: 3,
+    shallow: '#4d8f9e',
+    deep: '#1d4a63',
+  },
+  materials: {
+    surfaceA: '#e0cd9a',
+    surfaceB: '#d4be86',
+    soil: '#b8a071',
+    rock: '#8a8071',
+    rockLight: '#ada291',
+    foliageDark: '#7f8a5c',
+    foliageLight: '#a8b077',
+    wood: '#9a8a72',
+  },
+}
+
+export const HILL: Biome = {
+  id: 'hill',
+  name: 'Hillside',
+  prose: 'THE HILL',
+  note: 'High and bare. Stone country.',
+  propDensity: 0.5,
+  props: HILL_PROPS,
+  grounds: HILL_GROUNDS,
+  visitors: { flitter: 'skylark', glow: 'glowbeetles', grazer: 'sheep', bloom: 'heather' },
+  materials: {
+    // Drier and greyer than the meadow, with the rock a cold stone rather than
+    // a warm one: what makes a hill read as a hill is how much of it is bare.
+    surfaceA: '#87905c',
+    surfaceB: '#96a06a',
+    soil: '#6b6350',
+    rock: '#83807a',
+    rockLight: '#a5a29a',
+    foliageDark: '#4f6b3c',
+    foliageLight: '#7d9450',
+    flower: '#e6c34a',
+  },
+}
+
+export const VILLAGE: Biome = {
+  id: 'village',
+  name: 'Village',
+  prose: 'THE VILLAGE',
+  note: 'Neighbours. Gardens over the wall.',
+  propDensity: 0.6,
+  props: VILLAGE_PROPS,
+  grounds: VILLAGE_GROUNDS,
+  visitors: { flitter: 'sparrow', glow: 'lampmoths', grazer: 'cat', bloom: 'hollyhocks' },
+  materials: {
+    surfaceA: '#7fbe55',
+    surfaceB: '#6faa48',
+    rock: '#8f8b7e',
+    rockLight: '#a9a698',
+    wood: '#7a6144',
+  },
+}
+
+export const BIOMES: Biome[] = [MEADOW, WOODLAND, BEACH, HILL, VILLAGE]
+
+/**
+ * A biome id this build actually knows, or the meadow. Both the save's repair
+ * pass and the pre-boot ground seed need this: `home` picks a scatter pool and
+ * keys a record, so a name from a newer build has to land somewhere real.
+ */
+export const knownBiome = (id: unknown): BiomeId =>
+  BIOMES.some((b) => b.id === id) ? (id as BiomeId) : 'meadow'
+
+export const biomeById = (id: BiomeId): Biome => {
+  const found = BIOMES.find((b) => b.id === id)
+  if (!found) throw new Error(`Unknown biome: ${id}`)
+  return found
+}
 
 /**
  * Columns across the terrain patch. Twice as wide as it is deep: the camera

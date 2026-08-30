@@ -113,9 +113,10 @@ describe('emptySave', () => {
       streak: { days: 0, lastDay: '' },
       counters: { sessions: 0, retirements: 0 },
       shell: 'plum',
+      home: 'meadow',
       larder: {},
     })
-    expect(file.yard).toEqual({ plantings: [], strays: [] })
+    expect(file.yard).toEqual({ gardens: {}, strays: [] })
   })
 
   it('hands out a fresh object each time, not a shared one', () => {
@@ -199,8 +200,9 @@ describe('migrations', () => {
     expect(file.muted).toBe(true)
     expect(file.worldOffset).toBe(0)
     expect(file.album).toEqual([])
-    expect(file.yard).toEqual({ plantings: [], strays: [] })
+    expect(file.yard).toEqual({ gardens: { meadow: [] }, strays: [] })
     expect(file.larder).toEqual({})
+    expect(file.home).toBe('meadow')
   })
 
   it('seeds the lineage list from the pet that already existed', () => {
@@ -225,7 +227,7 @@ describe('migrations', () => {
 
   it('adds an empty yard at version 3', () => {
     store.data[KEY] = JSON.stringify({ ...emptySave(), version: 3, yard: undefined })
-    expect(load().yard).toEqual({ plantings: [], strays: [] })
+    expect(load().yard).toEqual({ gardens: { meadow: [] }, strays: [] })
   })
 
   it('adds an empty larder at version 4', () => {
@@ -263,19 +265,38 @@ describe('repair', () => {
   })
 
   it('replaces a yard that lost its arrays', () => {
-    expect(damaged({ yard: { plantings: 'no', strays: 3 } }).yard).toEqual({
-      plantings: [],
+    expect(damaged({ yard: { gardens: 'no', strays: 3 } }).yard).toEqual({
+      gardens: {},
       strays: [],
     })
   })
 
   it('replaces a yard that is not an object at all', () => {
-    expect(damaged({ yard: null }).yard).toEqual({ plantings: [], strays: [] })
+    expect(damaged({ yard: null }).yard).toEqual({ gardens: {}, strays: [] })
   })
 
   it('keeps a yard that is intact', () => {
-    const yard = { plantings: [{ kind: 'sapling', x: 1, z: 2, plantedAt: 3 }], strays: ['rabbit'] }
+    const yard = {
+      gardens: { meadow: [{ kind: 'sapling', x: 1, z: 2, plantedAt: 3 }] },
+      strays: ['rabbit'],
+    }
     expect(damaged({ yard }).yard).toEqual(yard)
+  })
+
+  it('drops a garden at a place this build has never heard of', () => {
+    const yard = { gardens: { meadow: [], atlantis: [{ kind: 'sapling' }] }, strays: [] }
+    expect(damaged({ yard }).yard.gardens).toEqual({ meadow: [] })
+  })
+
+  it('sends a save home to the meadow when it names somewhere unknown', () => {
+    // `home` picks a scatter pool and keys the gardens, so an unrecognised name
+    // has to land somewhere real rather than crash the first frame.
+    expect(damaged({ home: 'mars' }).home).toBe('meadow')
+    expect(damaged({ home: 7 }).home).toBe('meadow')
+  })
+
+  it('keeps a home it recognises', () => {
+    expect(damaged({ home: 'woodland' }).home).toBe('woodland')
   })
 
   it('replaces a streak that lost its fields', () => {

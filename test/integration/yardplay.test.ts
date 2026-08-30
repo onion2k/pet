@@ -3,7 +3,8 @@ import { harness, DEFAULT_START } from '../harness'
 import { emptySave } from '../../src/game/save'
 import { isPresent, withinHours } from '../../src/game/visitors'
 import { DAY_MS, seasonIdAt, worldHour } from '../../src/game/world'
-import { YARD_GAMES, yardGameById } from '../../src/data/yardgames'
+import { visitorFor, YARD_GAMES, yardGameById } from '../../src/data/yardgames'
+import { MEADOW } from '../../src/data/biome'
 import { PLAY_MIN_ENERGY } from '../../src/game/app'
 
 /**
@@ -26,9 +27,10 @@ function offsetWith(ball: boolean): number {
     const worldDay = Math.floor(at / DAY_MS)
     const season = seasonIdAt(at)
     const hour = worldHour(at)
-    const out = YARD_GAMES.filter(
-      (g) => isPresent(g.visitor, worldDay, season, []) && withinHours(g.visitor, hour),
-    )
+    const out = YARD_GAMES.filter((g) => {
+      const id = visitorFor(g, MEADOW.visitors)
+      return isPresent(id, worldDay, season, []) && withinHours(id, hour)
+    })
     if (ball ? out.some((g) => g.id === 'fetch') : out.length === 0) return offset
   }
   throw new Error(`no day with ${ball ? 'the ball out' : 'an empty yard'}`)

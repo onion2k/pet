@@ -29,7 +29,8 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
   const host: ForageHost = {
     isPetAway: () => away,
     journeyContext: (ground): JourneyContext => ({
-      ground: ground.id,
+      role: ground.role,
+      place: ground.place,
       season: 'spring',
       weather: 'clear',
       night: false,

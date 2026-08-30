@@ -72,7 +72,8 @@ A **HOW TO PLAY** link sits at the top right of the page, and behind it is
 `how-to-play.html`: an illustrated instructions booklet covering the buttons,
 the icon ring, the five stats, the food, the three games, the whole family tree,
 foraging, the curio board, the world's clock, and a map of the meadow with the
-four grounds laid out by how far off they are.
+four grounds laid out by how far off they are. It does not yet know the family
+can move house — the map and its prose are still the meadow's alone.
 
 Almost none of it is written twice. The creatures are drawn from their own voxel
 models (`howto/voxel-sprite.ts`), so a picture in the booklet cannot disagree
@@ -95,6 +96,10 @@ Care keeps a pet well; the lineage is why you keep coming back.
   farewell, a slow walk into the meadow haze, and a place in the album. The
   next egg hatches with an heirloom: a small starting bonus per ancestor,
   capped. NEW PET remains the hard reset; retirement is how a family grows.
+- **Moving house.** Hold C on an adult's status screen and the family can move
+  somewhere else. The grounds and the visitors come with the house, so where you
+  live decides what there is to do; the garden stays behind and the strays come
+  along. See [Moving house](#moving-house).
 - **The collection.** FOUND x/12 counts species reached across every
   generation. One form, Aurorix, exists only for a well-cared-for child
   evolved while the world is in winter.
@@ -467,14 +472,34 @@ choice of ground, a trip that is told, a risk you can take on purpose, and a
 supply line back into the rest of the game.
 
 **Where to send it.** Four grounds, on a menu built to the feed menu's shape —
-A/C to pick, B to go — each wanting a different sort of day.
+A/C to pick, B to go — each wanting a different sort of day. They belong to the
+place the family lives, so moving house swaps all four.
 
-| Ground | From | Costs | Wants | Turns up |
-| --- | --- | --- | --- | --- |
-| The Old Wall | child | 6 | nothing in particular | pebbles |
-| The Creek | adult | 10 | rain, or a mist | dewdrops, pebbles |
-| The Hollow | adult | 9 | autumn | toadstools, blossom |
-| The Long Hill | adult | 14 | clear weather | feathers, geodes |
+| Role | From | Costs | Wants | In the meadow | On the shore |
+| --- | --- | --- | --- | --- | --- |
+| near | child | 6 | nothing in particular | The Old Wall | The Tideline |
+| wet | adult | 10 | rain, or a mist | The Creek | The Rockpools |
+| sheltered | adult | 9 | autumn | The Hollow | The Dunes |
+| far | adult | 14 | clear weather | The Long Hill | The Headland |
+
+Every biome supplies the same four roles at the same costs. That is not
+tidiness: it is what stops moving house from stranding anyone. A child always
+has exactly one ground wherever it lives, and nowhere lacks somewhere to go on a
+fair day. What differs is what a place turns up, because curios are the
+collection and that is the right thing to make somewhere worth living in.
+
+| Place | Leans toward |
+| --- | --- |
+| Meadow | an even spread — pebbles, dewdrops, toadstools, feathers, geodes |
+| Woodland | blooms: blossom and toadstools, and snowdrops off the ridge |
+| Beach | stones and weather: pebbles, feathers, geodes |
+| Hillside | geodes and snowdrops — cold, stony finds |
+| Village | blossom, and the churchyard for the autumn ones |
+
+Sunpetals are the summer bloom nothing inland favours, and they are why two of
+the five are worth the walk: the beach turns them up on the tideline and the
+village out on the water meadow. A collection you cannot finish without living
+somewhere else is the point of the whole arrangement.
 
 Every row carries a read on today — LOOKS PROMISING, WORTH A TRY, NOT TODAY —
 worked out from the ground against the live season and weather, and the same
@@ -550,6 +575,100 @@ Both live on the save rather than on the pet, so they outlive the pet that
 brought them home. Retiring ends a life, not a garden — and a yard that is
 slowly filling with things a family walked out and found is the one part of the
 world that is a record rather than a seed.
+
+### Moving house
+
+A family can move. Hold C on an adult's status screen — alongside hold B to
+retire, because both are things you do a handful of times in a family's life and
+neither should happen because a thumb rested on a button — and the move menu
+offers everywhere it could live.
+
+Five places to live: the **Meadow**, the **Woodland**, the **Beach**, the
+**Hillside** and the **Village**.
+
+Moving is not a repaint. **The grounds and the visitors come with the house**, so
+where you live decides what the next stretch of play is made of: a different four
+grounds turning up different curios, and a different cast out in the yard. A
+biome that only changed the colours would be wallpaper, and you would pick one
+once and forget it.
+
+What tells the five apart on screen is mostly what stands up out of the ground —
+trunks, cottages, outcrops, marram — and only secondarily the colours. That means
+how much of the *shared* cover a place gets is part of its character too: a
+village green has had the stones picked off it, a hilltop has less grass than a
+meadow, and a beach has none at all. Left even, the shared stones and grass
+outweigh everything distinctive and all five read as a recoloured meadow.
+
+The village needs no materials the shelter did not already need — a roof is a
+roof — so it costs a prop set rather than a palette, and the pet's own shelter
+stays its own shelter with the cottages as neighbours.
+
+### The sea
+
+The beach has water at the back of it, and where the water could go was decided
+by the haze rather than by taste.
+
+The patch fades into the sky with depth so its edge is never a visible boundary:
+by the far row the haze is already eight parts in ten. A sea parked out past that
+edge would therefore be the colour of the sky and nothing else. So the water is
+*on* the patch. Past the shelter the ground falls away — pulled toward one seabed
+value rather than having depth subtracted from it, which damps the noise as it
+descends and is what keeps the waterline a single line instead of a scatter of
+sandbanks — and the water fills what it leaves. That puts the waterline in the
+band that is still crisp and lets the far water melt into the horizon on its own.
+
+The water is one flat plane, two triangles, with everything that moves in the
+fragment stage. What sells it at this size is not the surface — it is four pixels
+tall by the time the haze has it — but three things around it: that the ground
+goes visibly under it, that it takes the sky's colour where it is far enough off
+to be a mirror, and that the sun lies on it in a line of sparks written into the
+same bloom mask the lantern glass uses.
+
+The one place it deliberately parts company with the land is the fade. The
+terrain hazes all the way to the sky, because its edge is meant to disappear.
+Water given the same treatment vanishes outright — almost everything you can see
+of a sea is the far part, beyond where the sand stops, and hazed to sky that part
+*is* sky. A real sea keeps most of its colour right up to the horizon and then
+stops at a line. So the water settles toward a horizon tint rather than toward
+the sky and never quite gets there, which is what puts a horizon in the frame at
+all.
+
+Wet sand and foam are two more materials rather than something painted into the
+water, so the band follows every wander of the waterline instead of ruling a
+straight line across it — and goes grey in winter like everything else. They are
+read off the height, but only out on the shore: the clearing is levelled to
+exactly the height a foam line wants, and by height alone the whole lane the pet
+walks in came up white.
+
+Nothing the pet touches is ever near it. The pet does not sample the ground as it
+walks — it is placed at `groundY` wherever it goes — so a roaming band that dipped
+to the waterline would have it standing in the sea and never knowing. The lane,
+the verge, the lantern row and the shelter pad are all asserted dry across a
+spread of seeds in `test/unit/shore.test.ts`, which is the part of the renderer
+that is pure arithmetic and the part that can drown a pet.
+
+**The garden stays, the friends follow.** Plantings belong to the ground they
+were put in — moving leaves three generations of trees standing where they are,
+and that is the price. Strays come along, even where they do not belong: a rabbit
+out on a wood clearing is slightly wrong, entirely charming, and the only visible
+proof the family used to live somewhere else. Gardens are keyed by place rather
+than cleared, so going back finds the trees still there — and the terrain is
+seeded from the pet **and** the place, so going back is going back to the same
+patch of ground rather than to a new one that happens to share a name.
+
+Three of the five yard games are already scarce by season. Gating them by place
+as well would leave a player with a healthy adult and nothing to do, so a game
+that wants a creature asks for a **role** and the biome says who fills it — a
+moth in the wood where the meadow has a butterfly, glow-worms where it has
+fireflies. Same game, same rhythm, different thing to look at. Objects — the
+ball, the sled, the pile of leaves — belong nowhere in particular and turn up
+everywhere. Journey narration is written per ground role for the same reason: a
+new place costs four names and a curio table, not a fresh set of trip lines.
+
+The rebuild is one very long frame — the whole 160×80 patch is re-meshed — so the
+pet walks off and the screen settles for a couple of seconds while the new ground
+is built behind it. A long frame in the middle of the yard reads as a fault; the
+same frame behind a walk reads as a journey.
 
 ### Inheritance
 
@@ -808,14 +927,27 @@ Register the form in `src/data/species.ts` with branch rules scoring against
 `Metrics`. The mesh builder culls interior faces and bakes corner ambient
 occlusion, which is what makes the cubes read at this resolution.
 
-**Terrain and scenery.** `src/data/biome.ts` holds the palettes, the patch's
-dimensions and the scatter density; `src/render/terrain.ts` turns them into
-geometry. A biome is a surface pair, a soil and a rock colour, sky and haze
-tints, and the colours its props resolve to. `src/data/props.ts` holds the props
-themselves as small voxel models with a placeholder palette — `s`/`t` for stone,
-`f`/`e` for foliage, `w` for stems, `p` for flowers — resolved against the biome
-at build time, so one prop set can dress several biomes. Give each a `weight`
-for how often it appears and a `spacing` for how much room it needs.
+**A new place to live.** Add a `Biome` to `src/data/biome.ts`: a name, a line for
+the move menu, a scatter density, a prop pool, its four grounds, and who fills
+each `VisitorRole`. Optionally a `materials` override — a handful of colours
+painted over the season's palette rather than a palette of its own, since five
+places times four seasons would be twenty palettes to keep in step, and a wood
+should still look wintry in winter. Nothing is rebuilt for a tint: terrain and
+props store a material index and the colour behind it is uploaded every frame
+anyway. The patch's dimensions, the lantern row and the verge pitches stay shared
+constants — `LAMP_COUNT` in particular is baked into three shaders at module
+load, so it has to stay fixed. Add the id to `BiomeId`, bump `SAVE_VERSION` only
+if the shape of the save changes, and give the biome four grounds in
+`src/data/grounds.ts` with one of each `GroundRole`.
+
+**Terrain and scenery.** `src/render/terrain.ts` turns a biome into geometry.
+`src/data/props.ts` holds the props themselves as small voxel models with a
+placeholder palette — `s`/`t` for stone, `f`/`e` for foliage, `w` for stems, `p`
+for flowers, `r`/`n` for roof and interior — resolved against the materials at
+build time, so one prop set can dress several biomes. Ground cover is shared and
+the tall things are not, which is most of why two places read as different from
+the same generator. Give each a `weight` for how often it appears and a `spacing`
+for how much room it needs.
 
 **A new food.** Add it to `src/data/foods.ts` with a `DietAxis` and stat deltas.
 Anything with an axis shows up on the feed menu and counts toward branching;

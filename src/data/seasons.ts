@@ -17,6 +17,11 @@ export const MATERIALS = [
   'interior',
   'lampPost',
   'lampGlow',
+  // Only a shore has any use for these two, but a material is a slot in one
+  // shared texture rather than something a biome can invent, so they live on
+  // the list with the rest -- and get to change with the season like the rest.
+  'wet',
+  'foam',
 ] as const
 export type Material = (typeof MATERIALS)[number]
 
@@ -78,6 +83,8 @@ export const SEASONS: Season[] = [
       interior: '#3f3227',
       lampPost: '#4a3b2c',
       lampGlow: '#ffc44f',
+      wet: '#6f5c45',
+      foam: '#e8f2f4',
     },
     daySky: { top: '#4f95e2', bottom: '#c2e7f8' },
     nightSky: { top: '#0d1430', bottom: '#1b2547' },
@@ -104,6 +111,8 @@ export const SEASONS: Season[] = [
       interior: '#40332a',
       lampPost: '#4a3b2c',
       lampGlow: '#ffcf5e',
+      wet: '#7a664c',
+      foam: '#f4fbfd',
     },
     daySky: { top: '#3f8ee8', bottom: '#d2f0ff' },
     nightSky: { top: '#101a3a', bottom: '#20305c' },
@@ -130,6 +139,8 @@ export const SEASONS: Season[] = [
       interior: '#372b22',
       lampPost: '#43362a',
       lampGlow: '#ffb63c',
+      wet: '#645343',
+      foam: '#e2ecef',
     },
     daySky: { top: '#5c8bc4', bottom: '#dcd4b9' },
     nightSky: { top: '#0c1128', bottom: '#1a2038' },
@@ -156,6 +167,8 @@ export const SEASONS: Season[] = [
       interior: '#33291f',
       lampPost: '#3d3227',
       lampGlow: '#ffd070',
+      wet: '#57504a',
+      foam: '#eef6fa',
     },
     daySky: { top: '#6d90b6', bottom: '#e0ebf2' },
     nightSky: { top: '#080d1f', bottom: '#141c33' },

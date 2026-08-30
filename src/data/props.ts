@@ -36,7 +36,12 @@ const palette = {
 export const PROP_KEYS = ['s', 't', 'f', 'e', 'w', 'p', 'r', 'n', 'l', 'g'] as const
 export type PropKey = (typeof PROP_KEYS)[number]
 
-export const PROPS: Prop[] = [
+/**
+ * What lies about on the ground wherever the pet lives -- a stone is a stone,
+ * on a beach or a hilltop or a village green. Biomes are told apart by what
+ * stands up out of the ground, not by what lies about on it.
+ */
+const STONES: Prop[] = [
   {
     id: 'pebble',
     weight: 26,
@@ -117,6 +122,13 @@ export const PROPS: Prop[] = [
       ],
     },
   },
+]
+
+/**
+ * Grass, and what grows in it. Shared by the places that have any -- which is
+ * not a beach, and not much of a hilltop.
+ */
+const GRASS: Prop[] = [
   {
     id: 'tuft',
     weight: 34,
@@ -165,6 +177,10 @@ export const PROPS: Prop[] = [
       ],
     },
   },
+]
+
+/** What stands up out of the meadow: low, open, and mostly flowering. */
+const MEADOW_ONLY: Prop[] = [
   {
     id: 'shrub',
     weight: 14,
@@ -225,6 +241,574 @@ export const PROPS: Prop[] = [
       ],
     },
   },
+]
+
+/**
+ * What stands up out of a wood: trunks, and what grows in their shade. Taller
+ * and denser than the meadow's, which is most of why the two read as different
+ * places from the same terrain generator.
+ */
+const WOODLAND_ONLY: Prop[] = [
+  {
+    id: 'trunk',
+    weight: 22,
+    spacing: 4,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .....
+          .www.
+          .www.
+          .www.
+          .....`),
+        rows(`
+          .....
+          ..w..
+          .www.
+          ..w..
+          .....`),
+        rows(`
+          .....
+          ..w..
+          ..w..
+          ..w..
+          .....`),
+        rows(`
+          .....
+          ..w..
+          ..w..
+          ..w..
+          .....`),
+        rows(`
+          ..f..
+          .fff.
+          fffff
+          .fff.
+          ..f..`),
+        rows(`
+          .fff.
+          fffff
+          fffff
+          fffff
+          .fff.`),
+        rows(`
+          .....
+          .fef.
+          feeef
+          .fef.
+          .....`),
+        rows(`
+          .....
+          ..e..
+          .eee.
+          ..e..
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'stump',
+    weight: 14,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .www.
+          wwwww
+          wwwww
+          wwwww
+          .www.`),
+        rows(`
+          .www.
+          wwwww
+          wwnww
+          wwwww
+          .www.`),
+        rows(`
+          .....
+          .wnw.
+          .nnn.
+          .wnw.
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'bracken',
+    weight: 26,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .f.
+          fff
+          .f.`),
+        rows(`
+          f.f
+          .f.
+          f.f`),
+        rows(`
+          e.e
+          .e.
+          e.e`),
+        rows(`
+          ...
+          .e.
+          ...`),
+      ],
+    },
+  },
+  {
+    id: 'toadstools',
+    weight: 12,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          ...
+          w.w
+          ...`),
+        rows(`
+          .p.
+          ppp
+          .p.`),
+        rows(`
+          ...
+          .p.
+          ...`),
+      ],
+    },
+  },
+]
+
+
+/**
+ * A beach: nothing that needs soil. Marram holds the dunes together, the sea
+ * leaves the rest. No grass and no ferns, which is most of why the ground reads
+ * as sand even before the colours say so.
+ */
+const BEACH_ONLY: Prop[] = [
+  {
+    id: 'marram',
+    weight: 30,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          ...
+          .f.
+          ...`),
+        rows(`
+          f.f
+          .f.
+          f.f`),
+        rows(`
+          e.e
+          ...
+          e.e`),
+      ],
+    },
+  },
+  {
+    id: 'driftwood',
+    weight: 22,
+    spacing: 3,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .....
+          wwwww
+          .ww..
+          .....
+          .....`),
+        rows(`
+          .....
+          ..w..
+          .....
+          .....
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'shell',
+    weight: 34,
+    spacing: 1,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .t.
+          ttt
+          .t.`),
+        rows(`
+          ...
+          .t.
+          ...`),
+      ],
+    },
+  },
+  {
+    id: 'seaweed',
+    weight: 16,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .f.
+          fff
+          .ff`),
+        rows(`
+          ...
+          .f.
+          ...`),
+      ],
+    },
+  },
+]
+
+/**
+ * A hilltop: bones of rock coming through, and the two things that will grow in
+ * the wind. Sparse on purpose -- what makes a hill a hill is how much of it is
+ * bare.
+ */
+const HILL_ONLY: Prop[] = [
+  {
+    id: 'outcrop',
+    weight: 40,
+    spacing: 4,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .sss.
+          sssss
+          sssss
+          sssss
+          .sss.`),
+        rows(`
+          ..ss.
+          .ssss
+          .ssss
+          .sss.
+          .....`),
+        rows(`
+          .....
+          ..tt.
+          ..tt.
+          .....
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'gorse',
+    weight: 30,
+    spacing: 3,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .....
+          ..w..
+          .www.
+          ..w..
+          .....`),
+        rows(`
+          ..f..
+          .fff.
+          fffff
+          .fff.
+          ..f..`),
+        rows(`
+          .....
+          .fpf.
+          fpppf
+          .fpf.
+          .....`),
+        rows(`
+          .....
+          ..p..
+          .ppp.
+          ..p..
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'cairn',
+    weight: 18,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          sss
+          sss
+          sss`),
+        rows(`
+          .ss
+          sss
+          ss.`),
+        rows(`
+          ...
+          .tt
+          .t.`),
+        rows(`
+          ...
+          .t.
+          ...`),
+      ],
+    },
+  },
+  {
+    id: 'heath',
+    weight: 34,
+    spacing: 1,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .f.
+          fff
+          .f.`),
+        rows(`
+          ...
+          .p.
+          ...`),
+      ],
+    },
+  },
+]
+
+/**
+ * A village: the pet's own shelter is still its own shelter, and these are the
+ * neighbours. It needs no materials the shelter did not already need -- a roof
+ * is a roof -- which is why a village costs a prop set rather than a palette.
+ */
+const VILLAGE_ONLY: Prop[] = [
+  {
+    id: 'cottage',
+    weight: 26,
+    spacing: 4,
+    // Tall rather than wide. A wider footprint is rejected more often -- the
+    // scatter will not stamp anything across ground that steps -- and height is
+    // what actually reads from a camera at the pet's eye level. Four courses of
+    // wall put the eaves well above the hedges, which is the difference between
+    // a village and a green with sheds on it.
+    model: {
+      palette,
+      layers: [
+        rows(`
+          sssss
+          sssss
+          sssss
+          sssss
+          sssss`),
+        rows(`
+          wwwww
+          wnnnw
+          wnnnw
+          wnnnw
+          wwwww`),
+        rows(`
+          wwnww
+          wnnnw
+          wnnnw
+          wnnnw
+          wwnww`),
+        rows(`
+          wwwww
+          wnnnw
+          wnnnw
+          wnnnw
+          wwwww`),
+        rows(`
+          wwwww
+          wnnnw
+          wnnnw
+          wnnnw
+          wwwww`),
+        rows(`
+          rrrrr
+          rrrrr
+          rrrrr
+          rrrrr
+          rrrrr`),
+        rows(`
+          .rrr.
+          rrrrr
+          rrrrr
+          rrrrr
+          .rrr.`),
+        rows(`
+          .....
+          .rrr.
+          .rrr.
+          .rrr.
+          .....`),
+        rows(`
+          .....
+          ..r..
+          ..r..
+          ..r..
+          .....`),
+        rows(`
+          .....
+          ....s
+          .....
+          .....
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'drystone',
+    weight: 40,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          sss
+          sss
+          ...`),
+        rows(`
+          tst
+          sts
+          ...`),
+        rows(`
+          .s.
+          s.s
+          ...`),
+      ],
+    },
+  },
+  {
+    id: 'well',
+    weight: 10,
+    spacing: 3,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .sss.
+          ststs
+          stnts
+          ststs
+          .sss.`),
+        rows(`
+          .....
+          s...s
+          s.n.s
+          s...s
+          .....`),
+        rows(`
+          .....
+          w...w
+          .....
+          w...w
+          .....`),
+        rows(`
+          .....
+          rrrrr
+          rrrrr
+          rrrrr
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'hedge',
+    weight: 34,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          fff
+          fff
+          fff`),
+        rows(`
+          fef
+          eee
+          fef`),
+        rows(`
+          .e.
+          eee
+          .e.`),
+      ],
+    },
+  },
+  {
+    id: 'paling',
+    weight: 26,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          w.w
+          ...
+          ...`),
+        rows(`
+          w.w
+          ...
+          ...`),
+        rows(`
+          www
+          ...
+          ...`),
+      ],
+    },
+  },
+]
+
+/** The meadow's scatter pool: stones and grass, plus what the meadow grows. */
+export const MEADOW_PROPS: Prop[] = [...STONES, ...GRASS, ...MEADOW_ONLY]
+
+/** The wood's. */
+export const WOODLAND_PROPS: Prop[] = [...STONES, ...GRASS, ...WOODLAND_ONLY]
+
+/** The beach's. No grass at all: sand does not grow any. */
+export const BEACH_PROPS: Prop[] = [...STONES, ...BEACH_ONLY]
+
+/**
+ * The same prop, turning up more or less often than it does elsewhere.
+ *
+ * Weights are relative within a pool, so how much loose stone and grass a place
+ * has is as much a part of its character as what grows there. A village green
+ * has had the stones picked off it; a hilltop has less grass than a meadow and
+ * more bone showing through. Without this the shared cover outweighs everything
+ * distinctive and all five places read as a recoloured meadow.
+ */
+const asOften = (prop: Prop, weight: number): Prop => ({ ...prop, weight })
+
+const tussock = GRASS.find((p) => p.id === 'tuft')!
+const scarce = (pool: Prop[], weight: number) => pool.map((p) => asOften(p, weight))
+
+/** The hill's. Bone showing through, and the two things that grow in wind. */
+export const HILL_PROPS: Prop[] = [...STONES, asOften(tussock, 16), ...HILL_ONLY]
+
+/** The village's. Grass, but somebody has picked the stones off the green. */
+export const VILLAGE_PROPS: Prop[] = [...scarce(STONES, 6), ...GRASS, ...VILLAGE_ONLY]
+
+/** Every scatterable prop in the world, for the tests that check them all. */
+export const PROPS: Prop[] = [
+  ...STONES,
+  ...GRASS,
+  ...MEADOW_ONLY,
+  ...WOODLAND_ONLY,
+  ...BEACH_ONLY,
+  ...HILL_ONLY,
+  ...VILLAGE_ONLY,
 ]
 
 /**

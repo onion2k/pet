@@ -1,3 +1,4 @@
+import type { BiomeId } from '../data/biome'
 import type { PlayAxis } from '../data/yardgames'
 import type { TemperamentId } from './temperament'
 import type { Larder } from './larder'
@@ -129,6 +130,11 @@ export interface SaveFile {
   counters: { sessions: number; retirements: number }
   /** Shell colour id. */
   shell: string
+  /**
+   * Where the family lives. On the save rather than on the pet: a house
+   * outlives the pet in it, the same way the yard does.
+   */
+  home: BiomeId
   /** What has been planted and befriended. Outlives the pet that brought it home. */
   yard: YardState
   /** Foraged food and fuel, id -> count. The adult's supply line. */

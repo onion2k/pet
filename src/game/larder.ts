@@ -1,5 +1,5 @@
 import { FOODS } from '../data/foods'
-import type { GroundId } from '../data/grounds'
+import type { GroundRole } from '../data/grounds'
 
 /**
  * What the pet carries home that is of use rather than of interest.
@@ -18,8 +18,14 @@ export interface Supply {
   id: string
   /** What the trip says it brought back. */
   what: string
-  /** Which grounds turn it up. Absent means all of them. */
-  grounds?: GroundId[]
+  /**
+   * Which kinds of ground turn it up. Absent means all of them.
+   *
+   * Kinds rather than named grounds: a wet ground is a wet ground whichever
+   * biome it is in, so moving house changes which curios come home without
+   * needing the supply line rewritten for every new place.
+   */
+  roles?: GroundRole[]
   /** How deep into a trip it starts appearing. */
   depth?: number
   weight: number
@@ -27,9 +33,9 @@ export interface Supply {
 
 export const SUPPLIES: Supply[] = [
   { id: KINDLING, what: 'an armful of kindling', weight: 5 },
-  { id: 'berries', what: 'a cap full of brambles', grounds: ['wall', 'hollow'], weight: 4 },
-  { id: 'roots', what: 'a knot of wild roots', grounds: ['hollow', 'creek'], weight: 4 },
-  { id: 'honeycomb', what: 'a piece of honeycomb', grounds: ['hill', 'hollow'], depth: 2, weight: 2 },
+  { id: 'berries', what: 'a cap full of brambles', roles: ['near', 'sheltered'], weight: 4 },
+  { id: 'roots', what: 'a knot of wild roots', roles: ['sheltered', 'wet'], weight: 4 },
+  { id: 'honeycomb', what: 'a piece of honeycomb', roles: ['far', 'sheltered'], depth: 2, weight: 2 },
 ]
 
 export type Larder = Record<string, number>
@@ -37,10 +43,10 @@ export type Larder = Record<string, number>
 /** How much of one thing the larder will hold, so it cannot be hoarded forever. */
 export const LARDER_CAP = 9
 
-/** What a trip to this ground, walked this far, might have picked up. */
-export function findSupply(ground: GroundId, depth: number, roll: number): Supply | null {
+/** What a trip to this kind of ground, walked this far, might have picked up. */
+export function findSupply(role: GroundRole, depth: number, roll: number): Supply | null {
   const pool = SUPPLIES.filter(
-    (s) => (!s.grounds || s.grounds.includes(ground)) && (s.depth ?? 1) <= depth,
+    (s) => (!s.roles || s.roles.includes(role)) && (s.depth ?? 1) <= depth,
   )
   const total = pool.reduce((sum, s) => sum + s.weight, 0)
   if (total <= 0) return null

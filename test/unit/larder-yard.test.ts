@@ -6,9 +6,11 @@ import {
   LARDER_CAP,
   SUPPLIES,
 } from '../../src/game/larder'
+import { MEADOW, WOODLAND } from '../../src/data/biome'
 import {
   countOf,
   emptyYard,
+  gardenAt,
   growthOf,
   plantableKind,
   YARD_CAPACITY,
@@ -16,7 +18,7 @@ import {
 } from '../../src/game/yard'
 import { DAY_MS } from '../../src/game/world'
 import { FOODS } from '../../src/data/foods'
-import { GROUNDS, type GroundId } from '../../src/data/grounds'
+import { GROUNDS, type GroundRole } from '../../src/data/grounds'
 import { GROWTH_STAGES, PLANTS, type PlantId } from '../../src/data/plants'
 
 /**
@@ -47,32 +49,42 @@ describe('SUPPLIES', () => {
     }
   })
 
-  it('only names grounds that exist', () => {
-    const ids = new Set(GROUNDS.map((g) => g.id))
+  it('only names roles that exist', () => {
+    const roles = new Set(GROUNDS.map((g) => g.role))
     for (const supply of SUPPLIES) {
-      for (const ground of supply.grounds ?? []) expect(ids.has(ground)).toBe(true)
+      for (const role of supply.roles ?? []) expect(roles.has(role)).toBe(true)
     }
   })
 })
 
 describe('findSupply', () => {
-  const grounds = GROUNDS.map((g) => g.id)
+  const roles = [...new Set(GROUNDS.map((g) => g.role))]
 
-  it('finds something on every ground at every depth', () => {
-    for (const ground of grounds) {
+  it('finds something on every kind of ground at every depth', () => {
+    for (const role of roles) {
       for (let depth = 1; depth <= 3; depth++) {
         for (const roll of [0, 0.25, 0.5, 0.75, 0.999]) {
-          expect(findSupply(ground, depth, roll)).not.toBeNull()
+          expect(findSupply(role, depth, roll)).not.toBeNull()
         }
       }
     }
   })
 
-  it('only returns supplies that ground actually turns up', () => {
-    for (const ground of grounds) {
+  it('only returns supplies that kind of ground actually turns up', () => {
+    for (const role of roles) {
       for (const roll of [0, 0.3, 0.6, 0.9, 0.999]) {
-        const supply = findSupply(ground, 3, roll)!
-        if (supply.grounds) expect(supply.grounds).toContain(ground)
+        const supply = findSupply(role, 3, roll)!
+        if (supply.roles) expect(supply.roles).toContain(role)
+      }
+    }
+  })
+
+  it('keeps the supply line whole wherever the family lives', () => {
+    // Roles rather than named grounds, so that moving house cannot strand a
+    // pet somewhere its larder has nothing to put in it.
+    for (const biome of [MEADOW, WOODLAND]) {
+      for (const ground of biome.grounds) {
+        expect(findSupply(ground.role, 1, 0.5), `${biome.id}/${ground.id}`).not.toBeNull()
       }
     }
   })
@@ -80,34 +92,34 @@ describe('findSupply', () => {
   it('keeps the deepest supplies out of reach of a short trip', () => {
     const shallow = new Set<string>()
     for (let roll = 0; roll < 1; roll += 0.01) {
-      shallow.add(findSupply('hill', 1, roll)!.id)
+      shallow.add(findSupply('far', 1, roll)!.id)
     }
     expect(shallow.has('honeycomb')).toBe(false)
 
     const deep = new Set<string>()
-    for (let roll = 0; roll < 1; roll += 0.01) deep.add(findSupply('hill', 2, roll)!.id)
+    for (let roll = 0; roll < 1; roll += 0.01) deep.add(findSupply('far', 2, roll)!.id)
     expect(deep.has('honeycomb')).toBe(true)
   })
 
   it('picks by weight, so the first supply owns the lowest rolls', () => {
-    // On the wall the pool is kindling (5) then berries (4); total 9.
-    expect(findSupply('wall', 1, 0)!.id).toBe(KINDLING)
-    expect(findSupply('wall', 1, 4 / 9)!.id).toBe(KINDLING)
-    expect(findSupply('wall', 1, 0.9)!.id).toBe('berries')
+    // On a near ground the pool is kindling (5) then berries (4); total 9.
+    expect(findSupply('near', 1, 0)!.id).toBe(KINDLING)
+    expect(findSupply('near', 1, 4 / 9)!.id).toBe(KINDLING)
+    expect(findSupply('near', 1, 0.9)!.id).toBe('berries')
   })
 
   it('falls back to the last of the pool if a roll lands past the end', () => {
     // Floating-point drift on the running total must not return null.
-    expect(findSupply('wall', 1, 1)).not.toBeNull()
-    expect(findSupply('wall', 1, 1.5)).not.toBeNull()
+    expect(findSupply('near', 1, 1)).not.toBeNull()
+    expect(findSupply('near', 1, 1.5)).not.toBeNull()
   })
 
   it('is null when nothing in the pool is available', () => {
-    expect(findSupply('creek', 0, 0.5)).toBeNull()
+    expect(findSupply('wet', 0, 0.5)).toBeNull()
   })
 
-  it('is null for a ground nothing is keyed to', () => {
-    expect(findSupply('nowhere' as GroundId, 0, 0.5)).toBeNull()
+  it('is null for a kind of ground nothing is keyed to', () => {
+    expect(findSupply('nowhere' as GroundRole, 0, 0.5)).toBeNull()
   })
 })
 
@@ -148,9 +160,31 @@ describe('emptyYard', () => {
   it('is empty, and a fresh one each time', () => {
     const a = emptyYard()
     const b = emptyYard()
-    expect(a).toEqual({ plantings: [], strays: [] })
-    a.plantings.push({ kind: 'sapling', x: 0, z: 0, plantedAt: 0 })
-    expect(b.plantings).toEqual([])
+    expect(a).toEqual({ gardens: {}, strays: [] })
+    gardenAt(a, 'meadow').push({ kind: 'sapling', x: 0, z: 0, plantedAt: 0 })
+    expect(gardenAt(b, 'meadow')).toEqual([])
+  })
+})
+
+describe('gardenAt', () => {
+  it('keeps each place"s plantings to itself, so moving leaves them behind', () => {
+    const yard = emptyYard()
+    gardenAt(yard, 'meadow').push({ kind: 'sapling', x: 0, z: 0, plantedAt: 0 })
+    expect(gardenAt(yard, 'woodland')).toEqual([])
+    expect(gardenAt(yard, 'meadow')).toHaveLength(1)
+  })
+
+  it('finds the same trees still standing on the way back', () => {
+    const yard = emptyYard()
+    const tree: Planting = { kind: 'sapling', x: 0, z: 0, plantedAt: 0 }
+    gardenAt(yard, 'meadow').push(tree)
+    // A round trip: away to the wood, and home again.
+    gardenAt(yard, 'woodland')
+    expect(gardenAt(yard, 'meadow')).toEqual([tree])
+  })
+
+  it('is bare rather than absent for a place never lived in', () => {
+    expect(gardenAt(emptyYard(), 'woodland')).toEqual([])
   })
 })
 
@@ -183,42 +217,44 @@ describe('growthOf', () => {
 
 describe('countOf', () => {
   it('counts only the kind asked for', () => {
-    const yard = emptyYard()
-    yard.plantings.push(
+    const garden: Planting[] = [
       { kind: 'sapling', x: 0, z: 0, plantedAt: 0 },
       { kind: 'sapling', x: 1, z: 0, plantedAt: 0 },
       { kind: 'bramble', x: 2, z: 0, plantedAt: 0 },
-    )
-    expect(countOf(yard, 'sapling')).toBe(2)
-    expect(countOf(yard, 'bramble')).toBe(1)
-    expect(countOf(yard, 'moonflower')).toBe(0)
+    ]
+    expect(countOf(garden, 'sapling')).toBe(2)
+    expect(countOf(garden, 'bramble')).toBe(1)
+    expect(countOf(garden, 'moonflower')).toBe(0)
   })
 })
 
 describe('plantableKind', () => {
   it('is null once the yard is full', () => {
-    const yard = emptyYard()
+    const garden: Planting[] = []
     for (let i = 0; i < YARD_CAPACITY; i++) {
-      yard.plantings.push({ kind: 'sapling', x: i, z: 0, plantedAt: 0 })
+      garden.push({ kind: 'sapling', x: i, z: 0, plantedAt: 0 })
     }
-    expect(plantableKind(yard, 0.5)).toBeNull()
+    expect(plantableKind(garden, 0.5)).toBeNull()
   })
 
   it('prefers something the yard has none of, so a garden ends up varied', () => {
-    const yard = emptyYard()
-    yard.plantings.push({ kind: 'sapling', x: 0, z: 0, plantedAt: 0 })
+    const garden: Planting[] = [{ kind: 'sapling', x: 0, z: 0, plantedAt: 0 }]
     for (let roll = 0; roll < 1; roll += 0.05) {
-      expect(plantableKind(yard, roll)).not.toBe('sapling')
+      expect(plantableKind(garden, roll)).not.toBe('sapling')
     }
   })
 
   it('falls back to the whole list once every kind is represented', () => {
-    const yard = emptyYard()
-    PLANTS.forEach((p, i) => yard.plantings.push({ kind: p.id, x: i, z: 0, plantedAt: 0 }))
+    const garden: Planting[] = PLANTS.map((p, i) => ({
+      kind: p.id,
+      x: i,
+      z: 0,
+      plantedAt: 0,
+    }))
     // One slot left, and nothing fresh: any kind will do.
-    expect(yard.plantings.length).toBeLessThan(YARD_CAPACITY)
+    expect(garden.length).toBeLessThan(YARD_CAPACITY)
     const kinds = new Set<PlantId | null>()
-    for (let roll = 0; roll < 1; roll += 0.05) kinds.add(plantableKind(yard, roll))
+    for (let roll = 0; roll < 1; roll += 0.05) kinds.add(plantableKind(garden, roll))
     expect(kinds.size).toBeGreaterThan(1)
     expect(kinds.has(null)).toBe(false)
   })
@@ -226,12 +262,12 @@ describe('plantableKind', () => {
   it('always names a plant that exists', () => {
     const ids = new Set(PLANTS.map((p) => p.id))
     for (let roll = 0; roll < 1; roll += 0.01) {
-      const kind = plantableKind(emptyYard(), roll)
+      const kind = plantableKind([], roll)
       expect(ids.has(kind!)).toBe(true)
     }
   })
 
   it('stays in range for a roll of exactly one', () => {
-    expect(plantableKind(emptyYard(), 1)).not.toBeNull()
+    expect(plantableKind([], 1)).not.toBeNull()
   })
 })

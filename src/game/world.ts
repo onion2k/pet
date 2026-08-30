@@ -115,6 +115,40 @@ function seasonPalette(season: Season): Rgb[] {
   return cached
 }
 
+const tintCache = new Map<string, (Rgb | null)[]>()
+
+/** A biome's overrides in MATERIALS order, with a hole wherever it has none. */
+function tintFor(id: string, materials: Partial<Record<Material, string>>): (Rgb | null)[] {
+  let cached = tintCache.get(id)
+  if (!cached) {
+    cached = MATERIALS.map((name: Material) => {
+      const hex = materials[name]
+      return hex ? hexToLinear(hex) : null
+    })
+    tintCache.set(id, cached)
+  }
+  return cached
+}
+
+/**
+ * The season's colours, repainted for where the pet lives.
+ *
+ * A biome overrides a handful of materials rather than owning a palette of its
+ * own: five places times four seasons would be twenty palettes to author and
+ * keep in step, and a wood should still look wintry in winter. Nothing is
+ * rebuilt for this -- terrain and props store a material index, and the colour
+ * behind the index is uploaded fresh every frame anyway.
+ */
+export function tintPalette(
+  palette: Rgb[],
+  id: string,
+  materials?: Partial<Record<Material, string>>,
+): Rgb[] {
+  if (!materials) return palette
+  const overrides = tintFor(id, materials)
+  return palette.map((colour, i) => overrides[i] ?? colour)
+}
+
 interface SeasonPoint {
   season: Season
   nextSeason: Season

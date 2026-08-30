@@ -163,6 +163,11 @@ export interface VisitorContext {
   planted: PlantedThing[]
   /** Visitors the pet befriended: they turn up whenever their season comes round. */
   regulars: VisitorId[]
+  /**
+   * Who could turn up where the pet lives. Settled by the game rather than
+   * here, so what is drawn in the yard and what PLAY offers cannot disagree.
+   */
+  roster: VisitorId[]
 }
 
 /** One planting, as the renderer needs it: what, where, and how far along. */
@@ -295,7 +300,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       const seed = idSeed(visitor.id)
       // Who is here is the game's to settle, not the renderer's -- the yard has
       // to be something the game can offer you, not only something drawn.
-      const here = isPresent(visitor.id, context.day, context.season, context.regulars)
+      const here =
+        context.roster.includes(visitor.id) &&
+        isPresent(visitor.id, context.day, context.season, context.regulars)
       entry.chosen = here
       entry.foretold = false
       // Anything without a window is simply here for the day.
