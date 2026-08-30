@@ -36,7 +36,12 @@ const palette = {
 export const PROP_KEYS = ['s', 't', 'f', 'e', 'w', 'p', 'r', 'n', 'l', 'g'] as const
 export type PropKey = (typeof PROP_KEYS)[number]
 
-export const PROPS: Prop[] = [
+/**
+ * Ground cover that turns up wherever the pet lives -- a stone is a stone.
+ * Biomes are told apart by what stands up out of the grass, not by what lies
+ * about in it, so these are shared and the tall things are not.
+ */
+const GROUND_COVER: Prop[] = [
   {
     id: 'pebble',
     weight: 26,
@@ -165,6 +170,10 @@ export const PROPS: Prop[] = [
       ],
     },
   },
+]
+
+/** What stands up out of the meadow: low, open, and mostly flowering. */
+const MEADOW_ONLY: Prop[] = [
   {
     id: 'shrub',
     weight: 14,
@@ -226,6 +235,157 @@ export const PROPS: Prop[] = [
     },
   },
 ]
+
+/**
+ * What stands up out of a wood: trunks, and what grows in their shade. Taller
+ * and denser than the meadow's, which is most of why the two read as different
+ * places from the same terrain generator.
+ */
+const WOODLAND_ONLY: Prop[] = [
+  {
+    id: 'trunk',
+    weight: 22,
+    spacing: 4,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .....
+          .www.
+          .www.
+          .www.
+          .....`),
+        rows(`
+          .....
+          ..w..
+          .www.
+          ..w..
+          .....`),
+        rows(`
+          .....
+          ..w..
+          ..w..
+          ..w..
+          .....`),
+        rows(`
+          .....
+          ..w..
+          ..w..
+          ..w..
+          .....`),
+        rows(`
+          ..f..
+          .fff.
+          fffff
+          .fff.
+          ..f..`),
+        rows(`
+          .fff.
+          fffff
+          fffff
+          fffff
+          .fff.`),
+        rows(`
+          .....
+          .fef.
+          feeef
+          .fef.
+          .....`),
+        rows(`
+          .....
+          ..e..
+          .eee.
+          ..e..
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'stump',
+    weight: 14,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .www.
+          wwwww
+          wwwww
+          wwwww
+          .www.`),
+        rows(`
+          .www.
+          wwwww
+          wwnww
+          wwwww
+          .www.`),
+        rows(`
+          .....
+          .wnw.
+          .nnn.
+          .wnw.
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'bracken',
+    weight: 26,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .f.
+          fff
+          .f.`),
+        rows(`
+          f.f
+          .f.
+          f.f`),
+        rows(`
+          e.e
+          .e.
+          e.e`),
+        rows(`
+          ...
+          .e.
+          ...`),
+      ],
+    },
+  },
+  {
+    id: 'toadstools',
+    weight: 12,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          ...
+          w.w
+          ...`),
+        rows(`
+          .p.
+          ppp
+          .p.`),
+        rows(`
+          ...
+          .p.
+          ...`),
+      ],
+    },
+  },
+]
+
+/** The meadow's scatter pool: ground cover, plus what the meadow grows. */
+export const MEADOW_PROPS: Prop[] = [...GROUND_COVER, ...MEADOW_ONLY]
+
+/** The wood's. */
+export const WOODLAND_PROPS: Prop[] = [...GROUND_COVER, ...WOODLAND_ONLY]
+
+/** Every scatterable prop in the world, for the tests that check them all. */
+export const PROPS: Prop[] = [...GROUND_COVER, ...MEADOW_ONLY, ...WOODLAND_ONLY]
 
 /**
  * The pet's shelter. Placed at a fixed spot rather than scattered, on ground

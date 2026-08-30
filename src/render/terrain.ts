@@ -17,7 +17,7 @@ import {
   TERRAIN_VOXEL,
   type Biome,
 } from '../data/biome'
-import { LANTERN, PROPS, SHELTER, type Prop, type PropKey } from '../data/props'
+import { LANTERN, SHELTER, type Prop, type PropKey } from '../data/props'
 import { MATERIAL_INDEX, PROP_MATERIAL } from '../data/seasons'
 import { expandLayers } from '../data/voxel-format'
 import type { PaletteTexture } from './palette'
@@ -222,7 +222,8 @@ function scatterProps(
   const halfZ = TERRAIN_ROWS / 2
   const laneX = LANE_HALF_X / TERRAIN_VOXEL
   const laneZ = LANE_HALF_Z / TERRAIN_VOXEL + PROP_CLEARING_MARGIN
-  const totalWeight = PROPS.reduce((sum, prop) => sum + prop.weight, 0)
+  const pool = biome.props
+  const totalWeight = pool.reduce((sum, prop) => sum + prop.weight, 0)
   let top = 0
   let count = 0
 
@@ -242,11 +243,11 @@ function scatterProps(
 
   const pick = (roll: number): Prop => {
     let remaining = roll * totalWeight
-    for (const prop of PROPS) {
+    for (const prop of pool) {
       remaining -= prop.weight
       if (remaining <= 0) return prop
     }
-    return PROPS[PROPS.length - 1]!
+    return pool[pool.length - 1]!
   }
 
   /** Writes a prop's voxels into the field with its base at `baseY`. */

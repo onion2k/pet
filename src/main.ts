@@ -6,8 +6,8 @@ import { App } from './game/app'
 import { Beeper } from './engine/audio'
 import { createButtonHitTest, createInput } from './engine/input'
 import { Orbit } from './engine/orbit'
-import { LAMP_COUNT, LAMP_PARKED, MEADOW, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
-import { DAY_MS, worldAt, type Rgb } from './game/world'
+import { biomeById, knownBiome, LAMP_COUNT, LAMP_PARKED, ROAM_HALF_X, ROAM_HALF_Z } from './data/biome'
+import { DAY_MS, tintPalette, worldAt, type Rgb } from './game/world'
 import { legacyOf, temperamentFrom } from './game/temperament'
 import { evolve, feed, readyToEvolve, recordPlay } from './game/actions'
 import { PaletteTexture } from './render/palette'
@@ -73,22 +73,32 @@ let cameraPan = 0
 const backdrop = createBackdrop(gl)
 backdrop.root.setParent(screenScene)
 
-/** The saved pet's id, read before the app exists so the ground can be seeded. */
-function app0Seed(): string {
+/**
+ * The saved pet and where it lives, read before the app exists so the ground
+ * can be seeded. Both, because the ground is seeded from the pair: moving house
+ * and back has to find the same patch it left, or the garden it left there
+ * would come back standing on somebody else's hill.
+ */
+function app0Seed(): { id: string; home: string } {
   try {
     const raw = localStorage.getItem('petz9000.save')
-    const id = raw ? (JSON.parse(raw)?.pet?.id as string | undefined) : undefined
-    return id ?? 'meadow'
+    const saved = raw ? JSON.parse(raw) : null
+    return { id: (saved?.pet?.id as string) ?? 'meadow', home: (saved?.home as string) ?? 'meadow' }
   } catch {
-    return 'meadow'
+    return { id: 'meadow', home: 'meadow' }
   }
 }
 
-const biome = MEADOW
+/** One ground per pet per place, so going back is going back. */
+const groundSeed = (id: string, home: string): string => `${id}:${home}`
+
+const booted = app0Seed()
+let homeId = booted.home
+let biome = biomeById(knownBiome(homeId))
 const seasonPalette = new PaletteTexture(gl)
 // Seeded from the pet, so every life gets its own patch of ground and its own
 // arrangement of scenery.
-let terrainSeed = app0Seed()
+let terrainSeed = groundSeed(booted.id, homeId)
 const terrain = createTerrain(gl, terrainSeed, biome, seasonPalette)
 terrain.root.setParent(screenScene)
 
@@ -301,9 +311,16 @@ function step(dt: number): void {
   app.update(dt, Date.now())
   updateAnnouncement(dt)
 
-  // A new pet gets new ground. Evolution does not disturb it.
-  if (app.pet && app.pet.id !== terrainSeed) {
-    terrainSeed = app.pet.id
+  // A new pet gets new ground, and so does a move. Evolution disturbs neither.
+  //
+  // The rebuild is one very long frame -- the whole 160x80 patch is re-meshed --
+  // so a move waits until the pet has walked off and the screen is settling,
+  // and a new pet has nothing on screen to stutter yet.
+  const wantedSeed = app.pet ? groundSeed(app.pet.id, app.biome.id) : terrainSeed
+  if (wantedSeed !== terrainSeed) {
+    terrainSeed = wantedSeed
+    homeId = app.biome.id
+    biome = app.biome
     terrain.rebuild(terrainSeed, biome)
     petView.root.position.y = terrain.shape.groundY
     // New ground means the shelter may have moved to the other side.
@@ -344,7 +361,7 @@ function step(dt: number): void {
   // One definition of what time it is in the pet's world, shared by the picture
   // and by the pet itself.
   const world = worldAt(app.worldNow())
-  seasonPalette.update(world.palette)
+  seasonPalette.update(tintPalette(world.palette, biome.id, biome.materials))
 
   // The sun's direction is in world space; the screen camera never moves, so it
   // is cheaper to rotate it into view space here than in every shader.
@@ -425,6 +442,7 @@ function step(dt: number): void {
     announce: (text) => app.pushTicker(text),
     planted: app.planted,
     regulars: app.regulars,
+    roster: app.roster,
   })
   petView.setPlaything(visitors.playthingAt())
 
@@ -530,7 +548,9 @@ if (import.meta.env.DEV) {
       shell,
       orbit,
       terrain,
-      biome,
+      // A function, not the value: the biome changes when the family moves, and
+      // a snapshot taken at boot would go on reporting the meadow forever.
+      biome: () => biome,
       petView,
       weather,
       visitors,

@@ -9,13 +9,41 @@ import type { Stage } from '../game/types'
  *
  * The near ground is open to a child. The rest are an adult's, so the job grows
  * with the pet instead of arriving all at once at the last stage.
+ *
+ * Every biome supplies the same four roles. That is not tidiness for its own
+ * sake: it is what stops moving house from stranding a player. A child always
+ * has exactly one ground wherever it lives, and nowhere lacks somewhere to go
+ * on a fair day. What actually differs between two biomes' grounds is what they
+ * turn up -- which is the right lever, because curios are the collection.
  */
 
-export type GroundId = 'wall' | 'creek' | 'hollow' | 'hill'
+/**
+ * The four jobs a ground does. Narration is written per role rather than per
+ * ground, so a new biome costs four names and a curio table rather than a
+ * fresh set of journey lines.
+ */
+export type GroundRole = 'near' | 'wet' | 'sheltered' | 'far'
+
+export type GroundId =
+  | 'wall'
+  | 'creek'
+  | 'hollow'
+  | 'hill'
+  | 'coppice'
+  | 'streambed'
+  | 'deadfall'
+  | 'ridge'
 
 export interface Ground {
   id: GroundId
+  role: GroundRole
   name: string
+  /**
+   * The ground in a sentence, lower case, for the journey lines to slot in:
+   * "ambles down to the old wall". Role narration is shared, so this is the
+   * only part of a trip that names where the pet actually went.
+   */
+  place: string
   /** Shown under the name on the menu, in the feed menu's voice. */
   note: string
   /** The stage the pet has to have reached to be sent here. */
@@ -32,10 +60,12 @@ export interface Ground {
   weather?: WeatherId[]
 }
 
-export const GROUNDS: Ground[] = [
+export const MEADOW_GROUNDS: Ground[] = [
   {
     id: 'wall',
+    role: 'near',
     name: 'The Old Wall',
+    place: 'the old wall',
     note: 'Close by. Modest pickings.',
     from: 'child',
     energy: 6,
@@ -44,7 +74,9 @@ export const GROUNDS: Ground[] = [
   },
   {
     id: 'creek',
+    role: 'wet',
     name: 'The Creek',
+    place: 'the creek',
     note: 'Wants rain, or a mist.',
     from: 'adult',
     energy: 10,
@@ -54,7 +86,9 @@ export const GROUNDS: Ground[] = [
   },
   {
     id: 'hollow',
+    role: 'sheltered',
     name: 'The Hollow',
+    place: 'the hollow',
     note: 'Sheltered. Best in autumn.',
     from: 'adult',
     energy: 9,
@@ -64,7 +98,9 @@ export const GROUNDS: Ground[] = [
   },
   {
     id: 'hill',
+    role: 'far',
     name: 'The Long Hill',
+    place: 'the long hill',
     note: 'A climb, and a wide view.',
     from: 'adult',
     energy: 14,
@@ -74,16 +110,77 @@ export const GROUNDS: Ground[] = [
   },
 ]
 
+/**
+ * The wood's four. Same roles, same costs, different pickings: a wood is worth
+ * moving to because it turns up blooms where the meadow turns up stones, not
+ * because it is easier.
+ */
+export const WOODLAND_GROUNDS: Ground[] = [
+  {
+    id: 'coppice',
+    role: 'near',
+    name: 'The Coppice',
+    place: 'the coppice',
+    note: 'Just through the trees.',
+    from: 'child',
+    energy: 6,
+    luck: 0.55,
+    favours: ['blossom'],
+  },
+  {
+    id: 'streambed',
+    role: 'wet',
+    name: 'The Streambed',
+    place: 'the streambed',
+    note: 'Wants rain, or a mist.',
+    from: 'adult',
+    energy: 10,
+    luck: 0.7,
+    weather: ['rain', 'mist'],
+    favours: ['dewdrop', 'geode'],
+  },
+  {
+    id: 'deadfall',
+    role: 'sheltered',
+    name: 'The Deadfall',
+    place: 'the deadfall',
+    note: 'Sheltered. Best in autumn.',
+    from: 'adult',
+    energy: 9,
+    luck: 0.7,
+    seasons: ['autumn'],
+    favours: ['toadstool', 'pebble'],
+  },
+  {
+    id: 'ridge',
+    role: 'far',
+    name: 'The Ridge',
+    place: 'the ridge',
+    note: 'A climb, and a wide view.',
+    from: 'adult',
+    energy: 14,
+    luck: 0.75,
+    weather: ['clear'],
+    favours: ['feather', 'snowdrop'],
+  },
+]
+
+/** Every ground in the world, so an id can be looked up without its biome. */
+export const GROUNDS: Ground[] = [...MEADOW_GROUNDS, ...WOODLAND_GROUNDS]
+
 export const groundById = (id: GroundId): Ground => {
   const found = GROUNDS.find((g) => g.id === id)
   if (!found) throw new Error(`Unknown ground: ${id}`)
   return found
 }
 
-/** Which grounds this pet is old enough for. A child has one; an adult has all. */
-export function groundsFor(stage: Stage): Ground[] {
-  if (stage === 'adult') return GROUNDS
-  if (stage === 'child') return GROUNDS.filter((g) => g.from === 'child')
+/**
+ * Which of this biome's grounds the pet is old enough for. A child has one; an
+ * adult has all four.
+ */
+export function groundsFor(grounds: Ground[], stage: Stage): Ground[] {
+  if (stage === 'adult') return grounds
+  if (stage === 'child') return grounds.filter((g) => g.from === 'child')
   return []
 }
 

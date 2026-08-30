@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { VISITORS } from '../../src/data/visitors'
-import { hash2, idSeed, isPresent, visitorsPresent, withinHours } from '../../src/game/visitors'
+import { hash2, idSeed, isPresent, roster, visitorsPresent, withinHours } from '../../src/game/visitors'
+import { BIOMES, MEADOW, WOODLAND } from '../../src/data/biome'
 import type { SeasonId } from '../../src/data/seasons'
 
 const SEASONS: SeasonId[] = ['spring', 'summer', 'autumn', 'winter']
@@ -8,11 +9,14 @@ const SEASONS: SeasonId[] = ['spring', 'summer', 'autumn', 'winter']
  *  A few hundred days leaves ordinary sampling noise wide enough to fail. */
 const DAYS = 4000
 
+/** Everyone, so the roll is tested rather than the roster that narrows it. */
+const EVERYONE = VISITORS.map((v) => v.id)
+
 describe('who is in the yard', () => {
   it('never turns up out of season', () => {
     for (const season of SEASONS) {
       for (let day = 0; day < DAYS; day++) {
-        for (const id of visitorsPresent(day, season, [])) {
+        for (const id of visitorsPresent(EVERYONE, day, season, [])) {
           const visitor = VISITORS.find((v) => v.id === id)!
           expect(visitor.seasons).toContain(season)
         }
@@ -22,8 +26,8 @@ describe('who is in the yard', () => {
 
   it('is settled for the day rather than flickering', () => {
     for (let day = 0; day < DAYS; day++) {
-      const first = visitorsPresent(day, 'summer', [])
-      expect(visitorsPresent(day, 'summer', [])).toEqual(first)
+      const first = visitorsPresent(EVERYONE, day, 'summer', [])
+      expect(visitorsPresent(EVERYONE, day, 'summer', [])).toEqual(first)
     }
   })
 
@@ -94,5 +98,35 @@ describe('hour windows', () => {
     expect(withinHours('fireflies', 12)).toBe(false)
     expect(withinHours('fireflies', 19)).toBe(false)
     expect(withinHours('fireflies', 4)).toBe(false)
+  })
+})
+
+describe('who could turn up at all', () => {
+  it('always has room for the objects, which belong to nowhere in particular', () => {
+    for (const biome of BIOMES) {
+      const here = roster(biome, [])
+      for (const id of ['ball', 'sled', 'leafpile'] as const) {
+        expect(here, biome.id).toContain(id)
+      }
+    }
+  })
+
+  it('keeps each place"s own creatures to itself', () => {
+    expect(roster(MEADOW, [])).toContain('butterfly')
+    expect(roster(MEADOW, [])).not.toContain('moth')
+    expect(roster(WOODLAND, [])).toContain('moth')
+    expect(roster(WOODLAND, [])).not.toContain('butterfly')
+  })
+
+  it('lets a stray follow the pet to a place it does not belong', () => {
+    // The garden stays behind when a family moves; the friends do not. A rabbit
+    // out in the wood is the only visible proof the pet lived somewhere else.
+    expect(roster(WOODLAND, ['rabbit'])).toContain('rabbit')
+  })
+
+  it('is in declaration order, so the renderer places things the same each day', () => {
+    const here = roster(WOODLAND, ['rabbit'])
+    const order = EVERYONE.filter((id) => here.includes(id))
+    expect(here).toEqual(order)
   })
 })

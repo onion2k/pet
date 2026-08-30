@@ -1,4 +1,5 @@
-import { VISITORS, type VisitorId } from '../data/visitors'
+import { UNIVERSAL_VISITORS, VISITORS, type VisitorId } from '../data/visitors'
+import type { Biome } from '../data/biome'
 import type { SeasonId } from '../data/seasons'
 
 /**
@@ -51,13 +52,34 @@ export function isPresent(
   return hash2(day, idSeed(id)) < chance
 }
 
+/**
+ * Who could turn up where the pet lives: the ones that turn up anywhere, plus
+ * whoever fills this biome's roles, plus every stray it has ever befriended.
+ *
+ * The strays are in there whatever the biome, and that is the point. Moving
+ * house leaves the garden behind but not the friends -- a rabbit out on a wood
+ * clearing is slightly wrong and entirely charming, and it is the only visible
+ * proof that the pet used to live somewhere else.
+ */
+export function roster(biome: Biome, regulars: VisitorId[]): VisitorId[] {
+  const here = new Set<VisitorId>([
+    ...UNIVERSAL_VISITORS,
+    ...Object.values(biome.visitors),
+    ...regulars,
+  ])
+  // Declaration order, not set order: the renderer places visitors in the order
+  // it is handed them, so this has to be stable from one day to the next.
+  return VISITORS.filter((v) => here.has(v.id)).map((v) => v.id)
+}
+
 /** Everyone in the yard today, in the order they are declared. */
 export function visitorsPresent(
+  roster: VisitorId[],
   day: number,
   season: SeasonId,
   regulars: VisitorId[],
 ): VisitorId[] {
-  return VISITORS.filter((v) => isPresent(v.id, day, season, regulars)).map((v) => v.id)
+  return roster.filter((id) => isPresent(id, day, season, regulars))
 }
 
 /**

@@ -1,7 +1,13 @@
 import { afterEach } from 'vitest'
 import { manualClock, resetClock, setClock } from '../src/engine/clock'
 import { resetRandom, scripted, seeded, setRandom, type RandomFn } from '../src/engine/random'
-import { App, HOLD_TO_BACK_SECONDS, RETIRE_HOLD_SECONDS, type AppHooks } from '../src/game/app'
+import {
+  App,
+  HOLD_TO_BACK_SECONDS,
+  MOVE_HOLD_SECONDS,
+  RETIRE_HOLD_SECONDS,
+  type AppHooks,
+} from '../src/game/app'
 import { STAGE_DURATION } from '../src/game/tuning'
 import {
   cancelPendingSave,
@@ -216,6 +222,11 @@ export class Harness {
   /** Long enough to see an adult off. */
   holdRetire(): this {
     return this.hold('b', RETIRE_HOLD_SECONDS + 4 * FRAME)
+  }
+
+  /** Long enough to open the move menu from an adult's status screen. */
+  holdMove(): this {
+    return this.hold('c', MOVE_HOLD_SECONDS + 4 * FRAME)
   }
 
   /** Steps past the power-on splash to whatever screen the save implies. */

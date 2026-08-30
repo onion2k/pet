@@ -8,21 +8,21 @@ import { random } from '../engine/random'
 import { now as clockNow } from '../engine/clock'
 import { clean, evolve, feed, readyToEvolve, recordPlay, toggleSleep, type Evolution, type YardStake } from './actions'
 import { MINIGAMES, YARD_SESSIONS, type GameSession, type Minigame } from './minigames'
-import { YARD_GAMES, type YardGame, type YardGameId } from '../data/yardgames'
+import { visitorFor, YARD_GAMES, type YardGame, type YardGameId } from '../data/yardgames'
 import { legacyOf, lineageOf, temperamentOf, type TemperamentId } from './temperament'
 import { metrics, type Metrics } from './metrics'
 import { emptyPlayAxes, load, newPet, save, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
 import { Forage } from './forage'
-import { growthOf, plantableKind, type Planting } from './yard'
+import { gardenAt, growthOf, plantableKind, type Planting } from './yard'
 import { findSupply, gatheredFoods, KINDLING, LARDER_CAP } from './larder'
 import { plantById } from '../data/plants'
 import { VISITORS, type VisitorId } from '../data/visitors'
-import { VERGE_SLOTS, VERGE_Z } from '../data/biome'
+import { biomeById, BIOMES, VERGE_SLOTS, VERGE_Z, type Biome } from '../data/biome'
 import type { PlantedThing } from '../render/visitors'
 import { groundsFor, prospectOf, type Ground, type Prospect } from '../data/grounds'
 import { DAY_MS, hoursUntilSunrise, isNight, seasonIdAt, worldAt, worldHour, WORLD_HOUR_MS } from './world'
-import { visitorsPresent, withinHours } from './visitors'
+import { roster, visitorsPresent, withinHours } from './visitors'
 import {
   COMMON_CURIOS,
   completedSets,
@@ -54,6 +54,7 @@ export type Mode =
   | 'playing'
   | 'evolve'
   | 'retire'
+  | 'move'
 
 /** One row of the play menu: something out in the yard, or one of the three. */
 export type PlayOption =
@@ -110,11 +111,27 @@ export const HOLD_TO_BACK_SECONDS = 0.8
 /** How long B must be held on the status screen to retire an adult. Longer
  *  than the back-hold: this one ends a life, gently. */
 export const RETIRE_HOLD_SECONDS = 1.6
+/**
+ * How long C must be held on the status screen to open the move menu. The same
+ * as retiring, because it asks for the same kind of pause: both are things a
+ * player does a handful of times in a family's life, and neither should ever
+ * happen because a thumb rested on a button.
+ */
+export const MOVE_HOLD_SECONDS = 1.6
+/** How long the screen holds while the new ground is built and settled into. */
+const SETTLING_SECONDS = 2.2
+/**
+ * What moving costs. The energy of the longest forage there is, because it is
+ * the same day's walking, and a dent in happiness that ordinary care mends
+ * within the day -- a pet is out of sorts in a new place, not wounded by it.
+ */
+const MOVE_ENERGY = 14
+const MOVE_UNSETTLED = 12
 /** Starting-stat bonus per retired ancestor, and its cap. */
 const HEIRLOOM_PER_ANCESTOR = 5
 const HEIRLOOM_CAP = 15
 /** Screens that C can be held to escape from. */
-const ESCAPABLE: Mode[] = ['feed', 'games', 'grounds', 'curios', 'playing']
+const ESCAPABLE: Mode[] = ['feed', 'games', 'grounds', 'curios', 'playing', 'move']
 
 export interface AppHooks {
   sound(id: SoundId): void
@@ -187,6 +204,18 @@ export class App {
   /** True only for a B press that began on the status screen itself, so the
    *  release of the press that opened the screen cannot close it. */
   private retireArmed = false
+  /** Set when C is pressed on an adult's status screen, arming the move hold. */
+  private moveArmed = false
+  /** Which row the move menu is on. */
+  moveIndex = 0
+  /**
+   * Counts down while the pet is off out of sight and the new ground is being
+   * built. The rebuild is a single long frame, so it has to happen behind
+   * something rather than in the middle of the yard.
+   */
+  private settling = 0
+  /** Where it is moving to, held until the ground is ready for it. */
+  private movingTo: Biome | null = null
   /**
    * Extra world-clock offset, used only by the dev harness to scrub time. Kept
    * here rather than in the renderer so that scrubbing moves the pet's world
@@ -353,8 +382,11 @@ export class App {
   private befriendable() {
     const season = seasonIdAt(this.worldNow())
     const already = this.save.yard.strays
+    // Only who is actually out here: a pet cannot befriend a deer it has never
+    // met, however far it walks across a meadow.
+    const here = roster(this.biome, already)
     const pool = VISITORS.filter(
-      (v) => v.friend && v.seasons.includes(season) && !already.includes(v.id),
+      (v) => v.friend && here.includes(v.id) && v.seasons.includes(season) && !already.includes(v.id),
     )
     return pool[Math.floor(random() * pool.length)] ?? null
   }
@@ -365,15 +397,15 @@ export class App {
    * planted up.
    */
   private plantSeed(): { seedName: string } | null {
-    const yard = this.save.yard
-    const kind = plantableKind(yard, random())
+    const garden = this.garden
+    const kind = plantableKind(garden, random())
     if (!kind) return null
     // There are more verge pitches than the yard has room for, and
     // `plantableKind` has already refused a full yard, so a free one is certain.
-    const taken = new Set(yard.plantings.map((p) => p.x))
+    const taken = new Set(garden.map((p) => p.x))
     const spot = VERGE_SLOTS.find((x) => !taken.has(x))!
     const planting: Planting = { kind, x: spot, z: VERGE_Z, plantedAt: this.worldNow() }
-    yard.plantings.push(planting)
+    garden.push(planting)
     return { seedName: plantById(kind)!.seedName }
   }
 
@@ -385,7 +417,7 @@ export class App {
   private gather(ground: Ground, legs: number): string | null {
     // Every ground has supplies from the first leg onward, and a trip is always
     // at least one leg, so there is always something it could have picked up.
-    const supply = findSupply(ground.id, legs, random())!
+    const supply = findSupply(ground.role, legs, random())!
     const held = this.save.larder[supply.id] ?? 0
     if (held >= LARDER_CAP) return null
     this.save.larder[supply.id] = held + 1
@@ -427,7 +459,7 @@ export class App {
   /** What is in the ground and how grown it is, for the renderer. */
   get planted(): PlantedThing[] {
     const now = this.worldNow()
-    return this.save.yard.plantings.map((p) => ({
+    return this.garden.map((p) => ({
       kind: p.kind,
       x: p.x,
       z: p.z,
@@ -438,6 +470,26 @@ export class App {
   /** Visitors the pet has won over, which now come whenever their season does. */
   get regulars(): VisitorId[] {
     return this.save.yard.strays
+  }
+
+  /** Where the family lives. Its grounds, its scenery and its visitors. */
+  get biome(): Biome {
+    return biomeById(this.save.home)
+  }
+
+  /** Everywhere it could live, for the move menu. */
+  get homes(): Biome[] {
+    return BIOMES
+  }
+
+  /** What is growing where the pet lives now. The other places keep theirs. */
+  private get garden(): Planting[] {
+    return gardenAt(this.save.yard, this.save.home)
+  }
+
+  /** Who could turn up here at all, for the renderer to roll against. */
+  get roster(): VisitorId[] {
+    return roster(this.biome, this.regulars)
   }
 
   /** Which world day it is. The visitors' dice are rolled from it. */
@@ -452,9 +504,12 @@ export class App {
    */
   get inTheYard(): VisitorId[] {
     const hour = worldHour(this.worldNow())
-    return visitorsPresent(this.worldDay, seasonIdAt(this.worldNow()), this.regulars).filter((id) =>
-      withinHours(id, hour),
-    )
+    return visitorsPresent(
+      this.roster,
+      this.worldDay,
+      seasonIdAt(this.worldNow()),
+      this.regulars,
+    ).filter((id) => withinHours(id, hour))
   }
 
   /** Queues a one-off announcement; it runs after the current line finishes. */
@@ -490,8 +545,8 @@ export class App {
 
     if (world.seasonBlend > 0) out.push(`${world.nextSeason.name.toUpperCase()} IS COMING`)
     const weatherLines: Record<WeatherId, string> = {
-      clear: 'CLEAR SKIES OVER THE MEADOW',
-      rain: 'RAIN ON THE MEADOW',
+      clear: `CLEAR SKIES OVER ${this.biome.prose}`,
+      rain: `RAIN ON ${this.biome.prose}`,
       snow: 'SNOW IS FALLING',
       mist: 'MIST LIES LOW',
     }
@@ -589,7 +644,7 @@ export class App {
 
   /** The grounds this pet is old enough to be sent to. */
   get grounds(): Ground[] {
-    return this.pet ? groundsFor(this.pet.stage) : []
+    return this.pet ? groundsFor(this.biome.grounds, this.pet.stage) : []
   }
 
   /**
@@ -613,7 +668,8 @@ export class App {
     const here = this.inTheYard
     const yard: PlayOption[] = pet
       ? YARD_GAMES.filter(
-          (game) => here.includes(game.visitor) && reached(pet.stage, game.from),
+          (game) =>
+            here.includes(visitorFor(game, this.biome.visitors)) && reached(pet.stage, game.from),
         ).map((game) => ({ kind: 'yard' as const, game, minigame: YARD_SESSIONS[game.id] }))
       : []
     return [...yard, ...MINIGAMES.map((minigame) => ({ kind: 'plain' as const, minigame }))]
@@ -725,7 +781,8 @@ export class App {
     journeyContext: (ground) => {
       const world = worldAt(this.worldNow())
       return {
-        ground: ground.id,
+        role: ground.role,
+        place: ground.place,
         season: world.season.id,
         weather: world.weather,
         night: isNight(this.worldNow()),
@@ -1015,10 +1072,16 @@ export class App {
           return
         }
         // A opens the board, which is the one screen in the game with anything
-        // to do on it; C still closes, as every other screen's C does.
+        // to do on it.
         if (button === 'a') {
           this.mode = 'curios'
           this.hooks.sound('confirm')
+          return
+        }
+        // C on an adult arms the move hold; a short tap still closes, which is
+        // what C does everywhere else.
+        if (button === 'c' && this.pet?.stage === 'adult') {
+          this.moveArmed = true
           return
         }
         this.mode = 'main'
@@ -1026,6 +1089,8 @@ export class App {
         return
       case 'curios':
         return this.pressCurios(button)
+      case 'move':
+        return this.pressMove(button)
       case 'retire':
         this.finishRetirement()
         return
@@ -1044,7 +1109,14 @@ export class App {
       this.mode = 'main'
       this.hooks.sound('cancel')
     }
+    // The same bargain for C: a tap closes the screen, a hold opens the move
+    // menu. Armed the same way, and for the same reason.
+    if (this.moveArmed && this.mode === 'status' && button === 'c' && held < MOVE_HOLD_SECONDS) {
+      this.mode = 'main'
+      this.hooks.sound('cancel')
+    }
     if (button === 'b') this.retireArmed = false
+    if (button === 'c') this.moveArmed = false
   }
 
   /** 0..1 while B is being held on an adult's status screen. */
@@ -1056,6 +1128,87 @@ export class App {
   get retireProgress(): number {
     if (!this.retireArmed || this.heldButton !== 'b' || this.mode !== 'status') return 0
     return Math.min(1, this.heldSeconds / RETIRE_HOLD_SECONDS)
+  }
+
+  /** 0..1 while C is being held on an adult's status screen, to move house. */
+  get moveProgress(): number {
+    if (!this.moveArmed || this.heldButton !== 'c' || this.mode !== 'status') return 0
+    return Math.min(1, this.heldSeconds / MOVE_HOLD_SECONDS)
+  }
+
+  /** True while the pet is away and the new ground is being built. */
+  get isSettling(): boolean {
+    return this.settling > 0
+  }
+
+  private openMove(): void {
+    this.heldButton = null
+    this.heldSeconds = 0
+    this.moveArmed = false
+    this.moveIndex = Math.max(
+      0,
+      this.homes.findIndex((b) => b.id === this.save.home),
+    )
+    this.mode = 'move'
+    this.hooks.sound('confirm')
+  }
+
+  private pressMove(button: ButtonId): void {
+    const menu = this.homes
+    if (button === 'a') {
+      this.moveIndex = (this.moveIndex + menu.length - 1) % menu.length
+      this.hooks.sound('move')
+      return
+    }
+    if (button === 'c') {
+      this.moveIndex = (this.moveIndex + 1) % menu.length
+      this.hooks.sound('move')
+      return
+    }
+    const biome = menu[this.moveIndex]
+    if (biome) this.moveHouse(biome)
+  }
+
+  /**
+   * Moves the family. The garden stays where it was planted and the strays come
+   * along, which is the whole shape of the thing: you give up the trees three
+   * generations put in the ground, and you keep everyone the pet won over.
+   *
+   * The pet walks off while the new ground is meshed -- a rebuild is one long
+   * frame, and a long frame in the middle of the yard reads as a fault rather
+   * than as a journey.
+   */
+  private moveHouse(biome: Biome): void {
+    const pet = this.living
+    if (biome.id === this.save.home) return this.say('already home', 'refuse')
+    if (pet.asleep) return this.say(`${pet.name} is asleep`, 'refuse')
+    if (this.forage.active) return this.say('still out', 'refuse')
+    if (pet.stats.energy < MOVE_ENERGY + 10) return this.say('too tired for that', 'refuse')
+
+    this.movingTo = biome
+    this.settling = SETTLING_SECONDS
+    this.mode = 'main'
+    this.applyStats({ energy: -MOVE_ENERGY, happiness: -MOVE_UNSETTLED })
+    this.hooks.depart()
+    this.hooks.sound('confirm')
+    this.speakNow(`${pet.name} is moving to ${biome.name.toLowerCase()}`)
+  }
+
+  /** Arrives, once the ground has had time to be built behind the walk. */
+  private finishMove(): void {
+    const biome = this.movingTo
+    this.movingTo = null
+    if (!biome) return
+    const leaving = this.biome
+    this.save.home = biome.id
+    const left = gardenAt(this.save.yard, leaving.id).length
+    this.hooks.form(this.living.speciesId, false)
+    this.hooks.sound('confirm')
+    this.pushTicker(`${this.living.name} has moved to ${biome.name.toLowerCase()}`)
+    // Only said when there was something to leave. A player who never planted
+    // anything should not be told about a garden they did not have.
+    if (left > 0) this.pushTicker(`the garden stays behind at ${leaving.name.toLowerCase()}`)
+    this.persist()
   }
 
   /**
@@ -1370,6 +1523,18 @@ export class App {
         this.beginRetirement()
         return
       }
+    }
+    // Hold C on the same screen to move house.
+    if (this.moveArmed && this.heldButton === 'c' && this.mode === 'status') {
+      this.heldSeconds += dt
+      if (this.heldSeconds >= MOVE_HOLD_SECONDS) {
+        this.openMove()
+        return
+      }
+    }
+    if (this.settling > 0) {
+      this.settling = Math.max(0, this.settling - dt)
+      if (this.settling === 0) this.finishMove()
     }
     if (this.messageTimer > 0) this.messageTimer = Math.max(0, this.messageTimer - dt)
 

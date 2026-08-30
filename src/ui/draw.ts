@@ -340,14 +340,18 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   drawCurioBoard(hud, app)
   drawSpeciesBoard(hud, app)
   if (pet.stage === 'adult') {
-    const progress = app.retireProgress
+    // Two holds share this screen, and only one can be running at a time, so
+    // the same bar reports whichever it is.
+    const retiring = app.retireProgress
+    const moving = app.moveProgress
+    const progress = Math.max(retiring, moving)
     if (progress > 0) {
       const width = hud.width - 44
       hud.rect(22, hud.height - 12, width, 3, '#1c1c2c')
       hud.rect(22, hud.height - 12, Math.round(width * progress), 3, ACCENT)
-      hud.textCentered(hud.width / 2, hud.height - 20, 'RETIRING...', ACCENT)
+      hud.textCentered(hud.width / 2, hud.height - 20, moving > 0 ? 'MOVING...' : 'RETIRING...', ACCENT)
     } else {
-      hud.textCentered(hud.width / 2, hud.height - 10, 'A CURIOS   HOLD B RETIRE', '#96a0c8')
+      hud.textCentered(hud.width / 2, hud.height - 10, 'A CURIOS  HOLD B RETIRE  HOLD C MOVE', '#96a0c8')
     }
   } else {
     hud.textCentered(hud.width / 2, hud.height - 10, 'A CURIOS   C CLOSE', '#3a4058')
@@ -429,7 +433,7 @@ function drawRetire(hud: Hud, app: App): void {
     `${retiring.name} THE ${retiring.speciesName.toUpperCase()}`,
     COOL,
   )
-  hud.textCentered(hud.width / 2, hud.height - 22, 'WANDERS INTO THE MEADOW', DIM)
+  hud.textCentered(hud.width / 2, hud.height - 22, `WANDERS INTO ${app.biome.prose}`, DIM)
   hud.textCentered(hud.width / 2, hud.height - 12, 'PRESS ANY BUTTON', flash ? DIM : '#2a3048')
 }
 
@@ -542,6 +546,32 @@ function drawGrounds(hud: Hud, app: App): void {
     if (selected) hud.text(4, y, '>', ACCENT)
   })
 
+  hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B GO', DIM)
+}
+
+/**
+ * Where to live. The grounds menu's shape again -- A/C to pick, B to go -- with
+ * the price of it standing at the bottom rather than against each row, because
+ * it is the same price wherever you go and it is the only thing on this screen
+ * a player might not have thought about.
+ */
+function drawMove(hud: Hud, app: App): void {
+  const menu = app.homes
+  hud.rect(0, 0, hud.width, hud.height, panel(0.045))
+  hud.textCentered(hud.width / 2, 8, 'MOVE HOUSE', ACCENT)
+
+  menu.forEach((biome, i) => {
+    const y = 26 + i * 26
+    const selected = app.moveIndex === i
+    const home = biome.id === app.biome.id
+    if (selected) hud.rect(6, y - 4, hud.width - 12, 24, '#1b2338')
+    hud.text(12, y, biome.name.toUpperCase(), selected ? INK : DIM)
+    hud.text(12, y + 8, biome.note.toUpperCase(), selected ? DIM : '#33384d')
+    if (home) hud.text(12, y + 16, 'YOU LIVE HERE', COOL)
+    if (selected) hud.text(4, y, '>', ACCENT)
+  })
+
+  hud.textCentered(hud.width / 2, hud.height - 34, 'YOUR GARDEN STAYS HERE', '#96a0c8')
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B GO', DIM)
 }
 
@@ -675,6 +705,10 @@ export function drawScreen(hud: Hud, app: App, world: WorldState): void {
       break
     case 'evolve':
       drawEvolve(hud, app)
+      break
+    case 'move':
+      drawMove(hud, app)
+      drawBackPrompt(hud, app)
       break
     case 'retire':
       drawRetire(hud, app)

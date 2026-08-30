@@ -9,7 +9,7 @@ import { fakeHud } from '../fake-hud'
 import { newPet, resetIdSource, setIdSource } from '../../src/game/save'
 import type { Metrics } from '../../src/game/metrics'
 import type { Season, SeasonId } from '../../src/data/seasons'
-import type { GroundId } from '../../src/data/grounds'
+import type { GroundRole } from '../../src/data/grounds'
 import type { ButtonId } from '../../src/render/shell'
 
 /**
@@ -25,9 +25,10 @@ afterEach(() => {
   resetIdSource()
 })
 
-describe('a ground with no lines of its own', () => {
-  const ctx = (ground: GroundId) => ({
-    ground,
+describe('a ground role with no lines of its own', () => {
+  const ctx = (role: GroundRole) => ({
+    role,
+    place: 'the quarry',
     season: 'spring' as SeasonId,
     weather: 'clear' as const,
     night: false,
@@ -36,20 +37,27 @@ describe('a ground with no lines of its own', () => {
 
   it('still tells the trip, from the shared pool', () => {
     for (const leg of ['out', 'middle', 'home'] as const) {
-      const line = beat(leg, ctx('quarry' as GroundId))
+      const line = beat(leg, ctx('quarry' as GroundRole))
       expect(line.length).toBeGreaterThan(0)
     }
   })
 
   it('does not throw, which is what it used to do', () => {
-    expect(() => beat('out', ctx('nowhere' as GroundId))).not.toThrow()
+    expect(() => beat('out', ctx('nowhere' as GroundRole))).not.toThrow()
+  })
+
+  it('leaves no placeholder showing, even falling back', () => {
+    for (const leg of ['out', 'middle', 'home'] as const) {
+      expect(beat(leg, ctx('nowhere' as GroundRole))).not.toContain('{place}')
+    }
   })
 })
 
 describe('a season the journey has no lines for', () => {
   it('still tells the middle of the trip', () => {
     const line = beat('middle', {
-      ground: 'wall',
+      role: 'near',
+      place: 'the old wall',
       season: 'monsoon' as SeasonId,
       weather: 'clear',
       night: false,
