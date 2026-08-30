@@ -550,25 +550,39 @@ function drawGrounds(hud: Hud, app: App): void {
 }
 
 /**
- * Where to live. The grounds menu's shape again -- A/C to pick, B to go -- with
- * the price of it standing at the bottom rather than against each row, because
- * it is the same price wherever you go and it is the only thing on this screen
- * a player might not have thought about.
+ * Where to live. Built on the games menu's shape rather than the grounds
+ * menu's: only the selected row carries its detail, so the list grows by a line
+ * per place rather than by a block, and somewhere new to live never pushes the
+ * footer off the bottom of the glass.
+ *
+ * The price stands at the bottom rather than against each row, because it is
+ * the same price wherever you go -- and it is the one thing on this screen a
+ * player might not have thought about.
  */
 function drawMove(hud: Hud, app: App): void {
   const menu = app.homes
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   hud.textCentered(hud.width / 2, 8, 'MOVE HOUSE', ACCENT)
 
+  let y = 24
   menu.forEach((biome, i) => {
-    const y = 26 + i * 26
     const selected = app.moveIndex === i
     const home = biome.id === app.biome.id
-    if (selected) hud.rect(6, y - 4, hud.width - 12, 24, '#1b2338')
+    const height = selected ? (home ? 27 : 19) : 10
+    if (selected) {
+      hud.rect(6, y - 4, hud.width - 12, height, '#1b2338')
+      hud.text(4, y, '>', ACCENT)
+    }
     hud.text(12, y, biome.name.toUpperCase(), selected ? INK : DIM)
-    hud.text(12, y + 8, biome.note.toUpperCase(), selected ? DIM : '#33384d')
-    if (home) hud.text(12, y + 16, 'YOU LIVE HERE', COOL)
-    if (selected) hud.text(4, y, '>', ACCENT)
+    if (selected) {
+      hud.text(12, y + 8, biome.note.toUpperCase(), DIM)
+      if (home) hud.text(12, y + 16, 'YOU LIVE HERE', COOL)
+    } else if (home) {
+      // Marked even unselected: which one you are already in is the thing the
+      // cursor is being moved relative to.
+      hud.text(hud.width - 12 - textWidth('HOME'), y, 'HOME', COOL)
+    }
+    y += height
   })
 
   hud.textCentered(hud.width / 2, hud.height - 34, 'YOUR GARDEN STAYS HERE', '#96a0c8')

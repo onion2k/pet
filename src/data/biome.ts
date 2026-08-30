@@ -1,9 +1,23 @@
-import { MEADOW_GROUNDS, WOODLAND_GROUNDS, type Ground } from './grounds'
-import { MEADOW_PROPS, WOODLAND_PROPS, type Prop } from './props'
+import {
+  BEACH_GROUNDS,
+  HILL_GROUNDS,
+  MEADOW_GROUNDS,
+  VILLAGE_GROUNDS,
+  WOODLAND_GROUNDS,
+  type Ground,
+} from './grounds'
+import {
+  BEACH_PROPS,
+  HILL_PROPS,
+  MEADOW_PROPS,
+  VILLAGE_PROPS,
+  WOODLAND_PROPS,
+  type Prop,
+} from './props'
 import type { Material } from './seasons'
 import type { VisitorId, VisitorRole } from './visitors'
 
-export type BiomeId = 'meadow' | 'woodland'
+export type BiomeId = 'meadow' | 'woodland' | 'beach' | 'hill' | 'village'
 
 /**
  * A place for the pet to live: the scenery scattered over it, where it can be
@@ -72,7 +86,71 @@ export const WOODLAND: Biome = {
   },
 }
 
-export const BIOMES: Biome[] = [MEADOW, WOODLAND]
+export const BEACH: Biome = {
+  id: 'beach',
+  name: 'Beach',
+  prose: 'THE SHORE',
+  note: 'Open sand. Sun and salt.',
+  // Sparse: an empty beach is the point of a beach, and marram in every slot
+  // would read as a meadow that had been recoloured.
+  propDensity: 0.42,
+  props: BEACH_PROPS,
+  grounds: BEACH_GROUNDS,
+  visitors: { flitter: 'tern', glow: 'seafire', grazer: 'crab', bloom: 'seapinks' },
+  materials: {
+    surfaceA: '#e0cd9a',
+    surfaceB: '#d4be86',
+    soil: '#b8a071',
+    rock: '#8a8071',
+    rockLight: '#ada291',
+    foliageDark: '#7f8a5c',
+    foliageLight: '#a8b077',
+    wood: '#9a8a72',
+  },
+}
+
+export const HILL: Biome = {
+  id: 'hill',
+  name: 'Hillside',
+  prose: 'THE HILL',
+  note: 'High and bare. Stone country.',
+  propDensity: 0.5,
+  props: HILL_PROPS,
+  grounds: HILL_GROUNDS,
+  visitors: { flitter: 'skylark', glow: 'glowbeetles', grazer: 'sheep', bloom: 'heather' },
+  materials: {
+    // Drier and greyer than the meadow, with the rock a cold stone rather than
+    // a warm one: what makes a hill read as a hill is how much of it is bare.
+    surfaceA: '#87905c',
+    surfaceB: '#96a06a',
+    soil: '#6b6350',
+    rock: '#83807a',
+    rockLight: '#a5a29a',
+    foliageDark: '#4f6b3c',
+    foliageLight: '#7d9450',
+    flower: '#e6c34a',
+  },
+}
+
+export const VILLAGE: Biome = {
+  id: 'village',
+  name: 'Village',
+  prose: 'THE VILLAGE',
+  note: 'Neighbours. Gardens over the wall.',
+  propDensity: 0.6,
+  props: VILLAGE_PROPS,
+  grounds: VILLAGE_GROUNDS,
+  visitors: { flitter: 'sparrow', glow: 'lampmoths', grazer: 'cat', bloom: 'hollyhocks' },
+  materials: {
+    surfaceA: '#7fbe55',
+    surfaceB: '#6faa48',
+    rock: '#8f8b7e',
+    rockLight: '#a9a698',
+    wood: '#7a6144',
+  },
+}
+
+export const BIOMES: Biome[] = [MEADOW, WOODLAND, BEACH, HILL, VILLAGE]
 
 /**
  * A biome id this build actually knows, or the meadow. Both the save's repair
