@@ -33,10 +33,41 @@ export class FakeHud {
   frames: DrawnRect[] = []
   texts: DrawnText[] = []
 
+  /** Frames begun and committed, so a draw that forgets one is visible. */
+  begun = 0
+  committed = 0
+  glyphs: { x: number; y: number; rows: string[]; colour: string }[] = []
+  meters: { x: number; y: number; value: number }[] = []
+  icons: { x: number; y: number; id: string; colour: string }[] = []
+
+  begin(): void {
+    this.begun++
+  }
+
+  commit(): void {
+    this.committed++
+  }
+
   safeInset(y: number): number {
     // The real screen has rounded corners; the shape of the curve does not
     // matter here, only that a number comes back.
     return Math.max(0, 6 - y * 0.2)
+  }
+
+  safeHalfWidth(y: number): number {
+    return this.width / 2 - this.safeInset(y)
+  }
+
+  icon(x: number, y: number, id: string, colour: string): void {
+    this.icons.push({ x, y, id, colour })
+  }
+
+  meter(x: number, y: number, _w: number, value: number, _on: string, _off: string): void {
+    this.meters.push({ x, y, value })
+  }
+
+  glyph(x: number, y: number, rows: string[], colour: string): void {
+    this.glyphs.push({ x, y, rows, colour })
   }
 
   rect(x: number, y: number, w: number, h: number, colour: string): void {
@@ -64,11 +95,16 @@ export class FakeHud {
     this.rects = []
     this.frames = []
     this.texts = []
+    this.glyphs = []
+    this.meters = []
+    this.icons = []
+    this.begun = 0
+    this.committed = 0
   }
 }
 
 /**
- * The subset of `Hud` the minigames actually use. Asserted structurally rather
+ * The subset of `Hud` the game's own drawing actually uses. Asserted structurally rather
  * than by declaring `implements Hud`, so a Hud method a game never calls does
  * not have to be faked.
  */

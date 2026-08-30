@@ -751,11 +751,20 @@ export class App {
     return tradeTarget(this.save.curios)
   }
 
-  /** Whether the curio under the cursor has spares to trade. */
+  /**
+   * Whether the curio under the cursor has spares to trade.
+   *
+   * Spares, not copies: the trade has to leave one behind. Spending the last of
+   * a kind would take it back off the board -- un-finding something the player
+   * had found, and possibly breaking a completed set and the standing boon that
+   * came with it. So four buys a trade and three does not, which is what
+   * `trade` has always enforced; this used to say three and advertise a trade
+   * the button then refused.
+   */
   get canTrade(): boolean {
     // The cursor wraps rather than running off the end, so it always names one.
     const curio = CURIOS[this.curioIndex]!
-    return (this.save.curios[curio.id] ?? 0) > TRADE_COST - 1 && !!this.tradeFor
+    return (this.save.curios[curio.id] ?? 0) > TRADE_COST && !!this.tradeFor
   }
 
   /**

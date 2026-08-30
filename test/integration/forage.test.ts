@@ -6,6 +6,9 @@ import { LARDER_CAP } from '../../src/game/larder'
 import { YARD_CAPACITY } from '../../src/game/yard'
 import { VERGE_SLOTS } from '../../src/data/biome'
 import { CURIOS, TRADE_COST } from '../../src/data/curios'
+import { drawScreen } from '../../src/ui/draw'
+import { worldAt } from '../../src/game/world'
+import { fakeHud } from '../fake-hud'
 
 /**
  * The adult's job, through the app rather than through the Forage class: the
@@ -25,6 +28,9 @@ function runTrip(h: Harness, answer?: 'b' | 'c'): Harness {
   }
   throw new Error('the pet never came home')
 }
+
+/** A fixed world, so a drawn screen does not depend on the sky. */
+const world = worldAt(0)
 
 /** A grown pet with the energy for any ground. */
 function grownUp(options: Parameters<typeof harness>[0] = {}): Harness {
@@ -375,9 +381,65 @@ describe('the collection board', () => {
   })
 
   it('refuses a trade that would spend the last of a kind', () => {
+    // Spending all three would take the pebble back off the board, un-finding
+    // something already found -- and could break a completed set with it.
     const h = cursorTo(withCurios({ pebble: TRADE_COST }), 'pebble')
     h.tap('b')
     expect(h.app.curioCounts.pebble).toBe(TRADE_COST)
+  })
+
+  it('only offers a trade it will actually make', () => {
+    // The screen draws its prompt from `canTrade` and the button runs `trade`.
+    // They were tested apart and drifted a step out of step, so at exactly
+    // three of a kind the footer said "B TRADE 3 FOR ..." and pressing B
+    // refused. Testing each half against its own idea of correct is what let
+    // that through, so this asserts the two agree rather than asserting either.
+    for (let held = 0; held <= TRADE_COST + 3; held++) {
+      const h = cursorTo(withCurios({ pebble: held }), 'pebble')
+      const advertised = h.app.canTrade
+      h.tap('b')
+      const traded = (h.app.curioCounts.pebble ?? 0) !== held
+      expect(traded, `held ${held}: offered ${advertised} but traded ${traded}`).toBe(advertised)
+    }
+  })
+
+  it('makes the same promise for every curio on the board', () => {
+    const stocked = Object.fromEntries(CURIOS.map((c) => [c.id, TRADE_COST]))
+    // One short of the whole board, so there is always something to want.
+    delete stocked.geode
+    for (const curio of CURIOS) {
+      if (curio.id === 'geode') continue
+      for (const held of [TRADE_COST, TRADE_COST + 1]) {
+        const h = cursorTo(withCurios({ ...stocked, [curio.id]: held }), curio.id)
+        const advertised = h.app.canTrade
+        h.tap('b')
+        const traded = (h.app.curioCounts[curio.id] ?? 0) !== held
+        expect(traded, `${curio.id} at ${held}`).toBe(advertised)
+      }
+    }
+  })
+
+  it('needs one more than the trade costs, so the board never goes backwards', () => {
+    const h = cursorTo(withCurios({ pebble: TRADE_COST }), 'pebble')
+    expect(h.app.canTrade).toBe(false)
+    const enough = cursorTo(withCurios({ pebble: TRADE_COST + 1 }), 'pebble')
+    expect(enough.app.canTrade).toBe(true)
+    enough.tap('b')
+    // The one left behind keeps the pebble on the board.
+    expect(enough.app.curioCounts.pebble).toBe(1)
+    expect(enough.app.curioTally.kinds).toBe(2)
+  })
+
+  it('never lets a trade break a set the lineage had completed', () => {
+    const stones = CURIOS.filter((c) => c.set === 'stones')
+    const counts = Object.fromEntries(stones.map((c) => [c.id, TRADE_COST + 1]))
+    const h = withCurios(counts)
+    expect(h.app.boons).toContain('stones')
+    for (const stone of stones) {
+      const attempt = cursorTo(withCurios(counts), stone.id)
+      attempt.tap('b')
+      expect(attempt.app.boons, `trading ${stone.id} lost the set`).toContain('stones')
+    }
   })
 
   it('refuses a trade on a curio the board has none of', () => {
@@ -396,6 +458,29 @@ describe('the collection board', () => {
     h.tap('a')
     h.clearCalls().tap('b')
     expect(h.app.message).toBe('NOTHING LEFT TO WANT')
+  })
+
+  it('tells the player what it actually takes, not what it costs', () => {
+    // The dim hint used to read "3 SPARES TRADE UP" directly under "HAVE 3",
+    // which is a promise the button then refused. It has to name the number
+    // that would make `canTrade` true.
+    const h = cursorTo(withCurios({ pebble: TRADE_COST }), 'pebble')
+    expect(h.app.canTrade).toBe(false)
+    const { fake, hud } = fakeHud()
+    drawScreen(hud, h.app, world)
+    const said = fake.said()
+    expect(said).toContain(`${TRADE_COST + 1} OF A KIND`)
+    expect(said).not.toContain('B TRADE')
+  })
+
+  it('offers the trade on screen exactly when it will make it', () => {
+    for (let held = 0; held <= TRADE_COST + 2; held++) {
+      const h = cursorTo(withCurios({ pebble: held }), 'pebble')
+      const { fake, hud } = fakeHud()
+      drawScreen(hud, h.app, world)
+      const offered = fake.said().includes('B TRADE')
+      expect(offered, `held ${held}`).toBe(h.app.canTrade)
+    }
   })
 
   it('saves a trade, so it survives the tab closing', () => {

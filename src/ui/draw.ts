@@ -472,7 +472,10 @@ function drawCurios(hud: Hud, app: App): void {
     const line = `B TRADE ${TRADE_COST} FOR ${want.name.toUpperCase()}`
     hud.textCentered(hud.width / 2, footer, line, ACCENT)
   } else {
-    hud.textCentered(hud.width / 2, footer, `${TRADE_COST} SPARES TRADE UP`, DIM)
+    // What it takes, not what it costs. "3 SPARES TRADE UP" sat directly under
+    // "HAVE 3" and read as a promise the button would then refuse, since the
+    // trade has to leave one behind.
+    hud.textCentered(hud.width / 2, footer, `${TRADE_COST + 1} OF A KIND TRADES UP`, DIM)
   }
 }
 
