@@ -1,3 +1,4 @@
+import type { PlayAxis } from '../data/yardgames'
 import type { TemperamentId } from './temperament'
 import type { Larder } from './larder'
 import type { YardState } from './yard'
@@ -42,6 +43,13 @@ export interface PlayRecord {
   gamesPlayed: number
   gamesWon: number
   bestStreak: number
+  /**
+   * Rounds played of each sort of yard game, counted the way meals are counted
+   * against the diet axes. Only yard games score here: the abstract three are
+   * the same game whatever the day, so they say nothing about how a pet was
+   * raised beyond how often it was played with.
+   */
+  byAxis: Record<PlayAxis, number>
 }
 
 export interface SleepRecord {

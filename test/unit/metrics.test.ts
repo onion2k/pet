@@ -277,3 +277,62 @@ describe('the whole reading', () => {
 })
 
 resetIdSource()
+
+describe('playAxes', () => {
+  const played = (chase: number, romp: number, quiet: number) =>
+    metrics(pet((p) => (p.play.byAxis = { chase, romp, quiet })))
+
+  it('is flat zero for a pet that has only played the standing three', () => {
+    // The property that keeps this from disturbing anything that already
+    // branched: a pet that never went outside scores nothing on every axis,
+    // so every existing rule reads exactly what it read before.
+    expect(played(0, 0, 0)).toMatchObject({
+      playAxes: { chase: 0, romp: 0, quiet: 0 },
+      playLean: null,
+    })
+  })
+
+  it('gives a settled habit the whole of its axis', () => {
+    expect(played(6, 0, 0).playAxes.chase).toBe(1)
+  })
+
+  it('splits an evenly played pet between the axes', () => {
+    const m = played(2, 2, 2)
+    expect(m.playAxes.chase).toBeCloseTo(1 / 3, 5)
+    expect(m.playAxes.romp).toBeCloseTo(1 / 3, 5)
+  })
+
+  it('damps a single afternoon, which is not yet a disposition', () => {
+    // One game would otherwise read as a pet wholly given over to chasing.
+    expect(played(1, 0, 0).playAxes.chase).toBeCloseTo(0.25, 5)
+    expect(played(4, 0, 0).playAxes.chase).toBe(1)
+  })
+
+  it('never scores an axis above what a whole habit is worth', () => {
+    expect(played(50, 0, 0).playAxes.chase).toBe(1)
+  })
+})
+
+describe('playLean', () => {
+  const leaning = (chase: number, romp: number, quiet: number) =>
+    metrics(pet((p) => (p.play.byAxis = { chase, romp, quiet }))).playLean
+
+  it('leans nowhere on too small a sample, however lopsided', () => {
+    expect(leaning(3, 0, 0)).toBeNull()
+  })
+
+  it('names the axis once it is a clear majority', () => {
+    expect(leaning(4, 0, 0)).toBe('chase')
+    expect(leaning(5, 3, 2)).toBe('chase')
+  })
+
+  it('leans nowhere when no axis has a majority', () => {
+    // Three axes, so being merely ahead is not standing out.
+    expect(leaning(3, 3, 2)).toBeNull()
+  })
+
+  it('is exactly at the line on a bare majority', () => {
+    expect(leaning(5, 3, 2)).toBe('chase')
+    expect(leaning(4, 3, 3)).toBeNull()
+  })
+})

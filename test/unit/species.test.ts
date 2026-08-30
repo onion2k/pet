@@ -26,6 +26,8 @@ const reading = (m: Partial<Metrics> = {}): Metrics => ({
   diet: { sweet: 0, protein: 0, veg: 0, junk: 0 },
   dietLean: null,
   play: 0.5,
+  playAxes: { chase: 0, romp: 0, quiet: 0 },
+  playLean: null,
   sleep: 0.5,
   ...m,
 })
@@ -183,6 +185,56 @@ describe('chooseBranch', () => {
 
     it('still picks something for a pet raised on nothing in particular', () => {
       expect(chooseBranch(pet('blob'), reading(), SPRING)).not.toBeNull()
+    })
+  })
+
+  describe('what the yard is played in', () => {
+    /** A pet whose whole habit is one sort of play. */
+    const habit = (axis: 'chase' | 'romp' | 'quiet', rest: Partial<Metrics> = {}) =>
+      reading({ playAxes: { chase: 0, romp: 0, quiet: 0, [axis]: 1 }, ...rest })
+
+    it('changes nothing for a pet that never played outside', () => {
+      // The guarantee the whole feature rests on: every existing rule reads
+      // what it read before unless the yard was actually used.
+      for (const from of ['blob', 'pudge', 'spike', 'sprout']) {
+        const flat = reading({ care: 0.7, play: 0.6, sleep: 0.4 })
+        const zeroed = { ...flat, playAxes: { chase: 0, romp: 0, quiet: 0 } }
+        expect(chooseBranch(pet(from), zeroed, SPRING)?.to).toBe(
+          chooseBranch(pet(from), flat, SPRING)?.to,
+        )
+      }
+    })
+
+    it('is a route and not a tiebreaker: rough games make a Spikelet', () => {
+      // Same diet and the same amount of play. What differs is only what the
+      // playing was, and that alone has to be enough to send it elsewhere.
+      const evenly = { diet: { sweet: 0, protein: 0.5, veg: 0.5, junk: 0 }, play: 0.5, sleep: 0.6 }
+      const without = reading(evenly)
+      const romping = habit('romp', evenly)
+      expect(chooseBranch(pet('blob'), without, SPRING)?.to).not.toBe('spike')
+      expect(chooseBranch(pet('blob'), romping, SPRING)?.to).toBe('spike')
+    })
+
+    it('turns a chasing child into a Blazeon rather than a Grumphal', () => {
+      // Kept indifferently: on this reading alone it is heading for a Grumphal.
+      const middling = { care: 0.35, play: 0.45 }
+      expect(chooseBranch(pet('spike'), reading(middling), SPRING)?.to).not.toBe('blaze')
+      expect(chooseBranch(pet('spike'), habit('chase', middling), SPRING)?.to).toBe('blaze')
+    })
+
+    it('turns nights after the fireflies into a Lumenox rather than a Verdantis', () => {
+      // The one route the quiet axis opens, and it wants what catching them
+      // costs: a pet kept up past its bedtime.
+      const greens = { diet: { sweet: 0, protein: 0, veg: 1, junk: 0 }, care: 0.8, sleep: 0.5 }
+      expect(chooseBranch(pet('sprout'), reading(greens), SPRING)?.to).toBe('verdant')
+      expect(chooseBranch(pet('sprout'), habit('quiet', greens), SPRING)?.to).toBe('lumen')
+    })
+
+    it('cannot carry a branch on its own against everything else', () => {
+      // Worth having, not worth more than how the pet was actually kept. A
+      // wholly neglected pet does not become a Blazeon for chasing a ball.
+      const neglected = habit('chase', { care: 0, play: 0 })
+      expect(chooseBranch(pet('spike'), neglected, SPRING)?.to).toBe('grump')
     })
   })
 

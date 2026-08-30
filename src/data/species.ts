@@ -64,8 +64,8 @@ const list: Species[] = [
       },
       {
         to: 'spike',
-        because: 'hearty meals and constant play',
-        score: (m) => m.diet.protein + m.diet.junk * 0.6 + m.play * 0.6,
+        because: 'hearty meals and rough games',
+        score: (m) => m.diet.protein + m.diet.junk * 0.6 + m.play * 0.6 + m.playAxes.romp * 0.5,
       },
       {
         to: 'sprout',
@@ -115,7 +115,7 @@ const list: Species[] = [
       {
         to: 'blaze',
         because: 'a winning streak',
-        score: (m) => m.play + m.care * 0.5 + m.diet.protein * 0.4,
+        score: (m) => m.play + m.care * 0.5 + m.diet.protein * 0.4 + m.playAxes.chase * 0.5,
       },
       {
         to: 'grump',
@@ -145,7 +145,7 @@ const list: Species[] = [
       {
         to: 'lumen',
         because: 'devoted care and very late nights',
-        score: (m) => m.care + (1 - m.sleep) * 0.5 + m.play * 0.3,
+        score: (m) => m.care + (1 - m.sleep) * 0.5 + m.play * 0.3 + m.playAxes.quiet * 0.6,
       },
     ],
   },

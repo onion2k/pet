@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { harness } from '../harness'
-import { emptySave, flushSave } from '../../src/game/save'
+import { emptyPlayAxes, emptySave, flushSave } from '../../src/game/save'
 import { KINDLING, LARDER_CAP } from '../../src/game/larder'
 import { CRITICAL, SICK_THRESHOLD } from '../../src/game/tuning'
 import { DAY_MS, isNight } from '../../src/game/world'
@@ -330,9 +330,10 @@ describe('playing', () => {
 
   it('reports the play record', () => {
     const h = harness().start()
-    expect(h.app.playRecord).toEqual({ gamesPlayed: 0, gamesWon: 0, bestStreak: 0 })
+    const fresh = { gamesPlayed: 0, gamesWon: 0, bestStreak: 0, byAxis: emptyPlayAxes() }
+    expect(h.app.playRecord).toEqual(fresh)
     h.app.restart()
-    expect(h.app.playRecord).toEqual({ gamesPlayed: 0, gamesWon: 0, bestStreak: 0 })
+    expect(h.app.playRecord).toEqual(fresh)
   })
 })
 

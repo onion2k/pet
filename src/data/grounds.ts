@@ -100,14 +100,24 @@ export const PROSPECT_LABEL: Record<Prospect, string> = {
 const PROSPECT_LUCK: Record<Prospect, number> = { good: 1.3, fair: 1, poor: 0.5 }
 
 /**
- * Reads a ground against the day. A ground with no preference is always fair --
- * dependable rather than dull, which is what makes the near ground the sensible
- * fallback when nothing else looks good.
+ * What a thing wants of the day. Grounds are not the only things that read the
+ * weather -- so does a game out in the yard -- and both want the same three
+ * words for it, so the preference is a shape rather than a ground.
  */
-export function prospectOf(ground: Ground, season: SeasonId, weather: WeatherId): Prospect {
+export interface DayPreference {
+  seasons?: SeasonId[]
+  weather?: WeatherId[]
+}
+
+/**
+ * Reads a preference against the day. Something with no preference is always
+ * fair -- dependable rather than dull, which is what makes the near ground the
+ * sensible fallback when nothing else looks good.
+ */
+export function prospectOf(want: DayPreference, season: SeasonId, weather: WeatherId): Prospect {
   let score = 0
-  if (ground.seasons) score += ground.seasons.includes(season) ? 1 : -1
-  if (ground.weather) score += ground.weather.includes(weather) ? 1 : -1
+  if (want.seasons) score += want.seasons.includes(season) ? 1 : -1
+  if (want.weather) score += want.weather.includes(weather) ? 1 : -1
   if (score > 0) return 'good'
   if (score < 0) return 'poor'
   return 'fair'

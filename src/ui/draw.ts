@@ -3,7 +3,6 @@ import { textWidth } from '../data/font'
 import { PROSPECT_LABEL, type Prospect } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
 import { speciesOf, SPECIES_COUNT, SPECIES_LIST } from '../data/species'
-import { MINIGAMES } from '../game/minigames'
 import { NAMES, type App } from '../game/app'
 import { CRITICAL } from '../game/tuning'
 import type { Hud } from '../render/hud'
@@ -194,15 +193,40 @@ function panel(showThrough: number, ink = '5,5,11'): string {
 }
 
 function drawGames(hud: Hud, app: App): void {
+  const menu = app.playMenu
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
-  hud.textCentered(hud.width / 2, 10, 'GAMES', ACCENT)
-  MINIGAMES.forEach((game, i) => {
-    const y = 34 + i * 22
+  hud.textCentered(hud.width / 2, 8, 'GAMES', ACCENT)
+
+  // Only the selected row carries its detail, the way the feed menu does, so
+  // the list grows by a line rather than a block. It has to: a summer night can
+  // put three games in the yard, and three yard rows at full height on top of
+  // the three standing ones would run off the bottom of the screen.
+  let y = 22
+  menu.forEach((option, i) => {
     const selected = app.gameIndex === i
-    if (selected) hud.rect(8, y - 4, hud.width - 16, 18, '#1b2338')
-    hud.text(16, y, game.title, selected ? INK : DIM, selected ? 2 : 1)
-    hud.text(16, y + (selected ? 12 : 6), game.hint, '#40465e')
+    const yard = option.kind === 'yard' ? option.game : null
+    const height = selected ? (yard ? 27 : 19) : 10
+    if (selected) {
+      hud.rect(6, y - 4, hud.width - 12, height, '#1b2338')
+      hud.text(4, y, '>', ACCENT)
+    }
+    hud.text(12, y, yard ? yard.title : option.minigame.title, selected ? INK : DIM)
+    if (selected) {
+      hud.text(12, y + 8, (yard ? yard.note : option.minigame.hint).toUpperCase(), DIM)
+      if (yard) {
+        const read = app.playProspect(yard)
+        hud.text(12, y + 16, PROSPECT_LABEL[read].toUpperCase(), PROSPECT_INK[read])
+      }
+    }
+    // What it costs stays on every row: it is the one thing worth comparing
+    // between them without moving the cursor.
+    if (yard) {
+      const cost = `-${yard.energy}`
+      hud.text(hud.width - 12 - textWidth(cost), y, cost, selected ? COOL : '#33384d')
+    }
+    y += height
   })
+
   // Already counted in the save and shown nowhere until now.
   const play = app.playRecord
   if (play.gamesPlayed > 0) {
@@ -274,8 +298,21 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
     hud.meter(40, y - 1, 40, value * 100, COOL, '#1c1c2c')
   })
 
-  hud.text(6, 122, `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}`, COOL)
-  hud.text(6, 130, `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  STREAK ${app.streakDays}`, DIM)
+  // The day and the record of days on one line, and the two readings of how
+  // this pet is being raised on the next -- diet and play are the same kind of
+  // fact about it, and were worth putting side by side.
+  hud.text(
+    6,
+    122,
+    `${world.season.name.toUpperCase()}  ${world.weather.toUpperCase()}  STREAK ${app.streakDays}`,
+    COOL,
+  )
+  hud.text(
+    6,
+    130,
+    `DIET ${(m.dietLean ?? 'MIXED').toUpperCase()}  PLAY ${(m.playLean ?? 'MIXED').toUpperCase()}`,
+    DIM,
+  )
 
   // Where the pet is currently headed, in the words the evolution screen will
   // use when it gets there. Named on its own line because it is the one thing
