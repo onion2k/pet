@@ -45,6 +45,7 @@ export type HookCall =
   | { kind: 'pop'; strength?: number }
   | { kind: 'form'; speciesId: string; animate: boolean }
   | { kind: 'depart' }
+  | { kind: 'arrive' }
 
 /** The frame rate the harness pretends to run at. Fine enough that hold-to-back
  *  and the reveal timers land where they would on a real device. */
@@ -101,6 +102,7 @@ export class Harness {
     pop: (strength) => this.calls.push({ kind: 'pop', strength }),
     form: (speciesId, animate) => this.calls.push({ kind: 'form', speciesId, animate }),
     depart: () => this.calls.push({ kind: 'depart' }),
+    arrive: () => this.calls.push({ kind: 'arrive' }),
   }
 
   /** Wall-clock milliseconds, as the app sees them. */

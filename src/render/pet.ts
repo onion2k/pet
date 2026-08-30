@@ -623,8 +623,10 @@ export class PetView {
   }
 
   /**
-   * Sends the pet walking off into the meadow haze, for retirement. It keeps
-   * going until it vanishes; only resetPosition brings the stage back.
+   * Sends the pet walking off into the haze -- to retire, or to move house. It
+   * keeps going until it vanishes, and *only* `resetPosition` brings the stage
+   * back: nothing else in here undoes it, and a caller that means the pet to
+   * return has to say so.
    */
   walkOff(): void {
     const w = this.walk
@@ -634,7 +636,7 @@ export class PetView {
     w.targetZ = -3.6
   }
 
-  /** Returns the stage to the clearing for a new egg. */
+  /** Returns the stage to the clearing, for a new egg or a pet arriving home. */
   resetPosition(): void {
     const w = this.walk
     w.x = 0
