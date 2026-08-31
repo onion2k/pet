@@ -663,6 +663,13 @@ describe('what the kit is worth', () => {
     expect(kitted([], { season: 'winter' }).app.worn).toEqual([])
   })
 
+  it('leans the board by the door on a snowy day, and puts it away after', () => {
+    expect(kitted(['snowboard'], { weather: 'snow' }).app.stowed).toEqual(['snowboard'])
+    expect(kitted(['snowboard'], { weather: 'clear' }).app.stowed).toEqual([])
+    // And never in the pet's hands: it is bigger than the pet.
+    expect(kitted(['snowboard'], { weather: 'snow' }).app.worn).toEqual([])
+  })
+
   it('keeps the pet warm in a bobble hat, without burning the kindling for it', () => {
     const h = kitted(['hat'], { season: 'winter' })
     h.app.larder.kindling = 2

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { KIT, kitById, wornToday, type Day, type KitId } from '../../src/data/kit'
-import { KIT_MODELS } from '../../src/data/kit-models'
+import { KIT, kitById, stowedToday, wornToday, type Day, type KitId } from '../../src/data/kit'
+import { KIT_MODELS, KIT_STANDING } from '../../src/data/kit-models'
 import { SPECIES_LIST } from '../../src/data/species'
 import { expandLayers, rows, type VoxelModel } from '../../src/data/voxel-format'
 import { buildWorn, kitAnchors, wornKinds } from '../../src/render/worn'
@@ -332,6 +332,83 @@ describe('what the pet has about it today', () => {
       for (const weather of WEATHERS) {
         for (const id of wornToday(owned, day(season.id, weather))) {
           expect(KIT_MODELS[id], id).toBeDefined()
+        }
+      }
+    }
+  })
+})
+
+describe('what stands in the yard', () => {
+  const day = (season: (typeof SEASONS)[number]['id'], weather: WeatherId): Day => ({
+    season,
+    weather,
+    night: false,
+  })
+
+  it('stands nothing about for a family that owns nothing', () => {
+    for (const season of SEASONS) {
+      for (const weather of WEATHERS) {
+        expect(stowedToday([], day(season.id, weather))).toEqual([])
+      }
+    }
+  })
+
+  it('leans the board by the door on the day it would be ridden', () => {
+    const owned: KitId[] = ['snowboard']
+    expect(stowedToday(owned, day('winter', 'snow'))).toEqual(['snowboard'])
+    expect(stowedToday(owned, day('winter', 'clear'))).toEqual([])
+    expect(stowedToday(owned, day('spring', 'rain'))).toEqual([])
+  })
+
+  it('never carries the board, since it is bigger than the pet', () => {
+    for (const season of SEASONS) {
+      for (const weather of WEATHERS) {
+        for (const night of [false, true]) {
+          const there = { season: season.id, weather, night }
+          expect(wornToday(['snowboard'], there), `${season.id} ${weather}`).toEqual([])
+        }
+      }
+    }
+  })
+
+  it('keeps the umbrella somewhere on every single day', () => {
+    // The one object that moves with the weather: up in the pet's hand when it
+    // is wet and furled against the wall when it is not, so where it is says
+    // which. Nowhere at all would just look like it had been lost.
+    for (const season of SEASONS) {
+      for (const weather of WEATHERS) {
+        for (const night of [false, true]) {
+          const there = { season: season.id, weather, night }
+          const carried = wornToday(['umbrella'], there).length
+          const leaning = stowedToday(['umbrella'], there).length
+          expect(carried + leaning, `${season.id} ${weather}`).toBe(1)
+        }
+      }
+    }
+  })
+
+  it('gives everything it stands up something to stand there as', () => {
+    const day = { season: 'winter', weather: 'snow', night: false } as const
+    for (const id of stowedToday(KIT.map((item) => item.id), day)) {
+      expect(KIT_STANDING[id], `${id} has nothing to stand as`).toBeDefined()
+    }
+  })
+
+  it('gives every standing picture a height to stand at', () => {
+    for (const [id, standing] of Object.entries(KIT_STANDING) as [
+      KitId,
+      { model: VoxelModel; height: number },
+    ][]) {
+      expect(kitById(id), id).toBeDefined()
+      expect(standing.height, id).toBeGreaterThan(0)
+      const layers = expandLayers(standing.model)
+      const depth = layers[0]!.length
+      for (const layer of layers) {
+        expect(layer.length, id).toBe(depth)
+        for (const row of layer) {
+          for (const ch of row) {
+            if (ch !== '.') expect(standing.model.palette[ch], `${id}: ${ch}`).toBeDefined()
+          }
         }
       }
     }

@@ -241,6 +241,102 @@ const BASKET: VoxelModel = {
   ],
 }
 
+/**
+ * Kit as it stands in the yard rather than on the pet.
+ *
+ * Two of them are better off leaning by the door than carried. A snowboard is
+ * bigger than the pet and cannot be held convincingly, and it has no worn form
+ * at all -- so on a snowy day it stands ready by the shelter, which is the
+ * whole of what it has to say. And the umbrella is furled when it is not up:
+ * one object that moves with the weather, in the pet's hand when it is wet and
+ * against the wall when it is not, so the yard says which without a word.
+ *
+ * These carry their own world height, since they stand on the ground rather
+ * than on a creature and have nothing to take a voxel size from.
+ */
+const SNOWBOARD_STANDING: VoxelModel = {
+  palette: { b: '#5fd0e8', d: '#3fa8bf', s: '#2b3a52' },
+  mirror: true,
+  layers: [
+    // Tail, then the length of it, then a nose. The two dark bands are the
+    // bindings, which is what stops it reading as a surfboard.
+    rows(`
+      ...
+      .db
+      ...`),
+    rows(`
+      .db
+      .bb
+      .db`),
+    rows(`
+      .db
+      .bb
+      .db`),
+    rows(`
+      .ds
+      .ss
+      .ds`),
+    rows(`
+      .db
+      .bb
+      .db`),
+    rows(`
+      .ds
+      .ss
+      .ds`),
+    rows(`
+      .db
+      .bb
+      .db`),
+    rows(`
+      .db
+      .bb
+      .db`),
+    rows(`
+      ...
+      .db
+      ...`),
+  ],
+}
+
+const FURLED_UMBRELLA: VoxelModel = {
+  palette: { u: '#4f7fc4', h: '#5b4636' },
+  mirror: true,
+  layers: [
+    rows(`
+      ..h
+      ...`),
+    rows(`
+      ..h
+      ...`),
+    rows(`
+      ..u
+      ...`),
+    rows(`
+      .uu
+      ...`),
+    rows(`
+      .uu
+      ...`),
+    rows(`
+      .uu
+      ...`),
+    rows(`
+      ..u
+      ...`),
+    rows(`
+      ..h
+      ...`),
+  ],
+}
+
+/** What stands in the yard, and how tall it stands. */
+export const KIT_STANDING: Partial<Record<KitId, { model: VoxelModel; height: number }>> = {
+  // Taller than the pet, which is the point: it is not a thing to be carried.
+  snowboard: { model: SNOWBOARD_STANDING, height: 1.15 },
+  umbrella: { model: FURLED_UMBRELLA, height: 0.9 },
+}
+
 /** Only the kit that has a picture yet. The rest is drawn on the board alone. */
 export const KIT_MODELS: Partial<Record<KitId, VoxelModel>> = {
   hat: BOBBLE_HAT,

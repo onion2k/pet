@@ -3,6 +3,8 @@ import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT, VERGE_SLOTS, VERGE_Z } from '../data/biome'
 import { VISITORS, type Visitor, type VisitorId } from '../data/visitors'
 import { plantById, type PlantId } from '../data/plants'
+import { KIT_STANDING } from '../data/kit-models'
+import type { KitId } from '../data/kit'
 import type { SeasonId } from '../data/seasons'
 import { hash2, idSeed, isPresent, withinHours } from '../game/visitors'
 import { buildVoxelGeometry } from './voxel-mesh'
@@ -151,8 +153,13 @@ export interface VisitorContext {
   pet: { x: number; z: number }
   /** Bounds of the band the pet roams. */
   roam: { x: number; z: number }
-  /** Beside the shelter door. */
-  door: { x: number; z: number }
+  /**
+   * Beside the shelter door, and which way the open ground runs from there.
+   * The lantern already stands past one corner, so anything else left by the
+   * door is laid out further out again rather than back along the wall, where
+   * the wall itself would hide it.
+   */
+  door: { x: number; z: number; along: number }
   /** Called when something new turns up, so it can be put on the ticker. */
   announce(name: string): void
   /**
@@ -161,6 +168,12 @@ export interface VisitorContext {
    * visitors but none of the dice.
    */
   planted: PlantedThing[]
+  /**
+   * Kit the family owns that is not being carried today. Laid out beside the
+   * shelter door, which is where a thing you might pick up on the way out
+   * belongs.
+   */
+  stowed: KitId[]
   /** Visitors the pet befriended: they turn up whenever their season comes round. */
   regulars: VisitorId[]
   /**
@@ -178,6 +191,15 @@ export interface PlantedThing {
   /** Which growth stage's model to draw. */
   growth: number
 }
+
+/** Where stowed kit stands, measured out from the lantern beside the doorway. */
+const STOW_FROM_DOOR = 0.45
+/** And how far apart, when there is more than one thing leaning there. */
+const STOW_APART = 0.4
+/** Just proud of the wall, so it leans on it rather than through it. */
+const STOW_FORWARD = 0.05
+/** Nothing left leaning against a wall stands up straight. */
+const STOW_LEAN = 0.14
 
 /** How close the pet has to get to send the ball on its way. */
 const KICK_REACH = 0.72
@@ -281,6 +303,45 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       })
       plants.push({ mesh, node })
     }
+  }
+
+  /**
+   * Kit stood by the door, built exactly as the plantings are and for the same
+   * reason: it is where it was put, it does not move, and it changes only when
+   * the weather takes something out of the pet's hands or puts it back.
+   */
+  let stowed: PlantEntry[] = []
+  let stowedKey = ''
+
+  const buildStowed = (ids: KitId[], door: VisitorContext['door'], groundY: number): void => {
+    for (const entry of stowed) {
+      entry.node.setParent(null)
+      entry.mesh.geometry.remove()
+    }
+    stowed = []
+    ids.forEach((id, i) => {
+      const standing = KIT_STANDING[id]
+      if (!standing) return
+      const built = buildVoxelGeometry(gl, standing.model, standing.height)
+      const mesh = new Mesh(gl, { geometry: built.geometry, program })
+      const node = new Transform()
+      // Out from the lantern, along the front of the shelter, close enough to
+      // read as left by the door rather than dropped in the middle of the yard.
+      node.position.set(
+        door.x + door.along * (STOW_FROM_DOOR + i * STOW_APART),
+        groundY,
+        door.z + STOW_FORWARD,
+      )
+      // Tipped back into the wall, since nothing left leaning against one
+      // stands up straight.
+      node.rotation.x = -STOW_LEAN
+      node.setParent(root)
+      mesh.setParent(node)
+      mesh.onBeforeRender(() => {
+        program.uniforms.uFade.value = 1
+      })
+      stowed.push({ mesh, node })
+    })
   }
 
   /** What the yard is planted with, as one string, to spot a change cheaply. */
@@ -388,6 +449,14 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       if (key !== plantedKey) {
         plantedKey = key
         buildPlants(context.planted, context.groundY)
+      }
+
+      // Rebuilt only when the weather takes something out of the pet's hands
+      // or puts it back, which is a handful of times a day at most.
+      const stowKey = context.stowed.join('|')
+      if (stowKey !== stowedKey) {
+        stowedKey = stowKey
+        buildStowed(context.stowed, context.door, context.groundY)
       }
 
       if (context.day !== lastDay || context.season !== lastSeason) {

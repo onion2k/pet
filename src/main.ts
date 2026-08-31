@@ -482,7 +482,16 @@ function step(dt: number): void {
     groundY: terrain.shape.groundY,
     pet: petView.position,
     roam: { x: ROAM_HALF_X, z: ROAM_HALF_Z },
-    door: { x: terrain.shape.shelter.lamp.x, z: terrain.shape.shelter.lamp.z },
+    door: {
+      x: terrain.shape.shelter.lamp.x,
+      z: terrain.shape.shelter.lamp.z,
+      // Away from the building. The lantern already stands past one corner, so
+      // the open ground beside the doorway is further out still -- back the
+      // other way is the frontage itself, and things left there are hidden by
+      // the wall they are leaning on.
+      along: Math.sign(terrain.shape.shelter.lamp.x - terrain.shape.shelter.centre.x) || 1,
+    },
+    stowed: app.stowed,
     announce: (text) => app.pushTicker(text),
     planted: app.planted,
     regulars: app.regulars,

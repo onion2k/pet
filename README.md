@@ -142,7 +142,8 @@ Care keeps a pet well; the lineage is why you keep coming back.
   become waders in the wet, and the basket rides on its back. Kit shows when it
   is *doing* something rather than whenever it is owned — a pet wearing all
   eight at once would be a hat stand, and would say nothing about the day. The
-  snowboard and the pine cone have no look yet. See
+  snowboard leans by the shelter door on a snowy day, and so does the umbrella
+  on every day it is not up. Only the pine cone has no look. See
   [Kit on the pet](#kit-on-the-pet).
 
   It is not a currency and cannot be traded: a second umbrella is worth nothing,
@@ -363,6 +364,17 @@ shows when it is *doing* something rather than whenever it is owned — a pet
 wearing all eight at once would be a hat stand and would say nothing about the
 day. Boots and the basket are the exceptions and are worn always: they say
 something about the family rather than about the sky.
+
+Two pieces belong in the yard rather than on the pet, and are stood by the
+shelter door instead — built exactly the way plantings are, since they are the
+same sort of thing: put somewhere, never moving, and rebuilt only when they
+change. A **snowboard** is bigger than the pet and cannot be carried
+convincingly, so on a snowy day it simply leans there, ready. And the
+**umbrella** is furled against the wall on every day it is not up, which makes
+it the one object that *moves* with the weather: in the pet's hand when it is
+wet and by the door when it is not, so where it is says which. A test holds it
+to being in exactly one of those two places on every day the world can
+produce — nowhere at all would read as having lost it.
 
 Being part of the one mesh is what buys all of that, and what it costs is a
 rebuild whenever the kit changes — which is why `setWorn` is called every frame
