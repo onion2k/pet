@@ -1,6 +1,6 @@
 import { beat, type JourneyContext, type Leg } from '../data/journey'
 import { findCurio, type Curio } from '../data/curios'
-import type { KitDay, KitItem } from '../data/kit'
+import type { KitDay, KitItem, KitPowers, MishapId } from '../data/kit'
 import { luckOf, type Ground } from '../data/grounds'
 import type { CurioSet } from '../data/curios'
 import { random } from '../engine/random'
@@ -61,6 +61,12 @@ export interface ForageHost {
   energy(): number
   /** Which collection sets the lineage has completed, and so what it is good at. */
   boons(): CurioSet[]
+  /**
+   * What the family's kit is worth today. Read once, at the moment the trip
+   * settles, so the trip is judged by the same kit the grounds menu was read
+   * with -- and by the same weather, since both come off the one day.
+   */
+  kit(): KitPowers
   /** Winds the world on by the time the trip took. */
   addWorldTime(ms: number): void
   addCurio(curio: Curio): void
@@ -93,12 +99,15 @@ export interface ForageHost {
 /**
  * What can go wrong out there. Only reachable by pushing on, so the risk is
  * always something the player chose rather than something the game did to them.
+ *
+ * Named, because kit can spare one: an umbrella is the reason the pet did not
+ * come home muddy, and the spare has to survive the line being reworded.
  */
-const MISHAPS: { line: string; effect: Partial<Stats>; spoils: boolean }[] = [
-  { line: 'comes home caked to the eyes in mud', effect: { hygiene: -20 }, spoils: false },
-  { line: 'limps home, footsore', effect: { energy: -14 }, spoils: false },
-  { line: 'comes home late, and with nothing', effect: { happiness: -4 }, spoils: true },
-  { line: 'got caught out, and looks it', effect: { health: -6, hygiene: -10 }, spoils: true },
+const MISHAPS: { id: MishapId; line: string; effect: Partial<Stats>; spoils: boolean }[] = [
+  { id: 'mud', line: 'comes home caked to the eyes in mud', effect: { hygiene: -20 }, spoils: false },
+  { id: 'footsore', line: 'limps home, footsore', effect: { energy: -14 }, spoils: false },
+  { id: 'late', line: 'comes home late, and with nothing', effect: { happiness: -4 }, spoils: true },
+  { id: 'soaked', line: 'got caught out, and looks it', effect: { health: -6, hygiene: -10 }, spoils: true },
 ]
 
 export class Forage {
@@ -320,13 +329,17 @@ export class Forage {
     // What the collection is worth. Every set makes the pet better at the job
     // that fills the board, so finishing one pays out every trip after it.
     const boons = this.host.boons()
+    const kit = this.host.kit()
     const mishapOdds = extra * MISHAP_PER_LEG * (boons.includes('stones') ? STONES_MISHAP : 1)
-    const mishap = random() < mishapOdds ? pickMishap() : null
+    // Kit spares a mishap rather than swapping it for a different one: with an
+    // umbrella the mud simply did not happen, and nothing else got likelier.
+    const rolled = random() < mishapOdds ? pickMishap() : null
+    const mishap = rolled && kit.spares.includes(rolled.id) ? null : rolled
     const bonus =
       (boons.includes('blooms') ? BLOOMS_LUCK : 0) + (boons.includes('weather') ? WEATHER_LUCK : 0)
     const luck = Math.min(
       0.95,
-      luckOf(ground, ctx.season, ctx.weather) + extra * LUCK_PER_LEG + bonus,
+      luckOf(ground, ctx.season, ctx.weather, kit) + extra * LUCK_PER_LEG + bonus,
     )
     const curio = findCurio(ctx.season, ctx.weather, random(), ground.favours, this.legs)
 

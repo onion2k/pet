@@ -32,6 +32,13 @@ export type KitId =
   | 'creel'
   | 'spyglass'
 
+/**
+ * What can go wrong on a trip, named so that kit can spare one. The list
+ * itself lives with the forage, which is what has them; the names live here,
+ * because being spared is a thing kit does rather than a thing a trip does.
+ */
+export type MishapId = 'mud' | 'footsore' | 'late' | 'soaked'
+
 export interface KitItem {
   id: KitId
   name: string
@@ -220,6 +227,78 @@ export function kitById(id: string): KitItem | undefined {
 /** Ids this build still knows about, for reading a save written by another. */
 export const isKitId = (id: unknown): id is KitId =>
   typeof id === 'string' && KIT.some((k) => k.id === id)
+
+/**
+ * What the kit is doing today.
+ *
+ * Every field is already resolved against the day, which is where the whole
+ * design lives: kit does not make a good day better, it makes a bad day
+ * playable, and a bad day is the only kind most of these have anything to say
+ * about. An umbrella on a clear afternoon is a thing in a cupboard.
+ */
+export interface KitPowers {
+  /**
+   * The day's weather no longer counts against a ground that wanted otherwise.
+   * The umbrella, when it is actually raining.
+   */
+  forgivesWeather: boolean
+  /** The season likewise. The bobble hat, in winter. */
+  forgivesSeason: boolean
+  /**
+   * A ground that wants wet weather no longer needs it -- the mirror of the
+   * umbrella. One makes a wet day workable; the other makes a wet place
+   * workable on a dry one.
+   */
+  wades: boolean
+  /** Mishaps that simply do not happen. */
+  spares: MishapId[]
+  /** The pet is warm through the night without a fire banked against it. */
+  warm: boolean
+}
+
+/** The day a piece of kit is being asked about. */
+export interface Day {
+  season: SeasonId
+  weather: WeatherId
+}
+
+/** Weather you would want an umbrella or a pair of waders for. */
+const WET: WeatherId[] = ['rain', 'mist']
+
+export const isWet = (weather: WeatherId): boolean => WET.includes(weather)
+
+/**
+ * What the family's kit is worth on this particular day.
+ *
+ * A pure function of what is owned and what the sky is doing, so nothing has
+ * to remember to ask twice and no caller has to know which item does what:
+ * the grounds menu, the trip and the bedtime all read the same object.
+ */
+export function kitPowers(owned: KitId[], day: Day): KitPowers {
+  const has = (id: KitId) => owned.includes(id)
+  return {
+    forgivesWeather: has('umbrella') && isWet(day.weather),
+    forgivesSeason: has('hat') && day.season === 'winter',
+    wades: has('waders'),
+    // An umbrella is the reason the pet did not come home caked in mud. It
+    // spares the mishap rather than swapping it for another one: nothing else
+    // becomes likelier because you took an umbrella out.
+    spares: has('umbrella') ? ['mud'] : [],
+    // A hat is a fire the pet did not have to go and gather. Only in winter,
+    // or it would quietly retire the kindling it took an adult to learn to
+    // fetch -- and a hat is for the cold, which is what winter is.
+    warm: has('hat') && day.season === 'winter',
+  }
+}
+
+/** No kit at all, for anything that has to read powers without a family. */
+export const NO_KIT: KitPowers = {
+  forgivesWeather: false,
+  forgivesSeason: false,
+  wades: false,
+  spares: [],
+  warm: false,
+}
 
 /** The trip a piece of kit might turn up on. */
 export interface KitDay {

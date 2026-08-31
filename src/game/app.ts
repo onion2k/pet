@@ -33,7 +33,19 @@ import {
   type Curio,
   type CurioSet,
 } from '../data/curios'
-import { KIT, KIT_CHANCE, KIT_COUNT, kitPool, pickKit, type KitDay, type KitId, type KitItem } from '../data/kit'
+import {
+  KIT,
+  KIT_CHANCE,
+  KIT_COUNT,
+  kitPool,
+  kitPowers,
+  pickKit,
+  type Day,
+  type KitDay,
+  type KitId,
+  type KitItem,
+  type KitPowers,
+} from '../data/kit'
 import { textWidth } from '../data/font'
 import { SPECIES_COUNT } from '../data/species'
 import type { SeasonId, WeatherId } from '../data/seasons'
@@ -471,6 +483,13 @@ export class App {
    */
   private bankTheFire(): void {
     const pet = this.living
+    // A hat is a fire the pet did not have to go and gather, so it is tried
+    // first and the kindling stays in the larder for a night that needs it.
+    if (this.kitPowers.warm) {
+      pet.warm = true
+      this.pushTicker(`${pet.name} pulls its hat down for the night`)
+      return
+    }
     const held = this.save.larder[KINDLING] ?? 0
     if (held <= 0) {
       pet.warm = false
@@ -692,8 +711,47 @@ export class App {
    * choice a choice, so it is read off the live world rather than cached.
    */
   prospect(ground: Ground): Prospect {
+    const { season, weather } = this.today
+    return prospectOf(ground, season, weather, this.kitPowers)
+  }
+
+  /**
+   * Which piece of kit, if any, is the reason a ground reads better than it
+   * otherwise would -- so the menu can say so rather than leaving the player
+   * to notice that the creek quietly stopped saying "not today".
+   *
+   * Worked out by asking the same question with and without, and then one item
+   * at a time, rather than by writing down which item speaks for which ground.
+   * A rule the menu keeps separately from the rule that decides the read is a
+   * rule that will eventually disagree with it.
+   *
+   * Null when no single item did it on its own. No ground today wants both a
+   * season and a sky, so in practice one item is always the answer -- but one
+   * that did would need a hat *and* an umbrella to lift it, and naming either
+   * of them alone would be a plain lie about what the player is looking at.
+   */
+  prospectKit(ground: Ground): KitItem | null {
+    const { season, weather } = this.today
+    const bare = prospectOf(ground, season, weather)
+    if (bare === this.prospect(ground)) return null
+    return (
+      KIT.find(
+        (item) =>
+          this.save.kit.includes(item.id) &&
+          prospectOf(ground, season, weather, kitPowers([item.id], this.today)) !== bare,
+      ) ?? null
+    )
+  }
+
+  /** The day, for anything that reads the sky rather than the clock. */
+  private get today(): Day {
     const world = worldAt(this.worldNow())
-    return prospectOf(ground, world.season.id, world.weather)
+    return { season: world.season.id, weather: world.weather }
+  }
+
+  /** What the family's kit is worth today. */
+  private get kitPowers(): KitPowers {
+    return kitPowers(this.save.kit, this.today)
   }
 
   /**
@@ -840,6 +898,7 @@ export class App {
     },
     bringHome: (legs) => this.bringHome(legs),
     takeKit: (day) => this.takeKit(day),
+    kit: () => this.kitPowers,
     gather: (ground, legs) => this.gather(ground, legs),
     applyStats: (delta) => this.applyStats(delta),
     speakNow: (text) => {

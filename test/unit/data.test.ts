@@ -12,6 +12,7 @@ import {
 import { foodById, FOODS } from '../../src/data/foods'
 import { visitorFor, YARD_GAMES, yardGameById, type YardGameId } from '../../src/data/yardgames'
 import { CURIOS } from '../../src/data/curios'
+import { KIT, kitPowers, NO_KIT, type Day, type KitId } from '../../src/data/kit'
 import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
 import { PLAY_MIN_ENERGY } from '../../src/game/app'
 import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
@@ -178,6 +179,108 @@ describe('grounds', () => {
     it('has a label for every prospect', () => {
       for (const p of ['good', 'fair', 'poor'] as Prospect[]) {
         expect(PROSPECT_LABEL[p].length).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  /**
+   * What the kit is for. Each of these is a day a player would have skipped,
+   * turned into one they can do something with -- which is the whole design:
+   * kit does not make a good day better, it makes a bad day playable.
+   */
+  describe('prospectOf, with kit', () => {
+    const powers = (owned: KitId[], day: Day) => kitPowers(owned, day)
+    const wet: Day = { season: 'spring', weather: 'rain' }
+    const dry: Day = { season: 'spring', weather: 'clear' }
+
+    it('changes nothing at all for a family with none', () => {
+      for (const ground of GROUNDS) {
+        for (const season of SEASON_IDS) {
+          for (const weather of WEATHERS) {
+            const bare = prospectOf(ground, season, weather)
+            expect(prospectOf(ground, season, weather, NO_KIT)).toBe(bare)
+            expect(prospectOf(ground, season, weather, powers([], { season, weather }))).toBe(bare)
+          }
+        }
+      }
+    })
+
+    it('takes the rain out of the reckoning, for a pet with an umbrella', () => {
+      const hill = groundById('hill')
+      expect(prospectOf(hill, 'spring', 'rain')).toBe('poor')
+      expect(prospectOf(hill, 'spring', 'rain', powers(['umbrella'], wet))).toBe('fair')
+    })
+
+    it('leaves an umbrella in the cupboard on a dry day', () => {
+      // Nothing to forgive: the hill is poor in snow because it wanted clear,
+      // and an umbrella has nothing to say about snow.
+      expect(prospectOf(groundById('hill'), 'winter', 'snow')).toBe('poor')
+      const snowy: Day = { season: 'winter', weather: 'snow' }
+      expect(prospectOf(groundById('hill'), 'winter', 'snow', powers(['umbrella'], snowy))).toBe(
+        'poor',
+      )
+    })
+
+    it('lets waders stand in a creek that never got its rain', () => {
+      const creek = groundById('creek')
+      expect(prospectOf(creek, 'spring', 'clear')).toBe('poor')
+      expect(prospectOf(creek, 'spring', 'clear', powers(['waders'], dry))).toBe('fair')
+    })
+
+    it('does not let waders speak for a ground that wanted a clear day', () => {
+      // The mirror of the umbrella, and only the mirror: waders are for a wet
+      // place, not for wet weather.
+      expect(prospectOf(groundById('hill'), 'spring', 'rain', powers(['waders'], wet))).toBe('poor')
+    })
+
+    it('takes winter out of the reckoning, for a pet in a bobble hat', () => {
+      const hollow = groundById('hollow')
+      const cold: Day = { season: 'winter', weather: 'clear' }
+      expect(prospectOf(hollow, 'winter', 'clear')).toBe('poor')
+      expect(prospectOf(hollow, 'winter', 'clear', powers(['hat'], cold))).toBe('fair')
+    })
+
+    it('leaves the hat for the cold: it says nothing about a spring afternoon', () => {
+      expect(prospectOf(groundById('hollow'), 'spring', 'clear', powers(['hat'], dry))).toBe('poor')
+    })
+
+    it('never makes a day better than fair out of a day that was wrong', () => {
+      // Forgiving a miss is not the same as manufacturing a hit. If a full kit
+      // could make any old day promising, the sky would stop being worth
+      // reading -- which is the one thing this game asks of a player.
+      const all = KIT.map((k) => k.id)
+      for (const ground of GROUNDS) {
+        for (const season of SEASON_IDS) {
+          for (const weather of WEATHERS) {
+            const bare = prospectOf(ground, season, weather)
+            const kitted = prospectOf(ground, season, weather, powers(all, { season, weather }))
+            if (bare === 'poor') expect(kitted, `${ground.id} ${season} ${weather}`).not.toBe('good')
+            // And it can never make a day worse than it already was.
+            if (bare === 'good') expect(kitted, `${ground.id} ${season} ${weather}`).toBe('good')
+          }
+        }
+      }
+    })
+  })
+
+  describe('luckOf, with kit', () => {
+    it('pays out the better read the kit just bought', () => {
+      const hill = groundById('hill')
+      const wet: Day = { season: 'spring', weather: 'rain' }
+      const bare = luckOf(hill, 'spring', 'rain')
+      const kitted = luckOf(hill, 'spring', 'rain', kitPowers(['umbrella'], wet))
+      expect(kitted).toBeGreaterThan(bare)
+    })
+
+    it('still never promises more than 0.95, however much kit is carried', () => {
+      const all = KIT.map((k) => k.id)
+      for (const ground of GROUNDS) {
+        for (const season of SEASON_IDS) {
+          for (const weather of WEATHERS) {
+            const luck = luckOf(ground, season, weather, kitPowers(all, { season, weather }))
+            expect(luck).toBeLessThanOrEqual(0.95)
+          }
+        }
       }
     })
   })

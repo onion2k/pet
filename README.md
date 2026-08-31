@@ -139,11 +139,23 @@ Care keeps a pet well; the lineage is why you keep coming back.
   owning a thing is enough to have it, and why a full kit does not so much make
   every day good as make every day legible.
 
-  **None of it changes the odds yet.** The items are found, owned and shown;
-  what each one is *for* arrives with the code that reads it, a family at a
-  time — the weather kit first, then the depth and the dark, then supplies and
-  the sky. The notes on the board say what a thing is for rather than what it
-  does, for exactly that reason.
+  Three of them read the day so far. An **umbrella** takes wet weather out of
+  the reckoning, so the long hill is worth a try in the rain rather than not
+  today — and the pet never comes home caked in mud. **Waders** are its mirror:
+  a ground that wanted rain stops needing it, so the creek is workable on a dry
+  afternoon. A **bobble hat** does the same for winter, and keeps the pet warm
+  through a winter night without burning the kindling it went out to fetch.
+  The grounds menu names whichever of them is speaking for a ground, so the
+  read never silently changes underneath you.
+
+  Forgiving a miss is not the same as manufacturing a hit: the best a forgiven
+  day can read is *worth a try*, never *looks promising*. If a full kit could
+  make any old day promising, the sky would stop being worth reading, which is
+  the one thing this game asks of a player.
+
+  The other five — the snowboard, the torch, stout boots, the creel and the
+  spyglass — are found and owned and do nothing yet. Their notes say what they
+  are for rather than what they do, and the code that reads them is on its way.
 - **The album.** A second board under the curios, one slot per form, each drawn
   in its own body colour taken straight from its voxel model so the board and
   the creature always agree. Forms the family has never grown show as

@@ -600,7 +600,16 @@ function drawGrounds(hud: Hud, app: App): void {
     hud.text(12, y, ground.name.toUpperCase(), selected ? INK : DIM)
     hud.text(12, y + 8, ground.note.toUpperCase(), selected ? DIM : '#33384d')
     const read = app.prospect(ground)
-    hud.text(12, y + 16, PROSPECT_LABEL[read].toUpperCase(), PROSPECT_INK[read])
+    // What the kit is doing, said where it is doing it. Without this the creek
+    // simply stops saying "not today" one afternoon and the player is left to
+    // work out why -- and a piece of kit whose whole job is to change this line
+    // ought to be able to take the credit for having changed it.
+    const credit = app.prospectKit(ground)
+    const label = PROSPECT_LABEL[read].toUpperCase()
+    hud.text(12, y + 16, label, PROSPECT_INK[read])
+    if (credit) {
+      hud.text(12 + textWidth(label) + 4, y + 16, `(${credit.name.toUpperCase()})`, COOL)
+    }
     // What it costs, against the name, so the trade is on one line.
     const cost = `-${ground.energy}`
     hud.text(hud.width - 12 - textWidth(cost), y, cost, selected ? COOL : '#33384d')

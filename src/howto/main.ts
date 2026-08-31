@@ -641,10 +641,17 @@ const curiosSection = chapter(
     a second umbrella would be worth nothing, so there is nothing to spend.
   </p>
   <div class="callout">
-    <b>Still being made.</b> Right now the kit is something to find and to keep,
-    and no more than that: none of it has been taught to change what a day is
-    worth yet. That part is on its way, one family of them at a time.
-  </div>`,
+    <b>What it changes.</b> An umbrella, a pair of waders and a bobble hat each
+    take something out of the reckoning when you send your pet out — so a day,
+    or a place, that was <em>not today</em> becomes one worth a try. Watch the
+    forage menu: it names whichever of them is speaking for a ground. They can
+    never make a day <em>look promising</em>, though. Forgiving a bad day is
+    not the same as making a good one, and the sky is still worth reading.
+  </div>
+  <p class="note">
+    The other five are found and kept and do nothing yet. That part is on its
+    way, a family of them at a time.
+  </p>`,
 )
 
 for (const item of KIT) {

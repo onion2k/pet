@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { CURIOS } from '../../src/data/curios'
 import { GROUNDS, type GroundRole } from '../../src/data/grounds'
-import { KIT, KIT_COUNT, kitById, kitPool, isKitId, pickKit, type KitDay } from '../../src/data/kit'
+import {
+  KIT,
+  KIT_COUNT,
+  kitById,
+  kitPool,
+  kitPowers,
+  isKitId,
+  NO_KIT,
+  pickKit,
+  type Day,
+  type KitDay,
+  type KitId,
+} from '../../src/data/kit'
 import { SEASONS, type WeatherId } from '../../src/data/seasons'
 import { SLOTS_PER_ROW } from '../../src/ui/draw'
 
@@ -136,6 +148,70 @@ describe('what a day turns up', () => {
     const day: KitDay = { season: 'summer', weather: 'clear', night: false, role: 'far', depth: 1 }
     expect(kitPool([], day).map((k) => k.id)).not.toContain('waders')
     expect(kitPool([], { ...day, role: 'wet' }).map((k) => k.id)).toContain('waders')
+  })
+})
+
+describe('what the kit is worth today', () => {
+  const day = (season: (typeof SEASON_IDS)[number], weather: WeatherId): Day => ({ season, weather })
+
+  it('is worth nothing at all to a family with none', () => {
+    for (const season of SEASON_IDS) {
+      for (const weather of WEATHERS) {
+        expect(kitPowers([], day(season, weather))).toEqual(NO_KIT)
+      }
+    }
+  })
+
+  it('opens the umbrella only when it is actually wet', () => {
+    expect(kitPowers(['umbrella'], day('spring', 'rain')).forgivesWeather).toBe(true)
+    expect(kitPowers(['umbrella'], day('spring', 'mist')).forgivesWeather).toBe(true)
+    expect(kitPowers(['umbrella'], day('spring', 'clear')).forgivesWeather).toBe(false)
+    expect(kitPowers(['umbrella'], day('winter', 'snow')).forgivesWeather).toBe(false)
+  })
+
+  it('keeps the mud off, wet or dry: an umbrella is carried either way', () => {
+    for (const weather of WEATHERS) {
+      expect(kitPowers(['umbrella'], day('spring', weather)).spares).toEqual(['mud'])
+    }
+    expect(kitPowers(['hat', 'waders'], day('spring', 'rain')).spares).toEqual([])
+  })
+
+  it('puts the hat on for winter and nothing else', () => {
+    for (const season of SEASON_IDS) {
+      const powers = kitPowers(['hat'], day(season, 'clear'))
+      expect(powers.forgivesSeason, season).toBe(season === 'winter')
+      expect(powers.warm, season).toBe(season === 'winter')
+    }
+  })
+
+  it('leaves the waders on all year, because a wet place is always wet', () => {
+    for (const season of SEASON_IDS) {
+      for (const weather of WEATHERS) {
+        expect(kitPowers(['waders'], day(season, weather)).wades).toBe(true)
+      }
+    }
+  })
+
+  it('adds up, so a family with the lot gets all of it at once', () => {
+    const powers = kitPowers(['umbrella', 'hat', 'waders'], day('winter', 'mist'))
+    expect(powers).toEqual({
+      forgivesWeather: true,
+      forgivesSeason: true,
+      wades: true,
+      spares: ['mud'],
+      warm: true,
+    })
+  })
+
+  it('says nothing about the four that have not been taught to speak yet', () => {
+    // Boots, the snowboard, the torch, the creel and the spyglass are found and
+    // owned but do not read yet. This is the line that will have to change.
+    const quiet: KitId[] = ['boots', 'snowboard', 'torch', 'creel', 'spyglass']
+    for (const season of SEASON_IDS) {
+      for (const weather of WEATHERS) {
+        expect(kitPowers(quiet, day(season, weather))).toEqual(NO_KIT)
+      }
+    }
   })
 })
 

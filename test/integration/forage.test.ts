@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { harness, type Harness } from '../harness'
+import { DEFAULT_START, harness, type Harness } from '../harness'
 import { emptySave, flushSave } from '../../src/game/save'
-import { MEADOW_GROUNDS } from '../../src/data/grounds'
+import { MEADOW_GROUNDS, type Ground } from '../../src/data/grounds'
 import { LARDER_CAP } from '../../src/game/larder'
 import { YARD_CAPACITY } from '../../src/game/yard'
 import { VERGE_SLOTS } from '../../src/data/biome'
 import { CURIOS, TRADE_COST } from '../../src/data/curios'
-import { KIT } from '../../src/data/kit'
+import { KIT, type KitId } from '../../src/data/kit'
+import { draw } from '../screens'
 import { drawScreen } from '../../src/ui/draw'
 import { worldAt } from '../../src/game/world'
+import type { WeatherId } from '../../src/data/seasons'
 import { fakeHud } from '../fake-hud'
 
 /**
@@ -431,6 +433,107 @@ describe('a pet that goes away mid-trip', () => {
     expect(h.app.forageFound).toBeNull()
     expect(h.app.visual.foraging).toBe(false)
     expect(h.app.forageDim).toBe(0)
+  })
+})
+
+/**
+ * A world offset that lands the day on a particular sky, so a test about the
+ * kit can have the weather the kit is for. Stepped by the weather spell rather
+ * than by the day, since the sky turns more than once a day.
+ */
+function offsetWith(want: { season?: string; weather?: WeatherId }): number {
+  for (let step = 0; step < 4000; step++) {
+    const offset = step * 60_000
+    const world = worldAt(DEFAULT_START + offset)
+    if (want.season && world.season.id !== want.season) continue
+    if (want.weather && world.weather !== want.weather) continue
+    return offset
+  }
+  throw new Error(`no day with ${JSON.stringify(want)}`)
+}
+
+describe('what the kit is worth', () => {
+  /** An adult living on a day of the given sky, with the given kit. */
+  const kitted = (kit: KitId[], want: { season?: string; weather?: WeatherId }) =>
+    harness({ save: { ...emptySave(), kit, worldOffset: offsetWith(want) } })
+      .start()
+      .growTo('adult')
+
+  it('reads a wet day differently with an umbrella, and says which', () => {
+    const hill = MEADOW_GROUNDS.find((g) => g.id === 'hill')!
+    const bare = kitted([], { weather: 'rain' })
+    expect(bare.app.prospect(hill)).toBe('poor')
+    expect(bare.app.prospectKit(hill)).toBeNull()
+
+    const withOne = kitted(['umbrella'], { weather: 'rain' })
+    expect(withOne.app.prospect(hill)).toBe('fair')
+    expect(withOne.app.prospectKit(hill)?.id).toBe('umbrella')
+  })
+
+  it('says nothing on a ground the kit had nothing to do with', () => {
+    const wall = MEADOW_GROUNDS.find((g) => g.id === 'wall')!
+    const h = kitted(['umbrella'], { weather: 'rain' })
+    // The old wall minds neither the season nor the sky, so it was already
+    // fair and the umbrella cannot take the credit for it.
+    expect(h.app.prospect(wall)).toBe('fair')
+    expect(h.app.prospectKit(wall)).toBeNull()
+  })
+
+  it('lets waders stand in a creek on a dry day', () => {
+    const creek = MEADOW_GROUNDS.find((g) => g.id === 'creek')!
+    expect(kitted([], { weather: 'clear' }).app.prospect(creek)).toBe('poor')
+    const h = kitted(['waders'], { weather: 'clear' })
+    expect(h.app.prospect(creek)).toBe('fair')
+    expect(h.app.prospectKit(creek)?.id).toBe('waders')
+  })
+
+  it('puts the reading on the menu where the player is choosing', () => {
+    const h = kitted(['umbrella'], { weather: 'rain' })
+    h.pet.stats.energy = 100
+    h.select('forage')
+    expect(h.app.mode).toBe('grounds')
+    expect(draw(h).said()).toContain('(UMBRELLA)')
+  })
+
+  it('credits nobody when it took two things together to lift the read', () => {
+    // No ground today wants both a season and a sky. One that did would be
+    // poor twice over on the wrong day, and neither the hat nor the umbrella
+    // could lift it alone -- so the menu says nothing rather than picking one
+    // of them and taking its name in vain.
+    const fussy: Ground = {
+      ...MEADOW_GROUNDS[0]!,
+      seasons: ['autumn'],
+      weather: ['clear'],
+    }
+    const h = kitted(['hat', 'umbrella'], { season: 'winter', weather: 'snow' })
+    // Snow is not wet, so bring the umbrella's weather along by hand: what is
+    // being tested is the pair, not which day the pair happens on.
+    const wet = kitted(['hat', 'umbrella'], { season: 'winter', weather: 'mist' })
+    expect(h.app.prospect(fussy)).toBe('poor')
+    expect(wet.app.prospect(fussy)).toBe('fair')
+    expect(wet.app.prospectKit(fussy)).toBeNull()
+  })
+
+  it('keeps the pet warm in a bobble hat, without burning the kindling for it', () => {
+    const h = kitted(['hat'], { season: 'winter' })
+    h.app.larder.kindling = 2
+    h.pet.stats.energy = 20
+    h.select('sleep')
+    expect(h.pet.asleep).toBe(true)
+    expect(h.pet.warm).toBe(true)
+    // The fire it did not have to bank is still in the larder for a night
+    // that needs one.
+    expect(h.app.larder.kindling).toBe(2)
+    h.until('the news of it', () => h.app.tickerText.includes('PULLS ITS HAT DOWN'))
+  })
+
+  it('still burns the kindling out of season, since a hat is for the cold', () => {
+    const h = kitted(['hat'], { season: 'summer' })
+    h.app.larder.kindling = 2
+    h.pet.stats.energy = 20
+    h.select('sleep')
+    expect(h.pet.warm).toBe(true)
+    expect(h.app.larder.kindling).toBe(1)
   })
 })
 

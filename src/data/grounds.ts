@@ -1,3 +1,4 @@
+import { isWet, NO_KIT, type KitPowers } from './kit'
 import type { SeasonId, WeatherId } from './seasons'
 import type { Stage } from '../game/types'
 
@@ -384,17 +385,48 @@ export interface DayPreference {
  * Reads a preference against the day. Something with no preference is always
  * fair -- dependable rather than dull, which is what makes the near ground the
  * sensible fallback when nothing else looks good.
+ *
+ * Kit forgives a miss rather than manufacturing a hit: an umbrella takes the
+ * rain out of the reckoning, it does not make the rain a reason to go. So the
+ * best a forgiven mismatch can be is *fair*, which is the difference between
+ * kit widening the days worth playing and kit making every day the same day.
  */
-export function prospectOf(want: DayPreference, season: SeasonId, weather: WeatherId): Prospect {
+export function prospectOf(
+  want: DayPreference,
+  season: SeasonId,
+  weather: WeatherId,
+  kit: KitPowers = NO_KIT,
+): Prospect {
   let score = 0
-  if (want.seasons) score += want.seasons.includes(season) ? 1 : -1
-  if (want.weather) score += want.weather.includes(weather) ? 1 : -1
+  if (want.seasons) {
+    const met = want.seasons.includes(season)
+    score += met ? 1 : kit.forgivesSeason ? 0 : -1
+  }
+  if (want.weather) {
+    const met = want.weather.includes(weather)
+    score += met ? 1 : forgiven(want.weather, kit) ? 0 : -1
+  }
   if (score > 0) return 'good'
   if (score < 0) return 'poor'
   return 'fair'
 }
 
+/**
+ * Whether the kit has something to say about missing the weather. Two items
+ * do, from opposite directions: the umbrella when the day itself is wet, and
+ * the waders when the place wanted a wet day and did not get one.
+ */
+function forgiven(wanted: WeatherId[], kit: KitPowers): boolean {
+  if (kit.forgivesWeather) return true
+  return kit.wades && wanted.every(isWet)
+}
+
 /** The chance this ground comes home with something, on this particular day. */
-export function luckOf(ground: Ground, season: SeasonId, weather: WeatherId): number {
-  return Math.min(0.95, ground.luck * PROSPECT_LUCK[prospectOf(ground, season, weather)])
+export function luckOf(
+  ground: Ground,
+  season: SeasonId,
+  weather: WeatherId,
+  kit: KitPowers = NO_KIT,
+): number {
+  return Math.min(0.95, ground.luck * PROSPECT_LUCK[prospectOf(ground, season, weather, kit)])
 }
