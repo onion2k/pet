@@ -456,6 +456,15 @@ describe('repairing the pet', () => {
     expect(pet.discovered).toEqual(['egg'])
   })
 
+  it('will not hand back a pet with a blank name', () => {
+    // A name is not just a label here: the status screen draws it and the
+    // ticker reads it out, so an empty one is a hole rather than a default.
+    // Whitespace counts as blank for the same reason.
+    expect(withPet({ name: '' }).name).toBe('PET')
+    expect(withPet({ name: '   ' }).name).toBe('PET')
+    expect(withPet({ name: '  ZED  ' }).name).toBe('ZED')
+  })
+
   it('falls the last tick back to the moment the pet was born', () => {
     expect(withPet({ bornAt: 500 }).lastTick).toBe(500)
   })

@@ -238,6 +238,70 @@ describe('moving', () => {
   })
 })
 
+describe('a pet that goes away mid-walk', () => {
+  /**
+   * The walk that hides the rebuild takes three seconds, and a pet can stop
+   * existing inside them -- seen off from its status screen, or the whole
+   * lineage started over. The arrival read the pet's name to announce it and
+   * threw on the frame after, which for a retirement is the frame that draws
+   * the next egg's naming screen.
+   *
+   * The move itself still lands. A house belongs to the family rather than to
+   * the pet -- it sits on the save beside the album and the yard -- so the
+   * place the player chose, and paid a grown adult's energy for, is where the
+   * next egg hatches.
+   */
+  const halfwayThere = (): Harness => {
+    const h = grownUp()
+    h.select('status')
+    h.holdMove()
+    h.tap('c')
+    h.tap('b')
+    h.frames(2)
+    expect(h.app.isSettling, 'the walk should be underway').toBe(true)
+    return h
+  }
+
+  it('lands the move even though the pet was retired on the way', () => {
+    const h = halfwayThere()
+    h.select('status').holdRetire()
+    h.tap('b')
+    expect(h.app.pet).toBeNull()
+    expect(() => h.advance(5)).not.toThrow()
+    expect(h.app.biome.id).not.toBe('meadow')
+  })
+
+  it('survives the lineage being started over on the way', () => {
+    // NEW PET is a button on the page rather than one on the shell, so it can
+    // be pressed at any moment of the walk.
+    const h = halfwayThere()
+    h.app.restart()
+    expect(h.app.pet).toBeNull()
+    expect(() => h.advance(5)).not.toThrow()
+  })
+
+  it('walks nobody back on, since the last one was walked off for good', () => {
+    // Retiring is the one departure that is meant to be one-way. An arrival
+    // here would walk a pet that no longer exists back into the yard.
+    const h = halfwayThere()
+    h.select('status').holdRetire()
+    h.tap('b')
+    h.clearCalls()
+    h.advance(5)
+    expect(h.calls.some((c) => c.kind === 'arrive')).toBe(false)
+  })
+
+  it('keeps the new house in storage for the egg that follows', () => {
+    const h = halfwayThere()
+    h.select('status').holdRetire()
+    h.tap('b')
+    h.advance(5)
+    flushSave()
+    expect(h.stored()!.home).not.toBe('meadow')
+    expect(h.stored()!.pet).toBeNull()
+  })
+})
+
 describe('what moving changes', () => {
   it('hands the pet a whole new set of grounds', () => {
     const h = grownUp()

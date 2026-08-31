@@ -1124,8 +1124,14 @@ the soak found was one the default seed does not reach at any depth. So both
 knobs matter, and the sweep worth doing before a release turns them together:
 
 ```bash
-SOAK_RUNS=8000 SOAK_SEED=$RANDOM npm test   # about twelve seconds
+SOAK_RUNS=40000 SOAK_SEED=$RANDOM npm test   # about a minute
 ```
+
+Forty thousand rather than a few: eight thousand was the first recommendation
+here and it was too modest to be worth typing. Five sweeps at that depth came
+back clean, and the next two at forty thousand each found a bug -- one at
+seventeen thousand runs in, one at three and a half. A sweep that only ever
+passes is not a sweep, it is a slower version of the suite.
 
 The default hundred runs take about a tenth of a second and go in the suite.
 What a sweep finds belongs in `unit/` or `integration/` afterwards, as a test

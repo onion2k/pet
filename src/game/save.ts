@@ -249,7 +249,10 @@ function repairPet(v: unknown): PetState | null {
 
   return {
     id: str(v.id, '') || nextId(),
-    name: str(v.name, 'PET'),
+    // A blank name is not a name that is missing, it is a pet with a hole where
+    // its name goes: the status screen draws it and the ticker reads it out.
+    // Whitespace is blank for the same reason.
+    name: str(v.name, '').trim() || 'PET',
     speciesId: species.id,
     stage: species.stage,
     temperament: temperament(v.temperament),
