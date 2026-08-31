@@ -633,6 +633,12 @@ export interface Terrain {
   shape: TerrainShape
   /** Number of scenery pieces on the patch. */
   props: number
+  /**
+   * Meshes the patch that has been planned. Separate from planning because
+   * meshing is the longest single piece of work in a cold start, and the shape
+   * -- which is all the pet and the yard need to know -- is cheap.
+   */
+  raise(): void
   /** Rebuilds the patch for a different seed or biome. */
   rebuild(seed: string, biome: Biome): void
   setSick(amount: number): void
@@ -686,11 +692,29 @@ export function createTerrain(
 
   let mesh: Mesh | null = null
   let shape = terrainShape(seed, biome)
+  let plannedSeed = seed
+  let plannedBiome = biome
+  /** Whether the mesh matches the plan. */
+  let standing = false
   let faces = 0
   let props = 0
 
-  const build = (nextSeed: string, nextBiome: Biome) => {
+  /** The lie of the land: heights, where the shelter stands, where the lanterns
+   *  go. Cheap, and it is what everything outside this module reads. */
+  const plan = (nextSeed: string, nextBiome: Biome) => {
+    plannedSeed = nextSeed
+    plannedBiome = nextBiome
+    standing = false
     shape = terrainShape(nextSeed, nextBiome)
+  }
+
+  /** Meshes the planned patch. Everything expensive about the ground is here,
+   *  so a patch already standing is left alone. */
+  const raise = () => {
+    if (standing) return
+    standing = true
+    const nextSeed = plannedSeed
+    const nextBiome = plannedBiome
     const s = seedFrom(nextSeed)
     const cache = new Map<string, Voxel>()
     // Terrain stores a material index; the colour comes from the season palette
@@ -796,8 +820,6 @@ export function createTerrain(
     }
   }
 
-  build(seed, biome)
-
   return {
     root,
     get shape() {
@@ -809,7 +831,11 @@ export function createTerrain(
     get props() {
       return props
     },
-    rebuild: build,
+    raise,
+    rebuild: (nextSeed, nextBiome) => {
+      plan(nextSeed, nextBiome)
+      raise()
+    },
     setSick(amount) {
       program.uniforms.uSick.value = amount
     },
