@@ -29,7 +29,7 @@ export type KitId =
   | 'torch'
   | 'boots'
   | 'waders'
-  | 'creel'
+  | 'basket'
   | 'spyglass'
 
 /**
@@ -180,9 +180,9 @@ export const KIT: KitItem[] = [
     ),
   },
   {
-    id: 'creel',
-    name: 'Creel',
-    what: 'a creel',
+    id: 'basket',
+    name: 'Basket',
+    what: 'a basket',
     note: 'For carrying more home.',
     wants: { seasons: ['autumn'] },
     colour: '#c69a5a',

@@ -289,7 +289,7 @@ describe('repair', () => {
   })
 
   it('keeps one of each piece of kit, however many times the file says it', () => {
-    expect(damaged({ kit: ['torch', 'torch', 'creel'] }).kit).toEqual(['torch', 'creel'])
+    expect(damaged({ kit: ['torch', 'torch', 'basket'] }).kit).toEqual(['torch', 'basket'])
   })
 
   it('replaces a yard that is not an object at all', () => {

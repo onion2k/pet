@@ -125,7 +125,7 @@ Care keeps a pet well; the lineage is why you keep coming back.
   and only a quarter of the time: absence is the consolation, not the equal.
 - **The kit.** The other half of the board, and the half the pet *uses*. Eight
   things — an umbrella, a bobble hat, a snowboard, a torch, stout boots,
-  waders, a creel and a spyglass — each tied to a condition the world already
+  waders, a basket and a spyglass — each tied to a condition the world already
   produces, and each turning up only on the day it is for: the umbrella in the
   rain, the snowboard in snow, the torch on a trip that set out after dark. The
   world hands you the tool at about the moment you first wanted one. Kit belongs
@@ -168,7 +168,7 @@ Care keeps a pet well; the lineage is why you keep coming back.
   its own, so a there-and-back after dark is exactly as safe as it always was.
   Risk in this game is always chosen.
 
-  The last two — the creel and the spyglass — are found and owned and do
+  The last two — the basket and the spyglass — are found and owned and do
   nothing yet. Their notes say what they are for rather than what they do, and
   the code that reads them is on its way.
 - **The album.** A second board under the curios, one slot per form, each drawn

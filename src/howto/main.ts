@@ -660,7 +660,7 @@ const curiosSection = chapter(
   <p class="note">
     A trip there and back is as safe after dark as it ever was. It is only
     going further that the night charges for — risk here is always chosen.
-    The creel and the spyglass are found and kept and do nothing yet.
+    The basket and the spyglass are found and kept and do nothing yet.
   </p>`,
 )
 
