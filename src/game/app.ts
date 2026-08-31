@@ -11,7 +11,7 @@ import { MINIGAMES, YARD_SESSIONS, type GameSession, type Minigame } from './min
 import { visitorFor, YARD_GAMES, type YardGame, type YardGameId } from '../data/yardgames'
 import { legacyOf, lineageOf, temperamentOf, type TemperamentId } from './temperament'
 import { metrics, type Metrics } from './metrics'
-import { emptyPlayAxes, load, newPet, save, saveSoon, wipe } from './save'
+import { emptyPlayAxes, emptySave, load, newPet, save, saveSoon, wipe } from './save'
 import { reconcile, sleepThrough, tick, mood, urgentNeeds } from './sim'
 import { Forage } from './forage'
 import { gardenAt, growthOf, plantableKind, type Planting } from './yard'
@@ -1035,14 +1035,35 @@ export class App {
     this.persist()
   }
 
-  /** Wipes the save and returns to the naming screen. */
+  /**
+   * Wipes the save and returns to the naming screen.
+   *
+   * The button that calls this promises to erase the pet *and* the whole
+   * lineage -- album, curios and streak -- and for a while it only erased the
+   * file. `this.save` was left exactly as it was, so the next thing to persist
+   * wrote the lineage straight back, and naming the new egg was enough to do
+   * it: the album still had its retirements in it and the streak was still
+   * however many days long.
+   *
+   * So the save is rebuilt here rather than merely removed, and rebuilt the way
+   * a fresh boot builds one -- this session is still a session, and being here
+   * today is still a day. What the button gives you is now the same thing as
+   * pressing it and reloading the page, which is what it always looked like it
+   * did.
+   */
   restart(): void {
     wipe()
-    // Same reason as retiring: NEW PET is a button on the page, and nothing
-    // stops it being pressed while the pet is away.
+    // Both of these belong to a pet and a family that are about to stop
+    // existing. A trip has nobody to come home to, and a house chosen by the
+    // lineage being erased is not the house the next one starts in -- unlike a
+    // retirement, where the family carries on and keeps what it chose.
     this.forage.abandon()
+    this.moving = null
+    this.playedThisSession.clear()
+    this.save = emptySave()
+    this.save.counters.sessions += 1
+    this.updateStreak()
     this.pet = null
-    this.save.pet = null
     this.mode = 'name'
   }
 
