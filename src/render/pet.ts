@@ -351,6 +351,8 @@ export class PetView {
   /** What the pet has on, and the form it was last built onto. */
   private worn: KitId[] = []
   private form: VoxelModel | null = null
+  /** Where the glow is on whatever it is carrying, in the pet's own space. */
+  private wornLight: { x: number; y: number; z: number } | null = null
   /** Where the eyes are looking, and how far they have got there. */
   private gaze = { x: 0, y: 0, toX: 0, toY: 0, timer: 0 }
   private blink = { timer: 2, open: 1 }
@@ -489,7 +491,8 @@ export class PetView {
     // creature with a face: the one form without one is the egg, which has no
     // head to put a hat on and has never been out to earn one either.
     const worn = anchors ? buildWorn(this.worn, kitAnchors(model, PET_HEIGHT)) : null
-    const withKit = worn ? mergeArrays(body, worn) : body
+    this.wornLight = worn?.light ?? null
+    const withKit = worn ? mergeArrays(body, worn.arrays) : body
     const bodyVerts = withKit.position.length / 3
 
     const merged = face ? mergeArrays(withKit, face.arrays) : withKit
@@ -524,6 +527,30 @@ export class PetView {
 
     this.applyJoints(built)
     if (animate) this.hatch = 0
+  }
+
+  /**
+   * Where the pet's own light is, in world space, or null when it is carrying
+   * nothing lit.
+   *
+   * The kit is drawn inside the pet's mesh and bent about by the vertex
+   * shader, so where a voxel truly ends up is only known on the card. This is
+   * the resting place of the glow, turned and moved with the pet -- near
+   * enough for a light with a soft falloff, and the alternative is reading
+   * geometry back off the GPU every frame to move a lamp by a few
+   * hundredths.
+   */
+  lightAt(): { x: number; y: number; z: number } | null {
+    const local = this.wornLight
+    if (!local) return null
+    const facing = this.walk.facing
+    const sin = Math.sin(facing)
+    const cos = Math.cos(facing)
+    return {
+      x: this.root.position.x + local.x * cos + local.z * sin,
+      y: this.root.position.y + local.y,
+      z: this.root.position.z - local.x * sin + local.z * cos,
+    }
   }
 
   /** Limits the roaming to the level ground of the lane. */

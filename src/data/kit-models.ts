@@ -118,35 +118,37 @@ const UMBRELLA: VoxelModel = {
 }
 
 /**
- * Short, and the only piece of kit that gives off any light of its own. The
- * flame is emissive, which is enough to make it read after dark and to feed
- * the bloom pass; making it actually light the ground is its own job.
+ * An electric torch, which is what the word means here -- not a burning brand.
+ * It is held pointing forward and down rather than up, because that is how you
+ * carry one and because the beam has somewhere to land.
+ *
+ * The lens is the only emissive voxel in the whole kit. That alone makes it
+ * read after dark and feeds the bloom pass; lighting the ground it is pointed
+ * at is a separate job.
  */
 const TORCH: VoxelModel = {
-  palette: { t: '#5b4636', r: '#8a6242', f: '#ffb03a' },
-  emissive: ['f'],
+  palette: { t: '#4a5568', g: '#2f3646', l: '#fff3c4' },
+  emissive: ['l'],
   mirror: true,
   layers: [
     rows(`
-      ...
-      ..t
-      ...`),
+      ..
+      .g
+      .t
+      .t
+      .l`),
     rows(`
-      ...
-      ..t
-      ...`),
+      .t
+      tt
+      tt
+      tt
+      ll`),
     rows(`
-      ...
-      ..r
-      ...`),
-    rows(`
-      ..f
-      .ff
-      ..f`),
-    rows(`
-      ...
-      ..f
-      ...`),
+      ..
+      .g
+      .t
+      .t
+      .l`),
   ],
 }
 

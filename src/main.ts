@@ -419,12 +419,24 @@ function step(dt: number): void {
   // in world space and the camera turns, so they are transformed into view
   // space here for the same reason the sun's direction is.
   const lamps = terrain.shape.lamps
-  // A carved lantern, when one is out, is a light like any other.
+  // A carved lantern, when one is out, is a light like any other. So is a
+  // torch, except that it walks about -- its slot is read fresh each frame
+  // from wherever the pet has carried it to.
   const pumpkin = visitors.pumpkinAt()
+  const carried = petView.lightAt()
   for (let i = 0; i < LAMP_COUNT; i++) {
-    const lamp = i < lamps.length ? lamps[i]! : i === lamps.length ? pumpkin : null
+    const lamp =
+      i < lamps.length
+        ? lamps[i]!
+        : i === lamps.length
+          ? pumpkin
+          : i === lamps.length + 1
+            ? carried
+            : null
     const lx = lamp ? lamp.x : LAMP_PARKED[0]
-    const ly = lamp ? terrain.shape.groundY + lamp.y : LAMP_PARKED[1]
+    // The lanterns' heights are measured up their own posts, from the ground;
+    // a carried light already knows where it is.
+    const ly = lamp ? (lamp === carried ? lamp.y : terrain.shape.groundY + lamp.y) : LAMP_PARKED[1]
     const lz = lamp ? lamp.z : LAMP_PARKED[2]
     lampView[i * 3] = m[0]! * lx + m[4]! * ly + m[8]! * lz + m[12]!
     lampView[i * 3 + 1] = m[1]! * lx + m[5]! * ly + m[9]! * lz + m[13]!

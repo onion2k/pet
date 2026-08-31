@@ -1027,8 +1027,10 @@ describe('biome', () => {
     }
   })
 
-  it('carries one light slot per lantern, plus the shelter"s and one spare', () => {
-    expect(LAMP_COUNT).toBe(LAMP_ROW_X.length + 2)
+  it('carries a light slot per lantern, the shelter"s, and two that move', () => {
+    // The two that move: a carved lantern when one is out, and whatever the
+    // pet is carrying that glows.
+    expect(LAMP_COUNT).toBe(LAMP_ROW_X.length + 3)
   })
 
   it('gives the yard more standing room than plants can take, so seeds always fit', () => {

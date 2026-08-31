@@ -229,7 +229,9 @@ const HANGS: Partial<Record<KitId, Hangs>> = {
   hat: { on: 'crown', part: PART_HEAD, offset: [0, -1, 0] },
   // One in each hand, so a wet night does not put them in the same fist.
   umbrella: { on: 'hands', hand: 0, part: PART_ARM },
-  torch: { on: 'hands', hand: 1, part: PART_ARM, outward: 1.5 },
+  // Pointing forward, out of the pet's fist and toward whatever it is looking
+  // at, and held clear of the body so the barrel is not inside the hip.
+  torch: { on: 'hands', hand: 1, part: PART_ARM, offset: [0, 0, 1], outward: 1.2 },
   boots: { on: 'feet', part: PART_LEG },
   waders: { on: 'feet', part: PART_LEG },
   // Pushed back by its own depth so it hangs off the back rather than through
@@ -254,11 +256,24 @@ function spotsFor(anchors: KitAnchors, hangs: Hangs): Anchor[] {
   }
 }
 
+export interface WornBuild {
+  /** Vertices to merge onto the body. */
+  arrays: VoxelArrays
+  /**
+   * Where the light is, if the pet is carrying anything lit -- the middle of
+   * whatever glows, in the pet's own space. Worked out from the emissive
+   * voxels rather than written down, so a lamp cannot end up somewhere the
+   * glow is not: anything with a bright voxel in it becomes a light, and the
+   * torch is simply the first thing that has one.
+   */
+  light: Anchor | null
+}
+
 /**
- * The vertex arrays for everything the pet is wearing, ready to be merged onto
- * the body. Null when it is wearing nothing this build knows how to draw.
+ * Everything the pet is wearing, ready to be merged onto the body. Null when
+ * it is wearing nothing this build knows how to draw.
  */
-export function buildWorn(worn: KitId[], anchors: KitAnchors): VoxelArrays | null {
+export function buildWorn(worn: KitId[], anchors: KitAnchors): WornBuild | null {
   const pieces = worn
     .map((id) => ({ id, hangs: HANGS[id], model: KIT_MODELS[id] }))
     .filter((piece) => piece.hangs && piece.model)
@@ -269,6 +284,8 @@ export function buildWorn(worn: KitId[], anchors: KitAnchors): VoxelArrays | nul
   // form's voxels happen to measure.
   const scale = anchors.voxel
   let merged: VoxelArrays | null = null
+  // Running sum of where the bright voxels are, for the light that follows them.
+  const glow = { x: 0, y: 0, z: 0, n: 0 }
   for (const piece of pieces) {
     const hangs = piece.hangs!
     const source = wornSource(piece.model!, hangs.part)
@@ -287,10 +304,27 @@ export function buildWorn(worn: KitId[], anchors: KitAnchors): VoxelArrays | nul
           spot.z + (dz - source.d / 2) * scale,
         ],
       })
+      gather(glow, arrays)
       merged = merged ? mergeArrays(merged, arrays) : arrays
     }
   }
-  return merged
+  if (!merged) return null
+  return {
+    arrays: merged,
+    light:
+      glow.n > 0 ? { x: glow.x / glow.n, y: glow.y / glow.n, z: glow.z / glow.n } : null,
+  }
+}
+
+/** Adds the middle of one piece's bright vertices to a running total. */
+function gather(glow: { x: number; y: number; z: number; n: number }, arrays: VoxelArrays): void {
+  for (let i = 0; i < arrays.emissive.length; i++) {
+    if (arrays.emissive[i] === 0) continue
+    glow.x += arrays.position[i * 3]!
+    glow.y += arrays.position[i * 3 + 1]!
+    glow.z += arrays.position[i * 3 + 2]!
+    glow.n += 1
+  }
 }
 
 /** The kit this build can actually draw on the pet, for the tests to sweep. */

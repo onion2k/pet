@@ -365,6 +365,22 @@ wearing all eight at once would be a hat stand and would say nothing about the
 day. Boots and the basket are the exceptions and are worn always: they say
 something about the family rather than about the sky.
 
+The torch is the one piece that does more than sit there: an **electric torch**
+— the British sort, not a burning brand — and the only kit with an emissive
+voxel in it. That much makes it read after dark and feeds the bloom pass on its
+own. Beyond that it carries a light of its own, in the same slot machinery the
+lanterns use: `LAMP_COUNT` gained a slot that follows the pet's hand, so the
+ground it walks over is lit as it goes.
+
+Where that light goes is worked out from the glow rather than written down —
+the middle of whatever voxels are emissive — so a lamp can never end up
+somewhere the light is not, and anything given a bright voxel later becomes a
+light for free. Its resting place is used, not its true one: the kit is drawn
+inside the pet's mesh and bent about by the vertex shader, so where a voxel
+truly ends up is only known on the card. For a light with a soft falloff that
+is near enough, and the alternative is reading geometry back off the GPU every
+frame to move a lamp by a few hundredths.
+
 Two pieces belong in the yard rather than on the pet, and are stood by the
 shelter door instead — built exactly the way plantings are, since they are the
 same sort of thing: put somewhere, never moving, and rebuilt only when they

@@ -144,13 +144,13 @@ describe('building what is worn', () => {
     // The whole trick. A hat merged as part of the head twists with the idle
     // look-around, settles when the pet sleeps and rises with each stride,
     // without one line of the shader knowing it is there.
-    const built = buildWorn(['hat'], anchors)!
+    const built = buildWorn(['hat'], anchors)!.arrays
     expect(built.faces).toBeGreaterThan(0)
     expect(new Set(built.part)).toEqual(new Set([PART_HEAD]))
   })
 
   it('puts it on the crown rather than anywhere else on the creature', () => {
-    const built = buildWorn(['hat'], anchors)!
+    const built = buildWorn(['hat'], anchors)!.arrays
     const ys: number[] = []
     const xs: number[] = []
     for (let i = 0; i < built.position.length; i += 3) {
@@ -174,7 +174,7 @@ describe('building what is worn', () => {
     const across = 9
     for (const { id, model } of forms) {
       const anchors = kitAnchors(model, HEIGHT)
-      const built = buildWorn(['hat'], anchors)!
+      const built = buildWorn(['hat'], anchors)!.arrays
       const xs: number[] = []
       for (let i = 0; i < built.position.length; i += 3) xs.push(built.position[i]!)
       expect(Math.max(...xs) - Math.min(...xs), id).toBeCloseTo(across * anchors.voxel)
@@ -186,7 +186,7 @@ describe('carrying more than a hat', () => {
   const anchors = kitAnchors(forms[1]!.model, HEIGHT)
 
   const bounds = (worn: KitId[]) => {
-    const built = buildWorn(worn, anchors)!
+    const built = buildWorn(worn, anchors)!.arrays
     const xs: number[] = []
     const ys: number[] = []
     for (let i = 0; i < built.position.length; i += 3) {
@@ -209,7 +209,7 @@ describe('carrying more than a hat', () => {
       ['basket', PART_BODY],
     ]
     for (const [id, part] of parts) {
-      expect(new Set(buildWorn([id], anchors)!.part), id).toEqual(new Set([part]))
+      expect(new Set(buildWorn([id], anchors)!.arrays.part), id).toEqual(new Set([part]))
     }
   })
 
@@ -236,7 +236,7 @@ describe('carrying more than a hat', () => {
   })
 
   it('holds the umbrella high enough to be over the pet rather than beside it', () => {
-    const built = buildWorn(['umbrella'], anchors)!
+    const built = buildWorn(['umbrella'], anchors)!.arrays
     const ys: number[] = []
     for (let i = 1; i < built.position.length; i += 3) ys.push(built.position[i]!)
     // The canopy has to reach past the top of the head, or the whole thing
@@ -245,10 +245,46 @@ describe('carrying more than a hat', () => {
   })
 
   it('hangs the basket off the back rather than through it', () => {
-    const built = buildWorn(['basket'], anchors)!
+    const built = buildWorn(['basket'], anchors)!.arrays
     const zs: number[] = []
     for (let i = 2; i < built.position.length; i += 3) zs.push(built.position[i]!)
     expect(Math.max(...zs)).toBeLessThanOrEqual(anchors.back.z + 1e-6)
+  })
+
+  it('lights up wherever the bright part of the thing is', () => {
+    // The torch is the only kit with an emissive voxel in it, and its lens is
+    // what the light follows. Worked out from the glow rather than written
+    // down, so a lamp cannot end up somewhere the glow is not.
+    const built = buildWorn(['torch'], anchors)!
+    expect(built.light).not.toBeNull()
+    const xs: number[] = []
+    const ys: number[] = []
+    const zs: number[] = []
+    for (let i = 0; i < built.arrays.position.length; i += 3) {
+      xs.push(built.arrays.position[i]!)
+      ys.push(built.arrays.position[i + 1]!)
+      zs.push(built.arrays.position[i + 2]!)
+    }
+    // Inside the torch itself, and out at the lens end of it rather than in
+    // the middle of the barrel.
+    expect(built.light!.x).toBeGreaterThanOrEqual(Math.min(...xs))
+    expect(built.light!.x).toBeLessThanOrEqual(Math.max(...xs))
+    expect(built.light!.y).toBeGreaterThanOrEqual(Math.min(...ys))
+    expect(built.light!.y).toBeLessThanOrEqual(Math.max(...ys))
+    expect(built.light!.z).toBeGreaterThan((Math.min(...zs) + Math.max(...zs)) / 2)
+  })
+
+  it('carries no light for kit that does not glow', () => {
+    for (const id of wornKinds()) {
+      const built = buildWorn([id], anchors)!
+      const glows = built.arrays.emissive.some((e) => e > 0)
+      expect(built.light === null, id).toBe(!glows)
+    }
+  })
+
+  it('lights up for the torch and nothing else, which is the only lit thing', () => {
+    const lit = wornKinds().filter((id) => buildWorn([id], anchors)!.light !== null)
+    expect(lit).toEqual(['torch'])
   })
 
   it('gives every picture somewhere to hang, and every hanger a picture', () => {
