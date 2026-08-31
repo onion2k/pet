@@ -252,16 +252,104 @@ describe('saving', () => {
     expect(second.pet.stats.hygiene).toBeGreaterThan(0)
   })
 
-  it('keeps the lineage across a restart of the pet', () => {
-    const h = harness().start()
-    h.growTo('baby')
-    flushSave()
-    expect(h.stored()?.discovered).toContain('blob')
-    h.app.restart()
-    expect(h.app.pet).toBeNull()
-    expect(h.app.mode).toBe('name')
-    // The lineage list is the app"s, and it survives.
-    expect(h.app.discoveredIds).toContain('blob')
+  /**
+   * NEW PET is the one button that takes something away on purpose, and what it
+   * takes is written on the dialog: "This erases your pet AND the whole
+   * lineage: album, curios and streak. To pass the torch instead, retire an
+   * adult from its status screen." Retiring is the door that keeps things;
+   * this is the door that does not.
+   *
+   * It did not, for a while, and this file used to say so. `restart` removed
+   * the file and left `this.save` standing, so the next thing to persist wrote
+   * the lineage back -- and naming the new egg was enough. The dialog said one
+   * thing on the twenty-ninth and the code went on doing another; the test
+   * written the day after wrote down what the code did rather than what the
+   * button had promised.
+   */
+  describe('starting over', () => {
+    const lived = () =>
+      harness({
+        save: {
+          ...emptySave(),
+          album: [{ speciesId: 'blob', name: 'OLD', retiredAt: 0 }],
+          curios: { pebble: 3 },
+          streak: { days: 9, lastDay: '2024-05-01' },
+          home: 'woodland',
+          larder: { berries: 2 },
+        },
+      }).start()
+
+    it('takes the pet, and says so', () => {
+      const h = lived()
+      h.growTo('baby')
+      h.app.restart()
+      expect(h.app.pet).toBeNull()
+      expect(h.app.mode).toBe('name')
+    })
+
+    it('takes the lineage the button promised to take', () => {
+      const h = lived()
+      h.growTo('baby')
+      expect(h.app.discoveredIds).toContain('blob')
+      h.app.restart()
+      expect(h.app.discoveredIds).toEqual([])
+      expect(h.app.curioCounts).toEqual({})
+      expect(h.app.larder).toEqual({})
+    })
+
+    it('takes the house too, since the house belonged to the family', () => {
+      // The other way round from retiring, where the family carries on and
+      // keeps what it chose. There is no family left to keep it.
+      const h = lived()
+      expect(h.app.biome.id).toBe('woodland')
+      h.app.restart()
+      expect(h.app.biome.id).toBe('meadow')
+    })
+
+    it('counts today as a day, because you are here today', () => {
+      // Not zero. A fresh boot counts the visit it is in the middle of, and so
+      // does this: a streak of no days on a day you turned up is a lie.
+      const h = lived()
+      h.app.restart()
+      expect(h.app.streakDays).toBe(1)
+    })
+
+    it('leaves nothing behind for the next thing that saves', () => {
+      // The bug itself. Naming the new egg persists, and what it persisted was
+      // the whole lineage the button had just said it erased.
+      const h = lived()
+      h.app.restart()
+      h.tap('b')
+      h.advance(1)
+      flushSave()
+      const back = h.stored()!
+      expect(back.album).toEqual([])
+      expect(back.curios).toEqual({})
+      expect(back.streak.days).toBe(1)
+      expect(back.home).toBe('meadow')
+    })
+
+    it('gives the same thing as pressing it and then reloading the page', () => {
+      // The whole rule in one line. Wiping the file and rebuilding the state
+      // are two halves of the same act, and if they disagree it is the half
+      // nobody can see that is wrong.
+      const h = lived()
+      h.growTo('baby')
+      h.app.restart()
+      h.tap('b')
+      h.advance(1)
+      flushSave()
+      const afterRestart = h.stored()!
+
+      const reloaded = harness().start()
+      reloaded.advance(1)
+      flushSave()
+      const afterReload = reloaded.stored()!
+
+      // The pets are different pets -- different ids, different birthdays.
+      // Everything the lineage owns has to match.
+      expect({ ...afterRestart, pet: null }).toEqual({ ...afterReload, pet: null })
+    })
   })
 
   it('carries on running when storage refuses every write', () => {
