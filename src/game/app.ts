@@ -1204,20 +1204,35 @@ export class App {
     this.speakNow(`${pet.name} is moving to ${biome.name.toLowerCase()}`)
   }
 
-  /** Arrives, once the ground has had time to be built behind the walk. */
+  /**
+   * Arrives, once the ground has had time to be built behind the walk.
+   *
+   * The walk takes three seconds, and a pet can stop existing inside them: seen
+   * off from its status screen, or the whole lineage started over from the page.
+   * The move still lands. A house is the family's rather than the pet's -- it
+   * sits on the save beside the album and the yard, and outlives whoever was
+   * living in it -- so the place the player chose, and paid a grown adult's
+   * energy for, is the place the next egg hatches in.
+   *
+   * What does not land is the arrival. An arrival is a pet walking back into a
+   * yard, and a retirement has deliberately walked the last one off for good.
+   */
   private finishMove(biome: Biome): void {
     this.moving = null
     const leaving = this.biome
     this.save.home = biome.id
-    const left = gardenAt(this.save.yard, leaving.id).length
-    // The pet walked off to cover the rebuild; this is what walks it back on.
-    // Without it the move finishes perfectly and the yard is simply empty.
-    this.hooks.arrive()
-    this.hooks.sound('confirm')
-    this.pushTicker(`${this.living.name} has moved to ${biome.name.toLowerCase()}`)
-    // Only said when there was something to leave. A player who never planted
-    // anything should not be told about a garden they did not have.
-    if (left > 0) this.pushTicker(`the garden stays behind at ${leaving.name.toLowerCase()}`)
+    const pet = this.pet
+    if (pet) {
+      // The pet walked off to cover the rebuild; this is what walks it back on.
+      // Without it the move finishes perfectly and the yard is simply empty.
+      this.hooks.arrive()
+      this.hooks.sound('confirm')
+      this.pushTicker(`${pet.name} has moved to ${biome.name.toLowerCase()}`)
+      // Only said when there was something to leave. A player who never planted
+      // anything should not be told about a garden they did not have.
+      const left = gardenAt(this.save.yard, leaving.id).length
+      if (left > 0) this.pushTicker(`the garden stays behind at ${leaving.name.toLowerCase()}`)
+    }
     this.persist()
   }
 
