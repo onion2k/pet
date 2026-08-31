@@ -1029,12 +1029,20 @@ fast-forwards the whole simulation for playtesting.
 ## Tests
 
 ```bash
-npm test              # the whole suite, about a second
-npm run test:coverage # the same, with a coverage report
+npm test              # the whole suite, about three seconds
 npm run test:watch
+npm run test:coverage # the same, with a coverage report
+npm run verify        # typecheck, suite and coverage threshold -- run before pushing
 ```
 
-`npm run build` typechecks, runs the suite, and only then emits `dist/`.
+`npm run build` typechecks and emits `dist/`. It deliberately does not run the
+suite: a deploy is not the place to find out, and the three seconds it saves are
+three seconds off every deploy for a check that has already been made. The
+typecheck stays, because `vite build` does none of its own -- esbuild strips the
+types without reading them, so a type error would ship in silence.
+
+That trade is only worth what `npm run verify` is worth, which is the whole of
+the gate in one command: typecheck, suite, and the 100% threshold below.
 
 The typecheck covers `test` as well as `src`. It did not always: adding a
 required field to `Metrics` should have been a compile error in the three test
