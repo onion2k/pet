@@ -91,6 +91,18 @@ export function visitorsPresent(
 export function withinHours(id: VisitorId, hour: number): boolean {
   const visitor = VISITORS.find((v) => v.id === id)
   if (!visitor?.hours) return true
-  const [from, to] = visitor.hours
+  return withinWindow(visitor.hours, hour)
+}
+
+/**
+ * Whether an hour falls inside a window, wrapping or not.
+ *
+ * Split out from the lookup above because every visitor that keeps to an hour
+ * window currently keeps to the same one -- eight in the evening until four in
+ * the morning -- so the non-wrapping case has no data to reach it through. It
+ * is not dead code, it is the case the first daytime visitor will land on, and
+ * this is where it can be held to that in the meantime.
+ */
+export function withinWindow([from, to]: readonly [number, number], hour: number): boolean {
   return from <= to ? hour >= from && hour < to : hour >= from || hour < to
 }

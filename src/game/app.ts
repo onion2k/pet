@@ -215,13 +215,15 @@ export class App {
   /** Which row the move menu is on. */
   moveIndex = 0
   /**
-   * Counts down while the pet is off out of sight and the new ground is being
-   * built. The rebuild is a single long frame, so it has to happen behind
+   * Where the family is moving to, and how long is left of the walk that hides
+   * the rebuild. The rebuild is a single long frame, so it has to happen behind
    * something rather than in the middle of the yard.
+   *
+   * One field rather than two: a destination and a countdown that must always
+   * agree are a pair that can eventually disagree, and the arrival then had a
+   * `if (!biome) return` in it guarding against a state nothing could produce.
    */
-  private settling = 0
-  /** Where it is moving to, held until the ground is ready for it. */
-  private movingTo: Biome | null = null
+  private moving: { to: Biome; settling: number } | null = null
   /**
    * Extra world-clock offset, used only by the dev harness to scrub time. Kept
    * here rather than in the renderer so that scrubbing moves the pet's world
@@ -1147,7 +1149,7 @@ export class App {
 
   /** True while the pet is away and the new ground is being built. */
   get isSettling(): boolean {
-    return this.settling > 0
+    return this.moving !== null
   }
 
   private openMove(): void {
@@ -1194,8 +1196,7 @@ export class App {
     if (this.forage.active) return this.say('still out', 'refuse')
     if (pet.stats.energy < MOVE_ENERGY + 10) return this.say('too tired for that', 'refuse')
 
-    this.movingTo = biome
-    this.settling = SETTLING_SECONDS
+    this.moving = { to: biome, settling: SETTLING_SECONDS }
     this.mode = 'main'
     this.applyStats({ energy: -MOVE_ENERGY, happiness: -MOVE_UNSETTLED })
     this.hooks.depart()
@@ -1204,10 +1205,8 @@ export class App {
   }
 
   /** Arrives, once the ground has had time to be built behind the walk. */
-  private finishMove(): void {
-    const biome = this.movingTo
-    this.movingTo = null
-    if (!biome) return
+  private finishMove(biome: Biome): void {
+    this.moving = null
     const leaving = this.biome
     this.save.home = biome.id
     const left = gardenAt(this.save.yard, leaving.id).length
@@ -1440,9 +1439,10 @@ export class App {
 
   private pressGames(button: ButtonId): void {
     // Read once: the menu is derived from a yard that can change under it, and
-    // moving on one length while selecting from another lands off the end.
+    // moving on one length while selecting from another lands off the end. It
+    // is never empty -- the three that need nothing are always on it, which is
+    // pinned by a test -- so the wrapping below always has something to wrap.
     const menu = this.playMenu
-    if (menu.length === 0) return
     if (button === 'a') {
       this.gameIndex = (this.gameIndex + menu.length - 1) % menu.length
       this.hooks.sound('move')
@@ -1547,9 +1547,10 @@ export class App {
         return
       }
     }
-    if (this.settling > 0) {
-      this.settling = Math.max(0, this.settling - dt)
-      if (this.settling === 0) this.finishMove()
+    const moving = this.moving
+    if (moving) {
+      moving.settling -= dt
+      if (moving.settling <= 0) this.finishMove(moving.to)
     }
     if (this.messageTimer > 0) this.messageTimer = Math.max(0, this.messageTimer - dt)
 

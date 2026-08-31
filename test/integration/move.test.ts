@@ -22,6 +22,14 @@ const grownUp = (save?: Partial<SaveFile>): Harness =>
 /** A tree, on one of the verge pitches a real planting would land on. */
 const TREE: Planting = { kind: 'sapling', x: -6.1, z: -1.42, plantedAt: 0 }
 
+/** Sends the pet out over the hill, so the yard it would move from is empty. */
+function sendOut(h: Harness): Harness {
+  h.select('forage')
+  h.tap('b')
+  expect(h.app.visual.foraging, 'the pet should be away').toBe(true)
+  return h
+}
+
 /** Opens the move menu from an adult's status screen and picks a place by name. */
 function moveTo(h: Harness, name: string): Harness {
   h.select('status')
@@ -187,6 +195,34 @@ describe('moving', () => {
   it('refuses to move a pet with no walk left in it', () => {
     const h = grownUp()
     h.pet.stats.energy = 5
+    h.select('status')
+    h.holdMove()
+    h.tap('c')
+    h.tap('b')
+    h.advance(3)
+    expect(h.app.biome.id).toBe('meadow')
+  })
+
+  it('refuses to move a pet that is asleep', () => {
+    // Moving is a walk, and the walk is the whole of what the player sees of
+    // it. A sleeping pet cannot take one, and waking it to carry it would be a
+    // different thing from what the menu offered.
+    const h = grownUp()
+    h.select('status')
+    h.holdMove()
+    h.app.pet!.asleep = true
+    h.tap('c')
+    h.tap('b')
+    h.advance(3)
+    expect(h.app.biome.id).toBe('meadow')
+  })
+
+  it('refuses to move a pet that is out over the hill', () => {
+    // The move menu is reachable from the status screen and the trip runs on
+    // behind it, so the two can be open at once. Sending a pet that is already
+    // away would be sending it from somewhere it is not.
+    const h = grownUp()
+    sendOut(h)
     h.select('status')
     h.holdMove()
     h.tap('c')

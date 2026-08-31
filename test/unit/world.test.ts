@@ -9,7 +9,9 @@ import {
   WORLD_HOUR_MS,
   type Rgb,
 } from '../../src/game/world'
-import { SEASONS, type SeasonId } from '../../src/data/seasons'
+import { tintPalette } from '../../src/game/world'
+import { MATERIALS, SEASONS, type Material, type SeasonId } from '../../src/data/seasons'
+import { MEADOW, VILLAGE, WOODLAND } from '../../src/data/biome'
 
 /**
  * The world's clock, and everything the sky is derived from. It is a pure
@@ -308,3 +310,98 @@ function firstMomentOf(season: SeasonId): number {
   const index = SEASONS.findIndex((s) => s.id === season)
   return index * 70 * 60_000 + 60_000
 }
+
+describe('tintPalette', () => {
+  /**
+   * What a place wears, rather than what the sky is doing. A biome overrides a
+   * handful of materials over the season's own palette: five places times four
+   * seasons would be twenty palettes to author and keep in step, and a wood
+   * should still look wintry in winter.
+   *
+   * The three biomes below are the three shapes the data comes in -- nothing
+   * overridden, overridden flat, and overridden per season -- which is why they
+   * are named rather than looped over.
+   */
+  const at = (biome: Parameters<typeof tintPalette>[0], season: SeasonId) =>
+    tintPalette(biome, season, season, 0)
+
+  /** Which materials a place actually repaints in a given season. */
+  const overridden = (biome: typeof WOODLAND, season: SeasonId): Set<Material> =>
+    new Set([
+      ...(Object.keys(biome.materials ?? {}) as Material[]),
+      ...(Object.keys(biome.seasonMaterials?.[season] ?? {}) as Material[]),
+    ])
+
+  /** Material names whose colour differs between two palettes. */
+  const differing = (a: Rgb[], b: Rgb[]): Material[] =>
+    MATERIALS.filter((_, i) => a[i]!.some((channel, c) => channel !== b[i]![c]))
+
+  it('gives a place that overrides nothing the season it is standing in', () => {
+    // The meadow is the baseline every other place is a repaint of.
+    for (const season of SEASONS) {
+      const plain = at(MEADOW, season.id)
+      expect(plain).toHaveLength(MATERIALS.length)
+      for (const colour of plain) expectLinearRgb(colour)
+    }
+  })
+
+  it('repaints only what a place actually declares', () => {
+    for (const season of SEASONS) {
+      for (const biome of [VILLAGE, WOODLAND]) {
+        const changed = differing(at(biome, season.id), at(MEADOW, season.id))
+        const declared = overridden(biome, season.id)
+        // Subset rather than equal: an override is allowed to name the colour
+        // the season already had, and one that does is not a bug.
+        for (const name of changed) expect(declared).toContain(name)
+      }
+    }
+  })
+
+  it('paints a season override over the flat one', () => {
+    // The wood is made of its soil all year and dressed in its leaves by the
+    // month, and the two are different kinds of fact about the same place.
+    const autumn = at(WOODLAND, 'autumn')
+    const summer = at(WOODLAND, 'summer')
+    const leaf = MATERIALS.indexOf('foliageLight')
+    const soil = MATERIALS.indexOf('soil')
+    expect(autumn[leaf]).not.toEqual(summer[leaf])
+    expect(autumn[soil]).toEqual(summer[soil])
+  })
+
+  it('holds a place that dresses the same all year still through the turn', () => {
+    // The village repaints flat and never by season, so its overridden
+    // materials are the one thing about it a change of season cannot move.
+    const stone = MATERIALS.indexOf('rock')
+    expect(at(VILLAGE, 'winter')[stone]).toEqual(at(VILLAGE, 'summer')[stone])
+  })
+
+  it('slides between two repainted palettes rather than repainting a slid one', () => {
+    // The whole reason this takes two seasons instead of a palette. A wood
+    // that turns its leaves in autumn has to slide from summer green to autumn
+    // gold across the same week everything else does; tinting an
+    // already-blended palette could only ever snap on the day it flipped.
+    const from = at(WOODLAND, 'summer')
+    const to = at(WOODLAND, 'autumn')
+    const half = tintPalette(WOODLAND, 'summer', 'autumn', 0.5)
+    for (let i = 0; i < MATERIALS.length; i++) {
+      for (let c = 0; c < 3; c++) {
+        expect(half[i]![c]).toBeCloseTo((from[i]![c]! + to[i]![c]!) / 2, 10)
+      }
+    }
+  })
+
+  it('does not blend a season with itself, however far through it is', () => {
+    expect(tintPalette(WOODLAND, 'autumn', 'autumn', 0.9)).toEqual(at(WOODLAND, 'autumn'))
+  })
+
+  it('does not blend before the turn has started', () => {
+    expect(tintPalette(WOODLAND, 'summer', 'autumn', 0)).toEqual(at(WOODLAND, 'summer'))
+  })
+
+  it('builds each place-and-season once and hands the same colours back', () => {
+    // Nothing is rebuilt for a repaint: terrain and props store a material
+    // index, and this runs behind every frame that draws one.
+    expect(at(WOODLAND, 'spring')).toBe(at(WOODLAND, 'spring'))
+    expect(at(WOODLAND, 'spring')).not.toBe(at(WOODLAND, 'summer'))
+  })
+})
