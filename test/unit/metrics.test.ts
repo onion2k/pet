@@ -326,6 +326,15 @@ describe('playLean', () => {
     expect(leaning(5, 3, 2)).toBe('chase')
   })
 
+  it('names an axis that is not the first one on the list', () => {
+    // The winner is picked by folding along a fixed order, so a lean that only
+    // ever showed up on the axis that happens to be checked first would pass
+    // whatever the fold did with the rest.
+    expect(leaning(0, 5, 0)).toBe('romp')
+    expect(leaning(0, 0, 5)).toBe('quiet')
+    expect(leaning(1, 2, 5)).toBe('quiet')
+  })
+
   it('leans nowhere when no axis has a majority', () => {
     // Three axes, so being merely ahead is not standing out.
     expect(leaning(3, 3, 2)).toBeNull()

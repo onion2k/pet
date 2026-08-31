@@ -124,12 +124,72 @@ describe('chase', () => {
   })
 })
 
+describe('chase', () => {
+  it('draws a caught round in one colour and a missed one in another', () => {
+    // The pet starts on the perch the quarry is on, so a single step is the
+    // whole of the guess: one of the two ways is where it went. That makes
+    // both outcomes reachable from one seed, which is what lets the reveal be
+    // drawn twice and compared.
+    const { fake, hud } = fakeHud()
+    const said = new Map<string, string[]>()
+    for (const button of ['a', 'c'] as ButtonId[]) {
+      setRandom(seeded(7))
+      const session = open('chase')
+      session.press(button)
+      let beat: ReturnType<GameSession['update']> = null
+      for (let i = 0; i < 60 * 5 && !beat; i++) beat = session.update(FRAME)
+      fake.clear()
+      session.draw(hud)
+      said.set(beat!.sound, fake.texts.map((t) => t.text))
+    }
+    expect([...said.keys()].sort()).toEqual(['lose', 'win'])
+    expect(said.get('win')).toContain('CAUGHT IT!')
+    expect(said.get('lose')).toContain('GONE')
+  })
+})
+
 describe('catch them', () => {
   it('counts a press before anything lights as a miss', () => {
     const session = open('catch')
     const feedback = session.press('a')
     expect(feedback?.sound).toBe('lose')
     expect(session.streak).toBe(0)
+  })
+
+  /** Runs frames until a perch lights, which the game announces as it happens. */
+  const untilLit = (session: GameSession): boolean => {
+    for (let i = 0; i < 60 * 5; i++) {
+      if (session.update(FRAME)?.sound === 'toneA') return true
+    }
+    return false
+  }
+
+  it('catches the one that is lit, and only that one', () => {
+    const session = open('catch')
+    expect(untilLit(session)).toBe(true)
+
+    // Drawn while one is actually lit. Every other test draws this game either
+    // waiting or revealing, so the one frame it is about had never been put on
+    // a screen.
+    const { fake, hud } = fakeHud()
+    session.draw(hud)
+    expect(fake.texts.map((t) => t.text)).toContain('NOW!')
+
+    // Which perch it is is the game's own roll, so all three are tried against
+    // the same one: exactly one of them is the catch.
+    const said = new Map<string, string[]>()
+    for (const button of ['a', 'b', 'c'] as ButtonId[]) {
+      setRandom(seeded(7))
+      const fresh = open('catch')
+      expect(untilLit(fresh)).toBe(true)
+      const beat = fresh.press(button)!
+      fake.clear()
+      fresh.draw(hud)
+      said.set(beat.sound, fake.texts.map((t) => t.text))
+    }
+    expect([...said.keys()].sort()).toEqual(['lose', 'win'])
+    expect(said.get('win')).toContain('GOT ONE!')
+    expect(said.get('lose')).toContain('MISSED IT')
   })
 
   it('counts letting one fade as a miss, so hanging back is no safer', () => {

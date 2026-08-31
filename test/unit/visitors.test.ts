@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { VISITORS } from '../../src/data/visitors'
-import { hash2, idSeed, isPresent, roster, visitorsPresent, withinHours } from '../../src/game/visitors'
+import { VISITORS, type VisitorId } from '../../src/data/visitors'
+import {
+  hash2,
+  idSeed,
+  isPresent,
+  roster,
+  visitorsPresent,
+  withinHours,
+  withinWindow,
+} from '../../src/game/visitors'
 import { BIOMES, MEADOW, WOODLAND } from '../../src/data/biome'
 import type { SeasonId } from '../../src/data/seasons'
 
@@ -20,6 +28,19 @@ describe('who is in the yard', () => {
           const visitor = VISITORS.find((v) => v.id === id)!
           expect(visitor.seasons).toContain(season)
         }
+      }
+    }
+  })
+
+  it('leaves an id it has never heard of out of the yard', () => {
+    // Same reason as the hour window below: a roster can name someone this
+    // build has since dropped, and the answer has to be "not here" rather than
+    // a throw on the first frame that draws the yard.
+    for (const season of SEASONS) {
+      for (let day = 0; day < DAYS; day++) {
+        expect(isPresent('grendel' as VisitorId, day, season, [])).toBe(false)
+        // Not even by being a regular: a name nothing answers to cannot be one.
+        expect(isPresent('grendel' as VisitorId, day, season, ['grendel' as VisitorId])).toBe(false)
       }
     }
   })
@@ -90,6 +111,15 @@ describe('hour windows', () => {
     for (let hour = 0; hour < 24; hour++) expect(withinHours(anytime.id, hour)).toBe(true)
   })
 
+  it('lets an id it has never heard of be seen at any hour', () => {
+    // A save from a build with a visitor since renamed. The yard asks about
+    // whoever is on its roster, and an unknown name has to answer something
+    // rather than throw on a getter the renderer reads every frame.
+    for (let hour = 0; hour < 24; hour++) {
+      expect(withinHours('grendel' as VisitorId, hour)).toBe(true)
+    }
+  })
+
   it('wraps a window that runs through midnight', () => {
     // The fireflies are out from eight in the evening until four in the
     // morning, which is two stretches of the clock rather than one.
@@ -98,6 +128,39 @@ describe('hour windows', () => {
     expect(withinHours('fireflies', 12)).toBe(false)
     expect(withinHours('fireflies', 19)).toBe(false)
     expect(withinHours('fireflies', 4)).toBe(false)
+  })
+})
+
+describe('an hour window on its own', () => {
+  /**
+   * Every visitor that keeps to a window currently keeps to the same one, so
+   * the plain daytime case has no data to reach it through. It is not dead
+   * code -- it is what the first daytime visitor will land on -- so it is held
+   * to here rather than only through whoever happens to exist.
+   */
+  it('reads a plain window as one stretch of the clock', () => {
+    expect(withinWindow([9, 17], 9)).toBe(true)
+    expect(withinWindow([9, 17], 12)).toBe(true)
+    expect(withinWindow([9, 17], 8)).toBe(false)
+    // Half open at the top, the same way the wrapping case is: a window that
+    // ends at five is over at five.
+    expect(withinWindow([9, 17], 17)).toBe(false)
+  })
+
+  it('reads a window through midnight as two', () => {
+    expect(withinWindow([20, 4], 21)).toBe(true)
+    expect(withinWindow([20, 4], 2)).toBe(true)
+    expect(withinWindow([20, 4], 20)).toBe(true)
+    expect(withinWindow([20, 4], 12)).toBe(false)
+    expect(withinWindow([20, 4], 4)).toBe(false)
+  })
+
+  it('shuts a window that starts and ends at the same hour', () => {
+    // Equal bounds are not a whole day. `from <= to` holds, so this reads as
+    // the plain case -- at or after six and before six, which is nobody.
+    for (let hour = 0; hour < 24; hour++) {
+      expect(withinWindow([6, 6], hour), String(hour)).toBe(false)
+    }
   })
 })
 

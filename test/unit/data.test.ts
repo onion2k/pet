@@ -10,7 +10,7 @@ import {
   type Prospect,
 } from '../../src/data/grounds'
 import { foodById, FOODS } from '../../src/data/foods'
-import { visitorFor, YARD_GAMES } from '../../src/data/yardgames'
+import { visitorFor, YARD_GAMES, yardGameById, type YardGameId } from '../../src/data/yardgames'
 import { CURIOS } from '../../src/data/curios'
 import { MINIGAMES, YARD_SESSIONS } from '../../src/game/minigames'
 import { PLAY_MIN_ENERGY } from '../../src/game/app'
@@ -31,7 +31,15 @@ import {
   type SeasonId,
   type WeatherId,
 } from '../../src/data/seasons'
-import { BIOMES, LAMP_COUNT, LAMP_ROW_X, MEADOW, VERGE_SLOTS } from '../../src/data/biome'
+import {
+  biomeById,
+  BIOMES,
+  LAMP_COUNT,
+  LAMP_ROW_X,
+  MEADOW,
+  VERGE_SLOTS,
+  type BiomeId,
+} from '../../src/data/biome'
 import { emptySave } from '../../src/game/save'
 import { resetRandom, setRandom } from '../../src/engine/random'
 import type { Stage } from '../../src/game/types'
@@ -856,6 +864,18 @@ describe('biome', () => {
     }
   })
 
+  it('finds every place by its own id', () => {
+    for (const biome of BIOMES) expect(biomeById(biome.id)).toBe(biome)
+  })
+
+  it('refuses an id for a place that does not exist', () => {
+    // `knownBiome` is the forgiving door, for ids off a save file; this one is
+    // the strict door, for ids the code chose. A name that got this far and is
+    // still wrong is a bug in the caller, and returning the meadow instead
+    // would hide it behind a house the player never moved to.
+    expect(() => biomeById('atlantis' as BiomeId)).toThrow(/Unknown biome: atlantis/)
+  })
+
   it('keeps biome ids unique, since the save keys the gardens off them', () => {
     const ids = BIOMES.map((b) => b.id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -924,6 +944,11 @@ describe('the yard games', () => {
         expect(known, `${game.id}/${biome.id}`).toContain(visitorFor(game, biome.visitors))
       }
     }
+  })
+
+  it('finds every game by its own id, and refuses one that does not exist', () => {
+    for (const game of YARD_GAMES) expect(yardGameById(game.id)).toBe(game)
+    expect(() => yardGameById('hopscotch' as YardGameId)).toThrow(/Unknown yard game: hopscotch/)
   })
 
   it('is playable in every biome, so moving house never closes a game', () => {

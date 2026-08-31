@@ -58,6 +58,16 @@ describe('the play menu', () => {
     expect(h.app.playMenu.every((o) => o.kind === 'plain')).toBe(true)
   })
 
+  it('offers only the three before there is a pet to play with', () => {
+    // The naming screen has no pet, and so no yard to read: a menu is still
+    // asked for -- the renderer reads it every frame -- and has to come back
+    // with the three that need nothing rather than throwing on the way.
+    const h = harness().boot()
+    expect(h.app.pet).toBeNull()
+    expect(h.app.playMenu.every((o) => o.kind === 'plain')).toBe(true)
+    expect(h.app.playMenu.length).toBeGreaterThan(0)
+  })
+
   it('never leaves PLAY an empty menu', () => {
     expect(withEmptyYard().app.playMenu.length).toBeGreaterThan(0)
   })
