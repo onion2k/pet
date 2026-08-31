@@ -419,7 +419,7 @@ export class Forage {
     // Supplies are picked up on the way rather than looked for, so they ride
     // along with whatever the trip was actually about -- including a bad one.
     const supply =
-      !mishap?.spoils && random() < SUPPLY_CHANCE
+      !mishap?.spoils && random() < SUPPLY_CHANCE + kit.supplyBonus
         ? this.host.gather(ground, depth)
         : null
 

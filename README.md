@@ -168,9 +168,19 @@ Care keeps a pet well; the lineage is why you keep coming back.
   its own, so a there-and-back after dark is exactly as safe as it always was.
   Risk in this game is always chosen.
 
-  The last two — the basket and the pine cone — are found and owned and do
-  nothing yet. Their notes say what they are for rather than what they do, and
-  the code that reads them is on its way.
+  The last two are about the supply line and the sky. A **basket** brings
+  supplies home more often and lets the larder hold three more of anything, so
+  a foraging adult can actually bank a stock rather than topping one up. And a
+  **pine cone**, which closes before rain, tells you when the weather is going
+  to break and what to — printed under WHERE TO?, because that is the screen
+  where a day is a thing you are spending rather than a thing you are reading.
+
+  The forecast is not a guess. The weather is a hash of which spell of the
+  world's clock a moment falls in, so the cone asks the same function the sky
+  is painted from about a moment that has not arrived. It reports the next
+  *change* rather than the next spell — "clear" in clear weather tells nobody
+  anything — and says nothing at all when the sky is set for as far ahead as it
+  looks.
 - **The album.** A second board under the curios, one slot per form, each drawn
   in its own body colour taken straight from its voxel model so the board and
   the creature always agree. Forms the family has never grown show as

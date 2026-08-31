@@ -5,6 +5,9 @@ import type { DrawnText } from '../fake-hud'
 import { speciesOf } from '../../src/data/species'
 import { CURIOS } from '../../src/data/curios'
 import { KIT } from '../../src/data/kit'
+import { DEFAULT_START, harness } from '../harness'
+import { emptySave } from '../../src/game/save'
+import { isNight } from '../../src/game/world'
 
 /**
  * What is on each screen, and where.
@@ -95,6 +98,65 @@ describe('every screen', () => {
       })
     })
   }
+})
+
+/**
+ * The lines a screen only draws for some players.
+ *
+ * The sweep above opens each screen the way a fresh save reaches it, which
+ * means anything drawn only for a family that owns something never gets looked
+ * at -- and the forecast line went in sitting one pixel under a row of the
+ * forage menu for exactly that reason. It fitted the glass and it did not
+ * technically overlap, and it read as one crowded line.
+ */
+describe('a screen with everything on it', () => {
+  const everything = () => {
+    const h = harness({
+      save: {
+        ...emptySave(),
+        kit: KIT.map((item) => item.id),
+        // A dark day, so the menu draws its warning as well as its forecast.
+        worldOffset: darkOffset(),
+      },
+    })
+      .start()
+      .growTo('adult')
+    h.pet.stats.energy = 100
+    h.select('forage')
+    expect(h.app.mode).toBe('grounds')
+    return h
+  }
+
+  /** A world offset that lands the trip after dark. */
+  function darkOffset(): number {
+    for (let step = 0; step < 4000; step++) {
+      const offset = step * 60_000
+      if (isNight(DEFAULT_START + offset)) return offset
+    }
+    throw new Error('the sun never sets')
+  }
+
+  it('draws the forage menu with a forecast and a warning, and crowds nothing', () => {
+    const fake = draw(everything())
+    const said = fake.said()
+    expect(said).toContain(' BY ')
+    expect(said).toContain('THE TORCH IS LIT')
+
+    const boxes = fake.texts.map((t) => ({ t, b: box(t) }))
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!
+        const c = boxes[j]!
+        if (a.t.text === c.t.text && a.b.x1 === c.b.x1 && a.b.y1 === c.b.y1) continue
+        expect(overlaps(a.b, c.b), `"${a.t.text}" sits on "${c.t.text}"`).toBe(false)
+      }
+    }
+    for (const t of fake.texts) {
+      const b = box(t)
+      expect(b.x1, `"${t.text}"`).toBeGreaterThanOrEqual(0)
+      expect(b.x2, `"${t.text}"`).toBeLessThanOrEqual(fake.width)
+    }
+  })
 })
 
 describe('the toast', () => {

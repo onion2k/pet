@@ -12,7 +12,6 @@ import {
   pickKit,
   type Day,
   type KitDay,
-  type KitId,
 } from '../../src/data/kit'
 import { SEASONS, type WeatherId } from '../../src/data/seasons'
 import { SLOTS_PER_ROW } from '../../src/ui/draw'
@@ -226,9 +225,23 @@ describe('what the kit is worth today', () => {
     expect(day.depthBonus).toBe(0)
   })
 
+  it('carries more home in a basket, whatever the day', () => {
+    for (const season of SEASON_IDS) {
+      for (const weather of WEATHERS) {
+        const powers = kitPowers(['basket'], day(season, weather))
+        expect(powers.supplyBonus).toBeGreaterThan(0)
+        expect(powers.larderBonus).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('reads the sky with a cone, and changes not one other thing', () => {
+    const powers = kitPowers(['pinecone'], day('spring', 'clear'))
+    expect(powers).toEqual({ ...NO_KIT, forecasts: true })
+  })
+
   it('adds up, so a family with the lot gets all of it at once', () => {
-    const owned: KitId[] = ['umbrella', 'hat', 'waders', 'boots', 'snowboard', 'torch']
-    expect(kitPowers(owned, { season: 'winter', weather: 'snow', night: true })).toEqual({
+    expect(kitPowers(KIT.map((k) => k.id), { season: 'winter', weather: 'snow', night: true })).toEqual({
       forgivesWeather: false,
       forgivesSeason: true,
       wades: true,
@@ -238,19 +251,20 @@ describe('what the kit is worth today', () => {
       pushScale: 0.5,
       depthBonus: 1,
       lightsTheDark: true,
+      supplyBonus: 0.2,
+      larderBonus: 3,
+      forecasts: true,
     })
   })
 
-  it('says nothing about the two that have not been taught to speak yet', () => {
-    // The basket and the pine cone are found and owned but do not read yet.
-    // This is the line that will have to change when they do.
-    const quiet: KitId[] = ['basket', 'pinecone']
-    for (const season of SEASON_IDS) {
-      for (const weather of WEATHERS) {
-        for (const night of [false, true]) {
-          expect(kitPowers(quiet, { season, weather, night })).toEqual(NO_KIT)
-        }
-      }
+  it('has taught all eight of them to speak', () => {
+    // Every item has to do something on some day, or it is a slot on the board
+    // that rewards the player with nothing at all.
+    for (const item of KIT) {
+      const speaks = everyDay().some(
+        (day) => JSON.stringify(kitPowers([item.id], day)) !== JSON.stringify(NO_KIT),
+      )
+      expect(speaks, item.id).toBe(true)
     }
   })
 })

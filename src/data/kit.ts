@@ -268,6 +268,12 @@ export interface KitPowers {
   depthBonus: number
   /** The dark has stopped being a risk, because the pet is carrying a light. */
   lightsTheDark: boolean
+  /** Added to the odds a trip picks something up on the way. */
+  supplyBonus: number
+  /** Added to how much of any one thing the larder will hold. */
+  larderBonus: number
+  /** The pet can tell when the sky is going to turn, and what to. */
+  forecasts: boolean
 }
 
 /**
@@ -322,6 +328,13 @@ export function kitPowers(owned: KitId[], day: Day): KitPowers {
     pushScale: has('snowboard') && day.weather === 'snow' ? BOARD_PUSH : 1,
     depthBonus: has('torch') && day.night ? TORCH_REACH : 0,
     lightsTheDark: has('torch') && day.night,
+    // A basket asks nothing of the day either, and pays out only to a pet that
+    // is actually out gathering -- which is to say, to an adult doing its job.
+    supplyBonus: has('basket') ? BASKET_SUPPLY : 0,
+    larderBonus: has('basket') ? BASKET_LARDER : 0,
+    // The cone is information rather than power. It changes no odds at all; it
+    // tells the player which day is coming, and leaves them to use it.
+    forecasts: has('pinecone'),
   }
 }
 
@@ -331,6 +344,10 @@ const BOOTS_MISHAP = 0.55
 const BOARD_PUSH = 0.5
 /** How much further into the dark a lit torch can see, in legs. */
 const TORCH_REACH = 1
+/** What a basket adds to the odds of coming home with supplies. */
+const BASKET_SUPPLY = 0.2
+/** And to how much of any one thing the larder will hold. */
+const BASKET_LARDER = 3
 
 /** No kit at all, for anything that has to read powers without a family. */
 export const NO_KIT: KitPowers = {
@@ -343,6 +360,9 @@ export const NO_KIT: KitPowers = {
   pushScale: 1,
   depthBonus: 0,
   lightsTheDark: false,
+  supplyBonus: 0,
+  larderBonus: 0,
+  forecasts: false,
 }
 
 /** The trip a piece of kit might turn up on: a day, and how the trip went. */

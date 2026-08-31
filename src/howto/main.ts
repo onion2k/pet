@@ -660,7 +660,14 @@ const curiosSection = chapter(
   <p class="note">
     A trip there and back is as safe after dark as it ever was. It is only
     going further that the night charges for — risk here is always chosen.
-    The basket and the pine cone are found and kept and do nothing yet.
+  </p>
+  <p>
+    The last two are quieter. A basket brings supplies home more often and
+    lets your larder hold more of them, which is what turns a grown pet's
+    foraging from topping up into laying in. And a pine cone closes before
+    rain: carry one and the forage menu tells you when the weather is going to
+    break, and what into. Sometimes it says nothing, which means the sky is set
+    for as far as a cone can tell.
   </p>`,
 )
 

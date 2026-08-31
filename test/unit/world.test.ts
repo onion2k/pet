@@ -3,7 +3,9 @@ import {
   DAY_MS,
   hoursUntilSunrise,
   isNight,
+  nextChange,
   seasonIdAt,
+  weatherAt,
   worldAt,
   worldHour,
   WORLD_HOUR_MS,
@@ -310,6 +312,52 @@ function firstMomentOf(season: SeasonId): number {
   const index = SEASONS.findIndex((s) => s.id === season)
   return index * 70 * 60_000 + 60_000
 }
+
+/**
+ * The forecast. The weather is a hash of which spell a moment falls in, so
+ * this is not a prediction at all -- it is the same function the sky is
+ * painted from, asked about a moment that has not arrived yet. Which is worth
+ * pinning down, because the whole worth of the pine cone is that what it says
+ * is what then happens.
+ */
+describe('nextChange', () => {
+  const MINUTE = 60_000
+
+  it('names weather the sky actually turns to, at the moment it turns', () => {
+    let checked = 0
+    for (let m = 0; m < 400; m++) {
+      const now = m * MINUTE
+      const change = nextChange(now)
+      if (!change) continue
+      checked++
+      expect(weatherAt(change.at), `at ${change.at}`).toBe(change.weather)
+      // It is a change, not merely the next spell: reporting "clear" in clear
+      // weather would tell nobody anything.
+      expect(change.weather).not.toBe(weatherAt(now))
+      expect(change.at).toBeGreaterThan(now)
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  it('finds the first change rather than any later one', () => {
+    for (let m = 0; m < 200; m++) {
+      const now = m * MINUTE
+      const change = nextChange(now)
+      if (!change) continue
+      // Nothing between now and then may already have turned.
+      for (let at = now; at < change.at; at += MINUTE) {
+        expect(weatherAt(at), `at ${at}`).toBe(weatherAt(now))
+      }
+    }
+  })
+
+  it('says nothing at all when the sky is set as far as it looks', () => {
+    // Rare -- a run of the same weather right across the window -- but real,
+    // and the difference between "no change coming" and a wrong answer.
+    const settled = 571_320_000
+    expect(nextChange(settled)).toBeNull()
+  })
+})
 
 describe('tintPalette', () => {
   /**

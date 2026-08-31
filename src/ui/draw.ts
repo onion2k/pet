@@ -27,6 +27,13 @@ const BOTTOM_BAND = 21
 /** The news crawl, sitting just above the lower icon strip. */
 const TICKER_BAND = 11
 
+/** A world hour as the device writes it, which the forecast borrows. */
+function onTheHour(hour: number): string {
+  const h = String(Math.floor(hour)).padStart(2, '0')
+  const m = String(Math.floor((hour % 1) * 60)).padStart(2, '0')
+  return `${h}:${m}`
+}
+
 function duration(ms: number): string {
   const minutes = Math.floor(ms / 60_000)
   if (minutes < 60) return `${minutes}M`
@@ -265,9 +272,7 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   const left = Math.round(hud.safeInset(10)) + 2
   hud.text(left, 10, pet.name, ACCENT, 2)
   // The world's own clock, so the season and the weather are legible somewhere.
-  const clock = `${String(Math.floor(world.hour)).padStart(2, '0')}:${String(
-    Math.floor((world.hour % 1) * 60),
-  ).padStart(2, '0')}`
+  const clock = onTheHour(world.hour)
   hud.text(hud.width - left - textWidth(clock), 11, clock, DIM)
   hud.text(left, 24, `${speciesOf(pet.speciesId).name.toUpperCase()} / ${pet.stage.toUpperCase()}`, COOL)
   hud.text(6, 32, `AGE ${duration(pet.ageMs)}`, DIM)
@@ -593,6 +598,17 @@ function drawGrounds(hud: Hud, app: App): void {
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   hud.textCentered(hud.width / 2, 8, 'WHERE TO?', ACCENT)
 
+  // What the sky is about to do, for a pet carrying something that can tell.
+  // On this screen rather than the status page because here is where the
+  // weather is a thing the player is spending rather than a thing they are
+  // reading -- and up with the heading, because it is the standing condition
+  // every row below is being judged against rather than a note about one.
+  const forecast = app.forecast
+  if (forecast) {
+    const line = `${forecast.weather.toUpperCase()} BY ${onTheHour(forecast.hour)}`
+    hud.textCentered(hud.width / 2, 16, line, COOL)
+  }
+
   menu.forEach((ground, i) => {
     const y = 26 + i * 26
     const selected = app.groundIndex === i
@@ -625,6 +641,7 @@ function drawGrounds(hud: Hud, app: App): void {
     const line = lit ? 'THE TORCH IS LIT' : 'DARK OUT: PUSHING ON IS RISKIER'
     hud.textCentered(hud.width / 2, hud.height - 36, line, lit ? COOL : BAD)
   }
+
 
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B GO', DIM)
 }

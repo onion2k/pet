@@ -570,6 +570,49 @@ describe('what the kit is worth', () => {
     expect(draw(h).said()).toContain(`B GO ON (-${h.app.foragePushCost} SNOWBOARD)   C HOME`)
   })
 
+  it('holds more in the larder for a family with a basket', () => {
+    const fill = (kit: KitId[]) => {
+      const h = harness({ save: { ...emptySave(), kit }, random: 4 }).start().growTo('adult')
+      for (let trip = 0; trip < 40; trip++) {
+        h.pet.stats.energy = 100
+        h.pet.sick = false
+        h.select('forage')
+        h.tap('b')
+        runTrip(h, 'c')
+      }
+      return Math.max(0, ...Object.values(h.app.larder))
+    }
+    const bare = fill([])
+    expect(bare).toBe(LARDER_CAP)
+    expect(fill(['basket'])).toBeGreaterThan(LARDER_CAP)
+  })
+
+  it('tells a family with a pine cone when the sky is going to turn', () => {
+    const bare = kitted([], {})
+    expect(bare.app.forecast).toBeNull()
+
+    const h = kitted(['pinecone'], {})
+    const forecast = h.app.forecast
+    expect(forecast).not.toBeNull()
+    // What it says is what the sky actually does when it gets there, because
+    // the forecast is the same function the sky is painted from.
+    expect(forecast!.weather).not.toBe(worldAt(h.app.worldNow()).weather)
+
+    h.pet.stats.energy = 100
+    h.select('forage')
+    expect(draw(h).said()).toContain(forecast!.weather.toUpperCase())
+  })
+
+  it('says nothing when the sky is set for as far as the cone can tell', () => {
+    // A run of one weather right across the window the cone looks over. Rare,
+    // and the difference between "nothing coming" and a made-up answer.
+    const settled = 165_240_000
+    const h = harness({ save: { ...emptySave(), kit: ['pinecone'], worldOffset: settled } })
+      .start()
+      .growTo('adult')
+    expect(h.app.forecast).toBeNull()
+  })
+
   it('keeps the pet warm in a bobble hat, without burning the kindling for it', () => {
     const h = kitted(['hat'], { season: 'winter' })
     h.app.larder.kindling = 2

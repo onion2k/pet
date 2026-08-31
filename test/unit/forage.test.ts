@@ -828,6 +828,23 @@ describe('what it comes home with', () => {
     expect(found(lit)).toEqual([2])
   })
 
+  it('comes home with supplies more often for a pet carrying a basket', () => {
+    const gathersOver = (kit: KitPowers) => {
+      let count = 0
+      for (let seed = 0; seed < 60; seed++) {
+        setRandom(seeded(seed))
+        const stub = stubHost({ kit: () => kit })
+        const forage = new Forage(stub.host)
+        forage.begin(WALL)
+        runToEnd(forage, stub)
+        count += stub.calls.gathered
+      }
+      return count
+    }
+    const basket = kitPowers(['basket'], { season: 'spring', weather: 'clear', night: false })
+    expect(gathersOver(basket)).toBeGreaterThan(gathersOver(NO_KIT))
+  })
+
   it('makes a completed set of stones pay out on every trip after it', () => {
     // Stones cut the odds of a mishap, so the same dice go wrong less often.
     const mishapsWith = (boons: 'stones'[]) => {

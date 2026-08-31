@@ -21,7 +21,16 @@ import { VISITORS, type VisitorId } from '../data/visitors'
 import { biomeById, BIOMES, VERGE_SLOTS, VERGE_Z, type Biome } from '../data/biome'
 import type { PlantedThing } from '../render/visitors'
 import { groundsFor, prospectOf, type Ground, type Prospect } from '../data/grounds'
-import { DAY_MS, hoursUntilSunrise, isNight, seasonIdAt, worldAt, worldHour, WORLD_HOUR_MS } from './world'
+import {
+  DAY_MS,
+  hoursUntilSunrise,
+  isNight,
+  nextChange,
+  seasonIdAt,
+  worldAt,
+  worldHour,
+  WORLD_HOUR_MS,
+} from './world'
 import { roster, visitorsPresent, withinHours } from './visitors'
 import {
   COMMON_CURIOS,
@@ -451,7 +460,7 @@ export class App {
     // at least one leg, so there is always something it could have picked up.
     const supply = findSupply(ground.role, legs, random())!
     const held = this.save.larder[supply.id] ?? 0
-    if (held >= LARDER_CAP) return null
+    if (held >= LARDER_CAP + this.kitPowers.larderBonus) return null
     this.save.larder[supply.id] = held + 1
     return supply.what
   }
@@ -767,6 +776,20 @@ export class App {
     const now = this.worldNow()
     const world = worldAt(now)
     return { season: world.season.id, weather: world.weather, night: isNight(now) }
+  }
+
+  /**
+   * When the sky is next going to turn, and what to -- for a family that has
+   * something to read it with. Null without the cone, and null when the
+   * weather is set for as far ahead as there is any point looking.
+   *
+   * The whole of what the cone does. It changes no odds; it tells the player
+   * which day is coming, on the screen where a day is what they are spending.
+   */
+  get forecast(): { weather: WeatherId; hour: number } | null {
+    if (!this.kitPowers.forecasts) return null
+    const change = nextChange(this.worldNow())
+    return change ? { weather: change.weather, hour: worldHour(change.at) } : null
   }
 
   /** True when a trip sent now would set out into the dark. */
