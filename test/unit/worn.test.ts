@@ -4,7 +4,13 @@ import { KIT_MODELS } from '../../src/data/kit-models'
 import { SPECIES_LIST } from '../../src/data/species'
 import { expandLayers, rows, type VoxelModel } from '../../src/data/voxel-format'
 import { buildWorn, kitAnchors, wornKinds } from '../../src/render/worn'
-import { modelSource, PART_HEAD } from '../../src/render/voxel-mesh'
+import {
+  modelSource,
+  PART_ARM,
+  PART_BODY,
+  PART_HEAD,
+  PART_LEG,
+} from '../../src/render/voxel-mesh'
 import { SEASONS, type WeatherId } from '../../src/data/seasons'
 
 /**
@@ -86,6 +92,41 @@ describe('where a hat goes', () => {
   })
 })
 
+describe('where the rest of it goes', () => {
+  it('finds a pair of hands and a pair of feet on everything with limbs', () => {
+    for (const { id, model } of forms) {
+      const source = modelSource(model)
+      const { hands, feet, voxel } = kitAnchors(model, HEIGHT)
+      const limbless = id === 'egg'
+      expect(hands === null, id).toBe(limbless)
+      expect(feet === null, id).toBe(limbless)
+      if (!hands || !feet) continue
+      // Ordered left of the screen first, so a thing meant for one hand is
+      // always in the same hand.
+      expect(hands[0].x, id).toBeLessThan(hands[1].x)
+      expect(feet[0].x, id).toBeLessThan(feet[1].x)
+      // A hand is somewhere up the body; a foot is on the ground the pet
+      // stands on, which is where a boot has to start.
+      expect(hands[0].y, id).toBeGreaterThan(0)
+      expect(feet[0].y, id).toBe(0)
+      expect(feet[1].y, id).toBe(0)
+      // And both stay inside the creature's own footprint.
+      for (const spot of [...hands, ...feet]) {
+        expect(Math.abs(spot.x), id).toBeLessThanOrEqual((source.w / 2) * voxel)
+      }
+    }
+  })
+
+  it('puts the back behind the creature, and up where a strap would cross', () => {
+    for (const { id, model } of forms) {
+      const { back } = kitAnchors(model, HEIGHT)
+      expect(back.z, id).toBeLessThan(0)
+      expect(back.y, id).toBeGreaterThan(0)
+      expect(back.y, id).toBeLessThan(HEIGHT)
+    }
+  })
+})
+
 describe('building what is worn', () => {
   const anchors = kitAnchors(forms[0]!.model, HEIGHT)
 
@@ -141,6 +182,85 @@ describe('building what is worn', () => {
   })
 })
 
+describe('carrying more than a hat', () => {
+  const anchors = kitAnchors(forms[1]!.model, HEIGHT)
+
+  const bounds = (worn: KitId[]) => {
+    const built = buildWorn(worn, anchors)!
+    const xs: number[] = []
+    const ys: number[] = []
+    for (let i = 0; i < built.position.length; i += 3) {
+      xs.push(built.position[i]!)
+      ys.push(built.position[i + 1]!)
+    }
+    return { built, minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys) }
+  }
+
+  it('animates each piece with the limb that carries it', () => {
+    // The part is the whole of it, and each is chosen so the thing moves the
+    // way the thing would: a held torch swings with the arm, a boot pivots
+    // from the hip and stays planted, a basket rides on the body.
+    const parts: [KitId, number][] = [
+      ['hat', PART_HEAD],
+      ['umbrella', PART_ARM],
+      ['torch', PART_ARM],
+      ['boots', PART_LEG],
+      ['waders', PART_LEG],
+      ['basket', PART_BODY],
+    ]
+    for (const [id, part] of parts) {
+      expect(new Set(buildWorn([id], anchors)!.part), id).toEqual(new Set([part]))
+    }
+  })
+
+  it('puts a boot on each foot, not one on the pair of them', () => {
+    const boots = bounds(['boots'])
+    expect(boots.minX).toBeLessThan(anchors.feet![0].x + anchors.voxel * 2)
+    expect(boots.maxX).toBeGreaterThan(anchors.feet![1].x - anchors.voxel * 2)
+    // Standing on the ground, since that is where the foot is.
+    expect(boots.minY).toBeCloseTo(0)
+    // Wider than one boot could be on its own, which is what says there are
+    // two of them rather than one stretched across the gap.
+    const oneBoot = 3 * anchors.voxel
+    expect(boots.maxX - boots.minX).toBeGreaterThan(oneBoot)
+  })
+
+  it('holds a torch clear of the body, or it disappears behind the head', () => {
+    const hand = anchors.hands![1]!
+    const torch = bounds(['torch'])
+    // Further out than the hand it hangs from: an arm ends at the body's own
+    // edge, and a torch tall enough to matter is head height.
+    expect(torch.maxX).toBeGreaterThan(hand.x + anchors.voxel)
+    // And rising from the hand rather than from the floor.
+    expect(torch.minY).toBeCloseTo(hand.y)
+  })
+
+  it('holds the umbrella high enough to be over the pet rather than beside it', () => {
+    const built = buildWorn(['umbrella'], anchors)!
+    const ys: number[] = []
+    for (let i = 1; i < built.position.length; i += 3) ys.push(built.position[i]!)
+    // The canopy has to reach past the top of the head, or the whole thing
+    // reads as a blue box carried under one arm.
+    expect(Math.max(...ys)).toBeGreaterThan(anchors.crown.y)
+  })
+
+  it('hangs the basket off the back rather than through it', () => {
+    const built = buildWorn(['basket'], anchors)!
+    const zs: number[] = []
+    for (let i = 2; i < built.position.length; i += 3) zs.push(built.position[i]!)
+    expect(Math.max(...zs)).toBeLessThanOrEqual(anchors.back.z + 1e-6)
+  })
+
+  it('gives every picture somewhere to hang, and every hanger a picture', () => {
+    // Two lists that have to agree: a model with nowhere to hang is never
+    // drawn, and a hanger with no model would ask for one that is not there.
+    for (const id of Object.keys(KIT_MODELS) as KitId[]) {
+      expect(wornKinds(), `${id} has nowhere to hang`).toContain(id)
+    }
+    for (const id of wornKinds()) expect(KIT_MODELS[id], id).toBeDefined()
+  })
+})
+
 describe('what the pet has about it today', () => {
   const day = (season: (typeof SEASONS)[number]['id'], weather: WeatherId): Day => ({
     season,
@@ -158,6 +278,48 @@ describe('what the pet has about it today', () => {
     for (const season of SEASONS) {
       const worn = wornToday(['hat'], day(season.id, 'clear'))
       expect(worn, season.id).toEqual(season.id === 'winter' ? ['hat'] : [])
+    }
+  })
+
+  it('puts the umbrella up in the wet and the torch out after dark', () => {
+    const owned: KitId[] = ['umbrella', 'torch']
+    expect(wornToday(owned, day('spring', 'rain'))).toEqual(['umbrella'])
+    expect(wornToday(owned, day('spring', 'mist'))).toEqual(['umbrella'])
+    expect(wornToday(owned, day('spring', 'clear'))).toEqual([])
+    expect(wornToday(owned, { ...day('spring', 'clear'), night: true })).toEqual(['torch'])
+    // A wet night is both, which is why they are in different hands.
+    expect(wornToday(owned, { ...day('spring', 'rain'), night: true })).toEqual([
+      'umbrella',
+      'torch',
+    ])
+  })
+
+  it('wears the boots whatever the day, since they are not for the weather', () => {
+    for (const season of SEASONS) {
+      for (const weather of WEATHERS) {
+        expect(wornToday(['boots'], day(season.id, weather))).toEqual(['boots'])
+      }
+    }
+  })
+
+  it('swaps the boots for waders in the wet, since there is one pair of feet', () => {
+    const owned: KitId[] = ['boots', 'waders']
+    expect(wornToday(owned, day('spring', 'clear'))).toEqual(['boots'])
+    expect(wornToday(owned, day('spring', 'rain'))).toEqual(['waders'])
+    // And waders alone are still waders.
+    expect(wornToday(['waders'], day('spring', 'rain'))).toEqual(['waders'])
+  })
+
+  it('never puts two things on the same feet', () => {
+    const owned = KIT.map((item) => item.id)
+    for (const season of SEASONS) {
+      for (const weather of WEATHERS) {
+        for (const night of [false, true]) {
+          const worn = wornToday(owned, { season: season.id, weather, night })
+          const onFeet = worn.filter((id) => id === 'boots' || id === 'waders')
+          expect(onFeet.length, `${season.id} ${weather}`).toBeLessThanOrEqual(1)
+        }
+      }
     }
   })
 

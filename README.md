@@ -137,11 +137,13 @@ Care keeps a pet well; the lineage is why you keep coming back.
   than to the pet carrying it, so a torch one pet walked out three dark nights
   for is still in the porch for the next, and NEW PET takes it, tally and all.
 
-  Earn the bobble hat and you will see it: the pet puts it on when it snows and
-  takes it off again in spring. Kit shows when it is *doing* something rather
-  than whenever it is owned — a pet wearing all eight at once would be a hat
-  stand, and would say nothing about the day. The rest of the eight have no
-  picture yet. See [Kit on the pet](#kit-on-the-pet).
+  Six of the eight are visible on the pet: the hat goes on when it snows, the
+  umbrella up in the rain, the torch out after dark, the boots stay on and
+  become waders in the wet, and the basket rides on its back. Kit shows when it
+  is *doing* something rather than whenever it is owned — a pet wearing all
+  eight at once would be a hat stand, and would say nothing about the day. The
+  snowboard and the pine cone have no look yet. See
+  [Kit on the pet](#kit-on-the-pet).
 
   It is not a currency and cannot be traded: a second umbrella is worth nothing,
   so there is nothing to spend. The rule the whole list obeys is that kit does
@@ -316,8 +318,11 @@ rectangles, because what they cover is rectangular.
 
 ### Kit on the pet
 
-Earn a bobble hat and the pet wears it when it snows, so the yard says what the
-weather is doing — which is the one channel that never did.
+Six of the eight are visible on the pet. It puts its bobble hat on when it
+snows, its umbrella up in the rain, its torch out after dark; it wears its
+boots always and swaps them for waders in the wet; the basket rides on its back
+and shows when it turns. So the yard says what the weather is doing — which is
+the one channel that never did.
 
 It is the face's trick a second time, and cost almost nothing because of that. A
 hat is a small voxel model merged into the pet's own mesh with the head's `part`
@@ -337,6 +342,27 @@ Kit is built at the wearer's own voxel size, so its blocks line up with the
 head's. That is not the same as being one size for everyone: the forms are
 normalised to a single world height but are not all the same number of voxels
 tall, so a voxel is a shade bigger on a shorter creature and its hat is too.
+
+Four anchors carry the lot, and which part each piece rides on is the whole of
+how it moves: the crown for a hat, which twists with the look-around; a hand
+for the umbrella and the torch, which counter-swing with the walk; both feet
+for boots, which pivot from the hip and stay planted; the back for the basket,
+which rides with the body. Two of those are a *pair* — a pet does not put one
+boot on — and two are held, in different hands, so a wet night does not put the
+umbrella and the torch in the same fist.
+
+Placement wants two ideas beyond "stand it on the anchor". Things sink: a hat
+resting exactly on the crown floats, so it goes down a voxel and the brim
+grips. And things are held **outward**, away from the model's middle: an arm
+ends at the body's own edge, so a torch tall enough to be worth drawing
+vanishes behind the head without it. A single number does for both hands,
+because outward is signed by the side the hand is on.
+
+What decides whether a thing is worn at all is `shows(day)` on the item. Kit
+shows when it is *doing* something rather than whenever it is owned — a pet
+wearing all eight at once would be a hat stand and would say nothing about the
+day. Boots and the basket are the exceptions and are worn always: they say
+something about the family rather than about the sky.
 
 Being part of the one mesh is what buys all of that, and what it costs is a
 rebuild whenever the kit changes — which is why `setWorn` is called every frame

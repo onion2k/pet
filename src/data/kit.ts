@@ -80,6 +80,11 @@ export interface KitItem {
    * Absent for the pieces that have no picture yet.
    */
   shows?(day: Day): boolean
+  /**
+   * Kit this one stands in for while both are worn. Waders are boots that mean
+   * business, and a pet has only the one pair of feet.
+   */
+  replaces?: KitId
   /** 8x8 artwork, in the same format as the curios and the menu icons. */
   glyph: string
   colour: string
@@ -105,6 +110,7 @@ export const KIT: KitItem[] = [
     counts: (trip) => isWet(trip.weather),
     needs: 3,
     hint: 'TRIPS IN THE WET',
+    shows: (day) => isWet(day.weather),
     colour: '#6f9ee8',
     glyph: art(
       '...##...',
@@ -166,6 +172,7 @@ export const KIT: KitItem[] = [
     counts: (trip) => trip.night,
     needs: 3,
     hint: 'TRIPS AFTER DARK',
+    shows: (day) => day.night,
     colour: '#ffb03a',
     glyph: art(
       '...#....',
@@ -186,6 +193,7 @@ export const KIT: KitItem[] = [
     counts: (trip) => trip.legs > 1,
     needs: 5,
     hint: 'TRIPS PUSHED FURTHER',
+    shows: () => true,
     colour: '#8a6242',
     glyph: art(
       '........',
@@ -206,6 +214,8 @@ export const KIT: KitItem[] = [
     counts: (trip) => trip.role === 'wet',
     needs: 3,
     hint: 'TRIPS TO WET GROUND',
+    shows: (day) => isWet(day.weather),
+    replaces: 'boots',
     colour: '#4f8f6a',
     glyph: art(
       '..####..',
@@ -226,6 +236,7 @@ export const KIT: KitItem[] = [
     counts: (trip) => trip.supplies,
     needs: 5,
     hint: 'TRIPS THAT GATHERED',
+    shows: () => true,
     colour: '#c69a5a',
     glyph: art(
       '..####..',
@@ -450,7 +461,9 @@ export function creditTrip(owned: KitId[], progress: KitProgress, trip: Trip): K
  * day has no use for, less what has no picture yet.
  */
 export function wornToday(owned: KitId[], day: Day): KitId[] {
-  return KIT.filter((item) => owned.includes(item.id) && item.shows?.(day)).map((item) => item.id)
+  const on = KIT.filter((item) => owned.includes(item.id) && item.shows?.(day))
+  const covered = new Set(on.map((item) => item.replaces).filter(Boolean))
+  return on.filter((item) => !covered.has(item.id)).map((item) => item.id)
 }
 
 /** How near the family is to earning one, for the board to show under it. */
