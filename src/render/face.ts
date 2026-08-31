@@ -430,7 +430,18 @@ export function buildFace(anchors: FaceAnchors): FaceBuild {
   }
 
   return {
-    arrays: { position, normal, color, ao, part, emissive, material, faces },
+    // A face is a handful of quads, built up a push at a time; the mesh wants
+    // the packed arrays the voxel builder produces.
+    arrays: {
+      position: new Float32Array(position),
+      normal: new Float32Array(normal),
+      color: new Float32Array(color),
+      ao: new Float32Array(ao),
+      part: new Float32Array(part),
+      emissive: new Float32Array(emissive),
+      material: new Float32Array(material),
+      faces,
+    },
     face: { kind, local, param },
     gazeRange: (scleraW - pupilW) * 0.85,
     mouthHalf,
