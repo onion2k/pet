@@ -3,6 +3,13 @@ import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT, VERGE_SLOTS, VERGE_Z } from '../data/biome'
 import { VISITORS, type Visitor, type VisitorId } from '../data/visitors'
 import { plantById, type PlantId } from '../data/plants'
+import {
+  createShadows,
+  footprintOf,
+  liftFade,
+  SHADOW_LIFT,
+  type ShadowCaster,
+} from './contact-shadow'
 import { KIT_STANDING } from '../data/kit-models'
 import type { KitId } from '../data/kit'
 import type { SeasonId } from '../data/seasons'
@@ -122,6 +129,8 @@ interface Entry {
   ball: { x: number; z: number; vx: number; vz: number }
   radius: number
   fade: number
+  /** Its patch of ground, which stays put while the thing above it hops. */
+  shadow: ShadowCaster
   /** Rolled for today. A visitor with a window is chosen but not yet due. */
   chosen: boolean
   present: boolean
@@ -234,6 +243,8 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     },
   })
 
+  const shadows = createShadows(gl)
+
   const entries: Entry[] = VISITORS.map((visitor) => {
     const built = buildVoxelGeometry(gl, visitor.model, visitor.height)
     const mesh = new Mesh(gl, { geometry: built.geometry, program })
@@ -250,10 +261,14 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
     mesh.onBeforeRender(() => {
       program.uniforms.uFade.value = entry.fade
     })
+    // Parented to the root rather than to the node: a shadow belongs to the
+    // ground, and the node it would otherwise hang from hops, banks and turns.
+    const shadow = shadows.add(root, footprintOf(visitor.model, visitor.height))
     const entry: Entry = {
       visitor,
       mesh,
       node,
+      shadow,
       ball: { x: 0, z: 0, vx: 0, vz: 0 },
       radius,
       home: { x: 0, z: 0 },
@@ -277,6 +292,7 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
   interface PlantEntry {
     mesh: Mesh
     node: Transform
+    shadow: ShadowCaster
   }
   let plants: PlantEntry[] = []
   let plantedKey = ''
@@ -284,6 +300,7 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
   const buildPlants = (things: PlantedThing[], groundY: number): void => {
     for (const entry of plants) {
       entry.node.setParent(null)
+      entry.shadow.mesh.setParent(null)
       entry.mesh.geometry.remove()
     }
     plants = []
@@ -301,7 +318,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       mesh.onBeforeRender(() => {
         program.uniforms.uFade.value = 1
       })
-      plants.push({ mesh, node })
+      const shadow = shadows.add(root, footprintOf(stage.model, stage.height))
+      shadow.mesh.position.set(thing.x, groundY + SHADOW_LIFT, thing.z)
+      plants.push({ mesh, node, shadow })
     }
   }
 
@@ -316,6 +335,7 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
   const buildStowed = (ids: KitId[], door: VisitorContext['door'], groundY: number): void => {
     for (const entry of stowed) {
       entry.node.setParent(null)
+      entry.shadow.mesh.setParent(null)
       entry.mesh.geometry.remove()
     }
     stowed = []
@@ -340,7 +360,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       mesh.onBeforeRender(() => {
         program.uniforms.uFade.value = 1
       })
-      stowed.push({ mesh, node })
+      const shadow = shadows.add(root, footprintOf(standing.model, standing.height))
+      shadow.mesh.position.set(node.position.x, groundY + SHADOW_LIFT, node.position.z)
+      stowed.push({ mesh, node, shadow })
     })
   }
 
@@ -504,6 +526,7 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
         if (entry.fade < 0.004 && wanted === 0) {
           entry.fade = 0
           entry.node.visible = false
+          entry.shadow.mesh.visible = false
           continue
         }
         entry.node.visible = true
@@ -659,6 +682,18 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
           default:
             break
         }
+
+        // The patch of ground under it. Kept flat and unturned wherever the
+        // thing itself has got to, and thinning as it rises -- a rabbit
+        // mid-hop still has something under it, a gull on the wing does not.
+        const lift = entry.node.position.y - context.groundY
+        entry.shadow.mesh.position.set(
+          entry.node.position.x,
+          context.groundY + SHADOW_LIFT,
+          entry.node.position.z,
+        )
+        entry.shadow.mesh.visible = true
+        entry.shadow.strength = entry.fade * liftFade(lift)
       }
     },
   }

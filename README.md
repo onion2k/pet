@@ -317,6 +317,23 @@ every vertex carries from its own centre, so it blinks and steers a disc without
 knowing it is not a rectangle. The patches that hide the painted features stay
 rectangles, because what they cover is rectangular.
 
+### Standing on the ground
+
+Everything in the yard has a soft dark patch under it. It is not a shadow in
+any real sense — nothing is cast and the sun's direction is ignored entirely —
+but it buys the one thing the lighting cannot say on its own: that a thing is
+*on* the grass rather than hovering a little above it. The pet has had one
+since it could walk; the visitors, the plantings and the kit left by the door
+were all floating until they got one too.
+
+Each patch is sized from the model above it — the wider of its two footprint
+axes — so a sapling and a grown tree do not share a shadow. And each belongs to
+the ground rather than to the thing above it: a rabbit hops, a gull banks, a
+ball rolls, and a patch parented to any of them would rise and turn along with
+it. They are laid flat under wherever the thing has got to, and thin out as it
+leaves the ground, so a rabbit mid-hop still has something under it and a gull
+on the wing has almost nothing.
+
 ### Kit on the pet
 
 Six of the eight are visible on the pet. It puts its bobble hat on when it

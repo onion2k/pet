@@ -1208,8 +1208,26 @@ export const SHELTER: Prop = {
     palette,
     mirror: true,
     layers: [
-      // Walls: a solid back, two sides, and an open front.
-      ...Array.from({ length: 11 }, () => [
+      // Two courses of stone, so the thing stands on something rather than
+      // starting out of the grass. It also gives the walls a line to break
+      // them up, which at this size is most of what reads as construction.
+      ...Array.from({ length: 2 }, () => [
+        'sssssss',
+        's......',
+        's......',
+        's......',
+        's......',
+        's......',
+        's......',
+        's......',
+        's......',
+        's......',
+        's......',
+      ]),
+      // Wood above that: a solid back, two sides, and an open front. Nine
+      // courses of it, so the header below clears the pet's head -- at eight
+      // the beam came down across the top of it when it went in to sleep.
+      ...Array.from({ length: 9 }, () => [
         'wwwwwww',
         'w......',
         'w......',
@@ -1222,7 +1240,24 @@ export const SHELTER: Prop = {
         'w......',
         'w......',
       ]),
-      // Roof, stepped inward.
+      // A header across the front ties the two door posts together. Without it
+      // the front is not a doorway, it is a missing wall -- and a beam is the
+      // cheapest thing that tells the eye which.
+      [
+        'wwwwwww',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'w......',
+        'wwwwwww',
+      ],
+      // And a roof in three steps rather than two flat slabs, which is enough
+      // of a pitch to catch the light differently on each course.
       [
         'rrrrrrr',
         'rrrrrrr',
@@ -1247,6 +1282,19 @@ export const SHELTER: Prop = {
         '.rrrrrr',
         '.rrrrrr',
         '.rrrrrr',
+        '.......',
+      ],
+      [
+        '.......',
+        '.......',
+        '..rrrrr',
+        '..rrrrr',
+        '..rrrrr',
+        '..rrrrr',
+        '..rrrrr',
+        '..rrrrr',
+        '..rrrrr',
+        '.......',
         '.......',
       ],
     ],

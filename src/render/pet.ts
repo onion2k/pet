@@ -1,4 +1,4 @@
-import { Geometry, Mesh, Plane, Program, Transform } from 'ogl'
+import { Geometry, Mesh, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT } from '../data/biome'
 import type { VoxelModel } from '../data/voxel-format'
@@ -11,7 +11,9 @@ import {
   type VoxelGeometry,
 } from './voxel-mesh'
 import { buildFace, faceAnchors } from './face'
+import { createShadows, footprintOf } from './contact-shadow'
 import { buildWorn, kitAnchors } from './worn'
+import { doorstepOf } from './route'
 import type { KitId } from '../data/kit'
 
 const vertex = /* glsl */ `
@@ -260,35 +262,9 @@ const same = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && [...a].sort().join() === [...b].sort().join()
 
 /** World height every form is normalised to, so framing never changes on evolution. */
-const PET_HEIGHT = 1.85
+export const PET_HEIGHT = 1.85
 /** Fraction of the hop cycle spent in the air. The rest is stood on the ground. */
 const HOP_WINDOW = 0.38
-
-const shadowVert = /* glsl */ `
-  attribute vec3 position;
-  attribute vec2 uv;
-  uniform mat4 modelViewMatrix;
-  uniform mat4 projectionMatrix;
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-const shadowFrag = /* glsl */ `
-  precision highp float;
-  uniform float uStrength;
-  varying vec2 vUv;
-  void main() {
-    // Soft round contact patch. Without it the pet reads as floating above the
-    // ground rather than standing on it. Blended over the ground, the result is
-    // roughly grass * (1 - alpha), so alpha is what controls how dark it gets.
-    float d = length(vUv - 0.5) * 2.0;
-    float a = (1.0 - smoothstep(0.45, 1.0, d)) * uStrength;
-    gl_FragColor = vec4(0.02, 0.03, 0.02, a);
-  }
-`
 
 export type PetMood = {
   mood: number
@@ -306,12 +282,19 @@ const WALK_SPEED = 0.7
 /** Stride cycles per second. */
 const STRIDE_RATE = 1.15
 
+/** How dark the pet's own contact patch is. */
+const PET_SHADOW = 0.78
+
 /** Roughly the pet's half-width, used to keep it clear of the shelter walls. */
-const PET_RADIUS = 0.8
+export const PET_RADIUS = 0.8
 /** How much faster the pet moves when it is on its way somewhere. */
 const FORAGE_TROT = 3
 /** The lantern post's footprint, for walking round rather than through. */
 const LAMP_RADIUS = 0.3
+/** How near a waypoint counts as reached. Loose: it is a doorway, not a mark. */
+const VIA_REACHED = 0.12
+/** How far out from the front wall the doorstep sits, as a share of the pet. */
+export const DOORSTEP_CLEARANCE = 0.6
 
 /** Where the shelter is, so the pet can walk into it. */
 export interface ShelterTarget {
@@ -367,6 +350,8 @@ export class PetView {
     targetZ: 0,
     facing: 0,
     walking: false,
+    /** Somewhere to reach before the target itself. The doorway, in practice. */
+    via: null as { x: number; z: number } | null,
     timer: 1.5,
     phase: 0,
     blend: 0,
@@ -433,20 +418,12 @@ export class PetView {
     this.mesh.setParent(this.root)
     this.setModel(model, false)
 
-    this.shadow = new Mesh(gl, {
-      geometry: new Plane(gl, { width: PET_HEIGHT * 1.15, height: PET_HEIGHT * 1.15 }),
-      program: new Program(gl, {
-        vertex: shadowVert,
-        fragment: shadowFrag,
-        uniforms: { uStrength: { value: 0.78 } },
-        transparent: true,
-        depthWrite: false,
-      }),
-    })
-    this.shadow.rotation.x = -Math.PI / 2
-    // Just clear of the ground, so it never z-fights with the terrain surface.
-    this.shadow.position.y = 0.012
-    this.shadow.setParent(this.root)
+    // The pet's patch is sized from its own model rather than from a number,
+    // now that everything else in the yard is sized from its own.
+    const shadows = createShadows(gl)
+    const caster = shadows.add(this.root, footprintOf(model, PET_HEIGHT))
+    caster.strength = PET_SHADOW
+    this.shadow = caster.mesh
   }
 
   /** Swaps in a new form. Pass `animate` to play the reveal wipe. */
@@ -694,6 +671,9 @@ export class PetView {
     w.where = 'out'
     w.timer = 1.5
     w.blend = 0
+    // Nothing left over from wherever it was going before it was picked up and
+    // put back: a stale waypoint would send a new egg to the door first.
+    w.via = null
     this.mesh.visible = true
     this.shadow.visible = true
   }
@@ -737,6 +717,44 @@ export class PetView {
     if (nx === dx && nz === dz) return [dx, dz]
     const length = Math.hypot(nx, nz) || 1
     return [nx / length, nz / length]
+  }
+
+  /**
+   * Just outside the doorway, on the shelter's centre line.
+   *
+   * Going to bed is the one walk that ends inside a building, and the front is
+   * the only side that is open. Aimed at straight from wherever it happened to
+   * be standing, a pet off to one side walks in through a wall -- so bed is
+   * reached by the door: out to the front first, then straight in.
+   */
+  private doorstep(): { x: number; z: number } | null {
+    const sh = this.shelter
+    return sh ? doorstepOf(sh, PET_RADIUS * DOORSTEP_CLEARANCE) : null
+  }
+
+  /** Whether the pet is standing within the shelter's walls. */
+  private under(x: number, z: number): boolean {
+    const sh = this.shelter
+    if (!sh) return false
+    return Math.abs(x - sh.centre.x) < sh.half.x && Math.abs(z - sh.centre.z) < sh.half.z
+  }
+
+  /**
+   * One frame's walking, toward whatever it is currently aimed at. Shared by
+   * the walk to a waypoint and the walk to the target itself, so a pet on its
+   * way to the door moves exactly as a pet on its way anywhere else does.
+   */
+  private stride(dt: number, dx: number, dz: number, distance: number): void {
+    const w = this.walk
+    // A pet with somewhere to be moves like it: the walk out of the yard and
+    // back is a trot, not the amble it uses to potter about.
+    const hurrying = w.where === 'away-out' || w.where === 'away-back'
+    const step = Math.min(distance, WALK_SPEED * (hurrying ? FORAGE_TROT : 1) * dt)
+    const [sx, sz] = this.steerRoundLamp(w.x, w.z, dx / distance, dz / distance)
+    w.x += sx * step
+    w.z += sz * step
+    w.facing = approachAngle(w.facing, Math.atan2(sx, sz), dt * 4)
+    w.phase = (w.phase + dt * STRIDE_RATE) % 1
   }
 
   private blockedByShelter(x: number, z: number): boolean {
@@ -835,6 +853,9 @@ export class PetView {
       // same journey each time rather than depending on where it happened to be.
       w.targetX = this.bounds.x + 1.5
       w.targetZ = w.z
+      // Sent out from indoors -- woken and packed off in one go -- it still
+      // has to come out of the door before it can head for the hill.
+      w.via = this.under(w.x, w.z) ? this.doorstep() : null
       w.walking = true
       this.mesh.visible = true
       this.shadow.visible = true
@@ -863,21 +884,32 @@ export class PetView {
         w.where = 'heading-in'
         w.targetX = sh.inside.x
         w.targetZ = sh.inside.z
+        // In by the door, never through a wall.
+        w.via = this.doorstep()
         w.walking = true
       } else if (!state.asleep && w.where === 'in') {
         const next = this.nextTarget()
         w.where = 'heading-out'
         w.targetX = next?.x ?? 0
         w.targetZ = next?.z ?? 0
+        // And out by it again, before striking off across the yard.
+        w.via = this.doorstep()
         w.walking = true
       }
     }
 
     if (w.walking) {
-      const dx = w.targetX - w.x
-      const dz = w.targetZ - w.z
+      // A waypoint is walked to first and then forgotten: the pet is not
+      // following a route so much as being sent out to the front step before
+      // it is allowed to aim at anything else.
+      const aim = w.via ?? { x: w.targetX, z: w.targetZ }
+      const dx = aim.x - w.x
+      const dz = aim.z - w.z
       const distance = Math.hypot(dx, dz)
-      if (distance < 0.04) {
+      if (w.via) {
+        if (distance < VIA_REACHED) w.via = null
+        else this.stride(dt, dx, dz, distance)
+      } else if (distance < 0.04) {
         w.walking = false
         w.timer = 2.5 + Math.random() * 4.5
         if (w.where === 'heading-in') w.where = 'in'
@@ -889,15 +921,7 @@ export class PetView {
           this.shadow.visible = false
         } else if (w.where === 'away-back') w.where = 'out'
       } else {
-        // A pet with somewhere to be moves like it: the walk out of the yard
-        // and back is a trot, not the amble it uses to potter about.
-        const hurrying = w.where === 'away-out' || w.where === 'away-back'
-        const step = Math.min(distance, WALK_SPEED * (hurrying ? FORAGE_TROT : 1) * dt)
-        const [sx, sz] = this.steerRoundLamp(w.x, w.z, dx / distance, dz / distance)
-        w.x += sx * step
-        w.z += sz * step
-        w.facing = approachAngle(w.facing, Math.atan2(sx, sz), dt * 4)
-        w.phase = (w.phase + dt * STRIDE_RATE) % 1
+        this.stride(dt, dx, dz, distance)
       }
     } else {
       // Settled: face the viewer, and only set off again if awake and outdoors.
