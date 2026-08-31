@@ -4,7 +4,7 @@ import { registerServiceWorker } from '../pwa'
 
 import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
 import { FOODS } from '../data/foods'
-import { GROUNDS } from '../data/grounds'
+import { MEADOW_GROUNDS } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER, iconRows, type IconId } from '../data/icons'
 import { MINIGAMES } from '../game/minigames'
 import { SPECIES_COUNT, SPECIES_LIST, speciesOf, type Species } from '../data/species'
@@ -501,10 +501,15 @@ chapter(
     are an adult's, so the job grows with your pet rather than arriving all at
     once.
   </p>
+  <p class="note">
+    These are the meadow's four. Move house and the names change — a coppice for
+    a wall, a tideline for a creek — but the four jobs, and what they cost, do
+    not. What differs is what they turn up.
+  </p>
   <table>
     <thead><tr><th>Ground</th><th>Who can go</th><th>Costs</th><th>What the menu says</th></tr></thead>
     <tbody>
-      ${GROUNDS.map(
+      ${MEADOW_GROUNDS.map(
         (g) => `
         <tr>
           <td><b>${g.name}</b></td>
