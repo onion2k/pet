@@ -103,6 +103,7 @@ function drawTicker(hud: Hud, app: App): void {
   }
 }
 
+/** The toast: what the game said back, wherever it was said. */
 function drawMessage(hud: Hud, app: App): void {
   if (app.messageTimer <= 0) return
   // Above the ticker, so a toast never sits on top of the crawl.
@@ -146,7 +147,6 @@ function drawMain(hud: Hud, app: App): void {
     hud.textCentered(hud.width / 2, hud.height - BOTTOM_BAND - TICKER_BAND - 10, 'KEEP IT WARM', DIM)
   }
   drawTicker(hud, app)
-  drawMessage(hud, app)
   drawRing(hud, app)
 }
 
@@ -728,5 +728,13 @@ export function drawScreen(hud: Hud, app: App, world: WorldState): void {
       drawRetire(hud, app)
       break
   }
+  // Last, and on every screen rather than only the main one.
+  //
+  // A refusal is the game answering a press, and it was only ever drawn on the
+  // screen that has the fewest of them. Every other screen set the message,
+  // played the refusing blip and drew nothing: pressing B on the move menu --
+  // under a line that says B GO -- looked exactly like a button that did not
+  // work, which is what it was reported as.
+  drawMessage(hud, app)
   hud.commit()
 }
