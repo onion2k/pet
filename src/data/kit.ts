@@ -68,6 +68,18 @@ export interface KitItem {
    * WET 1/3".
    */
   hint: string
+  /**
+   * When the pet has it visibly about it, for the yard to draw.
+   *
+   * Kit shows when it is *doing* something rather than whenever it is owned. A
+   * pet wearing all eight at once is a hat stand, and would say nothing about
+   * the day -- whereas one that puts its hat on when it snows turns the yard
+   * into a readout of the weather, which is the one channel that has never
+   * carried it.
+   *
+   * Absent for the pieces that have no picture yet.
+   */
+  shows?(day: Day): boolean
   /** 8x8 artwork, in the same format as the curios and the menu icons. */
   glyph: string
   colour: string
@@ -113,6 +125,7 @@ export const KIT: KitItem[] = [
     counts: (trip) => trip.season === 'winter',
     needs: 3,
     hint: 'TRIPS IN WINTER',
+    shows: (day) => day.season === 'winter',
     colour: '#e2604f',
     glyph: art(
       '...##...',
@@ -430,6 +443,14 @@ export function creditTrip(owned: KitId[], progress: KitProgress, trip: Trip): K
     if (done >= item.needs) earned.push(item)
   }
   return { earned, progress: next }
+}
+
+/**
+ * What the pet has visibly about it today: what the family owns, less what the
+ * day has no use for, less what has no picture yet.
+ */
+export function wornToday(owned: KitId[], day: Day): KitId[] {
+  return KIT.filter((item) => owned.includes(item.id) && item.shows?.(day)).map((item) => item.id)
 }
 
 /** How near the family is to earning one, for the board to show under it. */

@@ -6,10 +6,13 @@ import {
   buildVoxelGeometry,
   geometryFrom,
   modelSource,
+  mergeArrays,
   voxelArrays,
   type VoxelGeometry,
 } from './voxel-mesh'
 import { buildFace, faceAnchors } from './face'
+import { buildWorn, kitAnchors } from './worn'
+import type { KitId } from '../data/kit'
 
 const vertex = /* glsl */ `
   attribute vec3 position;
@@ -252,6 +255,10 @@ const fragment = /* glsl */ `
   }
 `
 
+/** Whether two lists of kit hold the same things, order aside. */
+const same = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && [...a].sort().join() === [...b].sort().join()
+
 /** World height every form is normalised to, so framing never changes on evolution. */
 const PET_HEIGHT = 1.85
 /** Fraction of the hop cycle spent in the air. The rest is stood on the ground. */
@@ -341,6 +348,9 @@ export class PetView {
   /** Something in the yard worth walking over to, when there is one. */
   private plaything: { x: number; z: number } | null = null
   private hasFace = false
+  /** What the pet has on, and the form it was last built onto. */
+  private worn: KitId[] = []
+  private form: VoxelModel | null = null
   /** Where the eyes are looking, and how far they have got there. */
   private gaze = { x: 0, y: 0, toX: 0, toY: 0, timer: 0 }
   private blink = { timer: 2, open: 1 }
@@ -445,6 +455,22 @@ export class PetView {
     this.program.uniforms.uHeight.value = built.height
   }
 
+  /**
+   * What the pet is wearing.
+   *
+   * Kit turns with the weather, so this is called far more often than the form
+   * changes and does nothing at all when the answer has not moved. When it has,
+   * the body is rebuilt: worn kit is part of the one mesh rather than a mesh of
+   * its own, which is what buys it every deformation in the shader for free and
+   * costs it a rebuild to change.
+   */
+  setWorn(worn: KitId[]): void {
+    if (same(this.worn, worn)) return
+    this.worn = [...worn]
+    // No reveal wipe: putting a hat on is not hatching.
+    if (this.form) this.setModel(this.form, false)
+  }
+
   setModel(model: VoxelModel, animate = true): void {
     // PET_HEIGHT is not optional here: without it this falls back to the
     // builder's default and every form after the egg comes out oversized.
@@ -459,20 +485,14 @@ export class PetView {
     // settling, twisting and hopping carry it along with the head.
     const anchors = faceAnchors(model, PET_HEIGHT)
     const face = anchors ? buildFace(anchors) : null
-    const bodyVerts = body.position.length / 3
+    // Kit rides on the body in the same way the face does, and only on a
+    // creature with a face: the one form without one is the egg, which has no
+    // head to put a hat on and has never been out to earn one either.
+    const worn = anchors ? buildWorn(this.worn, kitAnchors(model, PET_HEIGHT)) : null
+    const withKit = worn ? mergeArrays(body, worn) : body
+    const bodyVerts = withKit.position.length / 3
 
-    const merged = face
-      ? {
-          position: body.position.concat(face.arrays.position),
-          normal: body.normal.concat(face.arrays.normal),
-          color: body.color.concat(face.arrays.color),
-          ao: body.ao.concat(face.arrays.ao),
-          part: body.part.concat(face.arrays.part),
-          emissive: body.emissive.concat(face.arrays.emissive),
-          material: body.material.concat(face.arrays.material),
-          faces: body.faces + face.arrays.faces,
-        }
-      : body
+    const merged = face ? mergeArrays(withKit, face.arrays) : withKit
 
     const geometry = geometryFrom(this.gl, merged)
     // Every pet carries these, faceless ones included: the program declares the
@@ -495,6 +515,7 @@ export class PetView {
     this.mesh.geometry = geometry
     built.geometry.remove()
 
+    this.form = model
     this.hasFace = face !== null
     const u = this.program.uniforms
     u.uGazeRange.value = face ? face.gazeRange : 0

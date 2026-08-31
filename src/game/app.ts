@@ -48,6 +48,7 @@ import {
   KIT_COUNT,
   kitPowers,
   progressOf,
+  wornToday,
   type Day,
   type KitId,
   type KitItem,
@@ -1154,6 +1155,14 @@ export class App {
 
   get kitTally(): { owned: number; of: number } {
     return { owned: this.save.kit.length, of: KIT_COUNT }
+  }
+
+  /**
+   * What the pet has visibly about it, for the renderer. Read every frame and
+   * usually unchanged; the renderer only rebuilds when the answer moves.
+   */
+  get worn(): KitId[] {
+    return wornToday(this.save.kit, this.today)
   }
 
   /** How near the family is to each thing it has yet to earn. */
