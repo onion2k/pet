@@ -105,10 +105,31 @@ describe('who could turn up at all', () => {
   it('always has room for the objects, which belong to nowhere in particular', () => {
     for (const biome of BIOMES) {
       const here = roster(biome, [])
-      for (const id of ['ball', 'sled', 'leafpile'] as const) {
+      for (const id of ['sled', 'leafpile'] as const) {
         expect(here, biome.id).toContain(id)
       }
     }
+  })
+
+  it('gives every place something of its own to shove about', () => {
+    // FETCH asks for the toy role rather than for a ball by name, so a biome
+    // without one would quietly lose a game on moving day.
+    for (const biome of BIOMES) {
+      expect(roster(biome, []), biome.id).toContain(biome.visitors.toy)
+    }
+  })
+
+  it('leaves nothing in the table that nowhere can produce', () => {
+    // A visitor no biome fills, does not list as an extra, and that is not
+    // universal is dead data that still costs a model, an arrival line and a
+    // row in every test that walks the table.
+    const reachable = new Set(BIOMES.flatMap((b) => roster(b, [])))
+    for (const visitor of VISITORS) expect([...reachable], visitor.id).toContain(visitor.id)
+  })
+
+  it('keeps the toys apart, or the role was not worth having', () => {
+    const toys = BIOMES.map((b) => b.visitors.toy)
+    expect(new Set(toys).size).toBeGreaterThan(1)
   })
 
   it('keeps each place"s own creatures to itself', () => {

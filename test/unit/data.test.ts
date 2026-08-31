@@ -567,13 +567,15 @@ describe('visitors', () => {
     // Written as which things are *not* alive rather than which are, so that a
     // new place bringing four new creatures costs nothing here and a new object
     // -- which is the case worth catching -- has to be thought about.
-    const objects = ['ball', 'snowman', 'pumpkin', 'leafpile', 'sled']
+    const objects = ['snowman', 'pumpkin', 'leafpile', 'sled']
     for (const id of objects) {
       const visitor = VISITORS.find((v) => v.id === id)!
       expect(visitor.friend, id).toBeUndefined()
     }
-    // A sled cannot be befriended however far the pet walks, and the objects
-    // are exactly the ones that turn up everywhere.
+    // A sled cannot be befriended however far the pet walks, and the things
+    // somebody left out are exactly the ones that turn up everywhere. What the
+    // pet plays with is not among them any more: a toy is a role its biome
+    // fills, so the beach gets a beach ball and the wood gets a cone.
     expect([...objects].sort()).toEqual([...UNIVERSAL_VISITORS].sort())
   })
 

@@ -17,6 +17,19 @@ export interface Prop {
   weight: number
   /** Columns of clear ground needed around the stamp. */
   spacing: number
+  /**
+   * Whether this thing was built rather than grown, and so brings its own
+   * footing: the scatter levels the ground under it instead of refusing the
+   * slot for being uneven.
+   *
+   * Without it nothing large can ever be scattered. The rule that a stamp needs
+   * ground level to within one voxel is right for a bush and fatal for a
+   * building -- a seven-column footprint almost never finds that much flat
+   * ground in open relief, so every attempt at a bigger house came out as a
+   * house that was never placed. Somebody putting up a wall digs the ground
+   * flat first, which is all this is.
+   */
+  foundation?: boolean
 }
 
 const palette = {
@@ -249,9 +262,225 @@ const MEADOW_ONLY: Prop[] = [
  * places from the same terrain generator.
  */
 const WOODLAND_ONLY: Prop[] = [
+  /**
+   * The wood's canopy: a pine and an oak, both of them twice the height of the
+   * pet and better than twice the height of what used to stand here.
+   *
+   * The old wood was eight voxels of trunk-and-blob, which at the camera's
+   * eye level topped out about level with the shelter roof -- a wood you look
+   * over rather than into. Trees are the one prop where height is the whole of
+   * the read: the trunk has to leave the canopy off the top of the frame, so
+   * that what the player sees between the branches is more wood behind.
+   *
+   * They are also the reason the wood scatters on a tighter grid than anywhere
+   * else. One of these on its own is a tree; three deep with their crowns
+   * overlapping is cover.
+   */
   {
-    id: 'trunk',
-    weight: 22,
+    id: 'pine',
+    weight: 34,
+    spacing: 1,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .....
+          .....
+          ..w..
+          .....
+          .....`),
+        rows(`
+          .....
+          .....
+          ..w..
+          .....
+          .....`),
+        rows(`
+          .....
+          .....
+          ..w..
+          .....
+          .....`),
+        rows(`
+          .....
+          ..w..
+          .www.
+          ..w..
+          .....`),
+        rows(`
+          ..f..
+          .fff.
+          fffff
+          .fff.
+          ..f..`),
+        rows(`
+          .....
+          .fff.
+          fffff
+          .fff.
+          .....`),
+        rows(`
+          .....
+          ..f..
+          .fwf.
+          ..f..
+          .....`),
+        rows(`
+          ..e..
+          .eee.
+          eeeee
+          .eee.
+          ..e..`),
+        rows(`
+          .....
+          .eff.
+          .fff.
+          .ffe.
+          .....`),
+        rows(`
+          .....
+          ..f..
+          .fwf.
+          ..f..
+          .....`),
+        rows(`
+          .....
+          ..e..
+          .eee.
+          ..e..
+          .....`),
+        rows(`
+          .....
+          ..e..
+          .eee.
+          ..e..
+          .....`),
+        rows(`
+          .....
+          .....
+          ..f..
+          .....
+          .....`),
+        rows(`
+          .....
+          .....
+          ..e..
+          .....
+          .....`),
+      ],
+    },
+  },
+  {
+    id: 'oak',
+    weight: 26,
+    spacing: 2,
+    model: {
+      palette,
+      layers: [
+        rows(`
+          .......
+          .......
+          ..www..
+          ..www..
+          ..www..
+          .......
+          .......`),
+        rows(`
+          .......
+          .......
+          ..www..
+          ..www..
+          ..www..
+          .......
+          .......`),
+        rows(`
+          .......
+          .......
+          ...w...
+          ..www..
+          ...w...
+          .......
+          .......`),
+        rows(`
+          .......
+          .......
+          ...w...
+          ..www..
+          ...w...
+          .......
+          .......`),
+        rows(`
+          .......
+          ...w...
+          ..fwf..
+          .fwwwf.
+          ..fwf..
+          ...w...
+          .......`),
+        rows(`
+          ..fff..
+          .fffff.
+          fffwfff
+          fffwfff
+          fffwfff
+          .fffff.
+          ..fff..`),
+        rows(`
+          ..fef..
+          .eefee.
+          feeeeef
+          feeweef
+          feeeeef
+          .eefee.
+          ..fef..`),
+        rows(`
+          ..eee..
+          .eeeee.
+          eeeeeee
+          eeeweee
+          eeeeeee
+          .eeeee.
+          ..eee..`),
+        rows(`
+          ...f...
+          ..fff..
+          .fffff.
+          .fffff.
+          .fffff.
+          ..fff..
+          ...f...`),
+        rows(`
+          .......
+          ..eee..
+          .eeeee.
+          .eeeee.
+          .eeeee.
+          ..eee..
+          .......`),
+        rows(`
+          .......
+          ...f...
+          ..fff..
+          ..fff..
+          ..fff..
+          ...f...
+          .......`),
+        rows(`
+          .......
+          .......
+          ...e...
+          ..eee..
+          ...e...
+          .......
+          .......`),
+      ],
+    },
+  },
+  // What is coming up under them. Kept for the floor of the wood, at a fraction
+  // of its old weight now that there are grown trees for it to stand beneath.
+  {
+    id: 'sapling',
+    weight: 14,
     spacing: 4,
     model: {
       palette,
@@ -594,78 +823,187 @@ const HILL_ONLY: Prop[] = [
  * is a roof -- which is why a village costs a prop set rather than a palette.
  */
 const VILLAGE_ONLY: Prop[] = [
+  /**
+   * The village is the one place with buildings in it, so the buildings have
+   * to be worth walking to. Both of these are stone, seven columns across and
+   * roofed a good two lengths up -- against a pet a length tall, that is a
+   * house rather than a shed, and it is what the place is named for.
+   *
+   * They can only exist because they bring their own footing. A seven-column
+   * stamp needs seven columns of ground level to within a voxel, which open
+   * relief almost never offers; every one of these would have been rejected and
+   * the green would have come out empty. See `Prop.foundation`.
+   */
   {
     id: 'cottage',
-    weight: 26,
-    spacing: 4,
-    // Tall rather than wide. A wider footprint is rejected more often -- the
-    // scatter will not stamp anything across ground that steps -- and height is
-    // what actually reads from a camera at the pet's eye level. Four courses of
-    // wall put the eaves well above the hedges, which is the difference between
-    // a village and a green with sheds on it.
+    weight: 30,
+    spacing: 3,
+    foundation: true,
+    model: {
+      palette,
+      layers: [
+        // A course of footings proud of the wall, which is what stops a stone
+        // house looking like a box someone set down on the grass.
+        rows(`
+          sssssss
+          sssssss
+          sssssss
+          sssssss
+          sssssss
+          sssssss
+          sssssss`),
+        rows(`
+          .sssss.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .sssss.`),
+        // The doorway, through the gable end that faces the yard, and a window
+        // on the wall opposite it.
+        rows(`
+          .sssss.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .ssnss.`),
+        rows(`
+          .ssnss.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .ssnss.`),
+        rows(`
+          .sssss.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .sssss.`),
+        rows(`
+          .sssss.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .snnns.
+          .sssss.`),
+        rows(`
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr`),
+        rows(`
+          .rrrrr.
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          .rrrrr.`),
+        rows(`
+          .......
+          .rrrrr.
+          .rrrrr.
+          .rrrrr.
+          .rrrrr.
+          .rrrrr.
+          .......`),
+        rows(`
+          .......
+          ..rrr..
+          ..rrr..
+          ..rrr..
+          ..rrr..
+          ..rrr..
+          .......`),
+        rows(`
+          .......
+          ...r...
+          ...r...
+          s..r...
+          ...r...
+          ...r...
+          .......`),
+        rows(`
+          .......
+          .......
+          .......
+          s......
+          .......
+          .......
+          .......`),
+      ],
+    },
+  },
+  {
+    id: 'barn',
+    weight: 16,
+    spacing: 3,
+    foundation: true,
+    // Longer and lower than the cottage, with the doorway through the gable
+    // end. Two shapes of building is what turns a row of identical houses into
+    // somewhere people actually put things.
     model: {
       palette,
       layers: [
         rows(`
-          sssss
-          sssss
-          sssss
-          sssss
-          sssss`),
+          sssssss
+          sssssss
+          sssssss
+          sssssss
+          sssssss`),
         rows(`
-          wwwww
-          wnnnw
-          wnnnw
-          wnnnw
-          wwwww`),
+          sssssss
+          snnnnns
+          snnnnns
+          snnnnns
+          sssnsss`),
         rows(`
-          wwnww
-          wnnnw
-          wnnnw
-          wnnnw
-          wwnww`),
+          sssssss
+          snnnnns
+          snnnnns
+          snnnnns
+          sssnsss`),
         rows(`
-          wwwww
-          wnnnw
-          wnnnw
-          wnnnw
-          wwwww`),
+          sstssss
+          snnnnns
+          snnnnns
+          snnnnns
+          sssnsss`),
         rows(`
-          wwwww
-          wnnnw
-          wnnnw
-          wnnnw
-          wwwww`),
+          sssssss
+          snnnnns
+          snnnnns
+          snnnnns
+          sssssss`),
         rows(`
-          rrrrr
-          rrrrr
-          rrrrr
-          rrrrr
-          rrrrr`),
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr
+          rrrrrrr`),
         rows(`
-          .rrr.
-          rrrrr
-          rrrrr
-          rrrrr
-          .rrr.`),
+          .rrrrr.
+          .rrrrr.
+          .rrrrr.
+          .rrrrr.
+          .rrrrr.`),
         rows(`
-          .....
-          .rrr.
-          .rrr.
-          .rrr.
-          .....`),
-        rows(`
-          .....
-          ..r..
-          ..r..
-          ..r..
-          .....`),
-        rows(`
-          .....
-          ....s
-          .....
-          .....
-          .....`),
+          ...r...
+          ..rrr..
+          ..rrr..
+          ..rrr..
+          ...r...`),
       ],
     },
   },
@@ -774,8 +1112,7 @@ const VILLAGE_ONLY: Prop[] = [
 /** The meadow's scatter pool: stones and grass, plus what the meadow grows. */
 export const MEADOW_PROPS: Prop[] = [...STONES, ...GRASS, ...MEADOW_ONLY]
 
-/** The wood's. */
-export const WOODLAND_PROPS: Prop[] = [...STONES, ...GRASS, ...WOODLAND_ONLY]
+
 
 /** The beach's. No grass at all: sand does not grow any. */
 export const BEACH_PROPS: Prop[] = [...STONES, ...BEACH_ONLY]
@@ -796,6 +1133,18 @@ const scarce = (pool: Prop[], weight: number) => pool.map((p) => asOften(p, weig
 
 /** The hill's. Bone showing through, and the two things that grow in wind. */
 export const HILL_PROPS: Prop[] = [...STONES, asOften(tussock, 16), ...HILL_ONLY]
+
+/**
+ * The wood's. Little loose stone and less grass than open ground: a wood floor
+ * is leaf litter, bracken and what has fallen off the trees. The pool is
+ * weighted this way as much as the density is, because a wood scattered from
+ * the shared pool comes out as a meadow with trees standing about in it.
+ */
+export const WOODLAND_PROPS: Prop[] = [
+  ...scarce(STONES, 7),
+  ...scarce(GRASS, 8),
+  ...WOODLAND_ONLY,
+]
 
 /** The village's. Grass, but somebody has picked the stones off the green. */
 export const VILLAGE_PROPS: Prop[] = [...scarce(STONES, 6), ...GRASS, ...VILLAGE_ONLY]

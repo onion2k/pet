@@ -599,30 +599,79 @@ village green has had the stones picked off it, a hilltop has less grass than a
 meadow, and a beach has none at all. Left even, the shared stones and grass
 outweigh everything distinctive and all five read as a recoloured meadow.
 
-The village needs no materials the shelter did not already need — a roof is a
-roof — so it costs a prop set rather than a palette, and the pet's own shelter
-stays its own shelter with the cottages as neighbours.
+Four other levers do the rest of the work, and each of them exists because
+colours and prop pools alone were not enough.
+
+**How close the scatter stands.** Density is the chance a candidate slot is
+taken; `propSpacing` is how far apart the slots are. At the shared three columns
+a wood at full density is still a plantation with a clear metre between every
+trunk, so the wood closes the grid to two and the hill and the village open it
+to four. The wood's trees are also twice the height they were: from a camera at
+the pet's eye level, height is the whole of a tree's read, and nothing tall is
+allowed to stand between the camera and the pet — a fourteen-voxel pine two
+lengths from the lens is a trunk filling a third of the frame.
+
+**What a place wears, as against what it is made of.** A flat `materials`
+override says sand is sand in April. It was also being used for leaf colour,
+which is not a fact about a wood but about the month — so the wood stayed green
+through October while the meadow beside it turned. Anything seasonal goes in
+`seasonMaterials` instead, one set per season, blended across the turn exactly
+as the season's own colours are: fresh green, deep green, gold, and bare.
+
+**How the ground lies.** `Relief` pulls the noise toward a height ahead of the
+pet and another behind it. A beach falls away in front into water and rises
+behind into dunes; a wood only rises, which carries its trees up over the
+shelter roof; a hilltop only falls, because a shoulder climbing behind the pet
+would stand between it and the one thing a hill has to offer.
+
+**What is in the sky.** The patch is fourteen lengths deep and hazed out before
+its far edge, so nothing in the scene can say how far you can see from where you
+are standing — which is exactly what a hilltop has to say. `Sky` gives a place
+cloud and distant ridges on the backdrop, and a `horizon`: where this place's
+skyline actually falls in the frame, since anything drawn below it is simply
+behind the ground. It is authored per biome rather than derived because it
+depends on the relief, on what is standing on it, and on where the place points
+the camera.
+
+The village's buildings are stone and seven columns across, which they can only
+be because they bring their own footing. The rule that a stamp needs ground
+level to within a voxel is right for a bush and fatal for a building; a prop
+marked `foundation` digs its footprint flat instead, and the built things are
+scattered in a first pass so they are not left picking through the holes between
+a hundred and fifty tufts.
 
 ### The sea
 
-The beach has water at the back of it, and where the water could go was decided
-by the haze rather than by taste.
+The beach has water at the front of it — between the pet and the camera — and
+where the water could go was decided by the haze rather than by taste.
 
 The patch fades into the sky with depth so its edge is never a visible boundary:
-by the far row the haze is already eight parts in ten. A sea parked out past that
-edge would therefore be the colour of the sky and nothing else. So the water is
-*on* the patch. Past the shelter the ground falls away — pulled toward one seabed
+by the far row the haze is already eight parts in ten. Water at the back of the
+patch was therefore a band of horizon four pixels tall — and a swell four pixels
+tall is a still picture. So the sea is in the foreground. Just past the lane the
+pet walks, the ground falls away toward the camera — pulled toward one seabed
 value rather than having depth subtracted from it, which damps the noise as it
 descends and is what keeps the waterline a single line instead of a scatter of
-sandbanks — and the water fills what it leaves. That puts the waterline in the
-band that is still crisp and lets the far water melt into the horizon on its own.
+sandbanks — and the water fills what it leaves, running off the bottom of the
+frame. Dunes climb behind, so the picture reads bottom to top: water, the flat
+the pet walks, sand, sky.
 
 The water is one flat plane, two triangles, with everything that moves in the
-fragment stage. What sells it at this size is not the surface — it is four pixels
-tall by the time the haze has it — but three things around it: that the ground
-goes visibly under it, that it takes the sky's colour where it is far enough off
-to be a mirror, and that the sun lies on it in a line of sparks written into the
-same bloom mask the lantern glass uses.
+fragment stage, and at two lengths from the lens there is enough of it on screen
+for that to be worth doing. The swell travels. The crests take the sun in a line
+of sparks written into the same bloom mask the lantern glass uses. The shallows
+over the sand are a different colour from the water past them. And the surf runs
+up the beach and slides back: the water is discarded above a line made of two
+slow sines, which puts the wet sand the terrain already paints back on show as it
+drains — the retreat is the half of the motion that reads, and it costs nothing.
+
+Two details are load-bearing. The plane sits a sixth of a voxel above its
+nominal level, because the seabed is voxels and a column that comes out exactly
+`level` high has its top face in exactly the water's plane — which at twenty
+metres is a field of tearing pixels rather than a shore. And the fall is
+straight rather than eased at both ends: eased in, the band of sand standing one
+voxel proud of the waterline came out half a length deep, which at this angle is
+a white stripe ruled across the frame rather than a line of foam.
 
 The one place it deliberately parts company with the land is the fade. The
 terrain hazes all the way to the sky, because its edge is meant to disappear.
@@ -660,9 +709,12 @@ Three of the five yard games are already scarce by season. Gating them by place
 as well would leave a player with a healthy adult and nothing to do, so a game
 that wants a creature asks for a **role** and the biome says who fills it — a
 moth in the wood where the meadow has a butterfly, glow-worms where it has
-fireflies. Same game, same rhythm, different thing to look at. Objects — the
-ball, the sled, the pile of leaves — belong nowhere in particular and turn up
-everywhere. Journey narration is written per ground role for the same reason: a
+fireflies. Same game, same rhythm, different thing to look at. What the pet
+plays with is a role too: the meadow's ball is a beach ball at the tideline, a
+football on the green and a fallen cone in the wood, and FETCH asks for whatever
+this place's toy happens to be. Only things somebody left out or built — the
+sled, the pile of leaves, the snowman, the jack-o-lantern — belong nowhere in
+particular and turn up everywhere. Journey narration is written per ground role for the same reason: a
 new place costs four names and a curio table, not a fresh set of trip lines.
 
 The rebuild is one very long frame — the whole 160×80 patch is re-meshed — so the
@@ -715,7 +767,7 @@ the others do not:
 
 | Game | Needs | Wants | Asks for |
 | --- | --- | --- | --- |
-| FETCH | the ball | nothing in particular | effort — tap to wind up the kick, and it sags if you stop |
+| FETCH | the toy, whatever it is here | nothing in particular | effort — tap to wind up the kick, and it sags if you stop |
 | CHASE | the butterfly | clear weather | prediction — it leans one way, and sometimes that lean is a lie |
 | DIVE IN | the leaf pile | dry leaves | tracking — keep your eye on the deep drift while they swirl |
 | THE HILL | the sled | snow | steering — down the hill, past what is in the way |
@@ -729,7 +781,7 @@ hint line.
 The row is built to the forage menu's shape — a name, a note, a read on today,
 and what it costs — because that is already this game's way of saying *here is a
 choice that depends on the day*. What a yard game must **not** do is restate its
-visitor's season: whether the ball is out there already carries summer and
+visitor's season: whether the toy is out there already carries summer and
 autumn, and saying it again would make the read a tautology that always looked
 promising. A yard game reads the part presence leaves open — the weather, and
 the hour. CATCH THEM needs no rule about darkness at all: the fireflies keep
@@ -929,12 +981,15 @@ occlusion, which is what makes the cubes read at this resolution.
 
 **A new place to live.** Add a `Biome` to `src/data/biome.ts`: a name, a line for
 the move menu, a scatter density, a prop pool, its four grounds, and who fills
-each `VisitorRole`. Optionally a `materials` override — a handful of colours
-painted over the season's palette rather than a palette of its own, since five
-places times four seasons would be twenty palettes to keep in step, and a wood
-should still look wintry in winter. Nothing is rebuilt for a tint: terrain and
-props store a material index and the colour behind it is uploaded every frame
-anyway. The patch's dimensions, the lantern row and the verge pitches stay shared
+each `VisitorRole` — including `toy`, the thing it leaves lying about for the pet
+to shove. Optionally a `materials` override — a handful of colours painted over
+the season's palette rather than a palette of its own, since five places times
+four seasons would be twenty palettes to keep in step, and a wood should still
+look wintry in winter — plus `seasonMaterials` for anything that changes with the
+month, `propSpacing` for how close the scatter stands, `relief` for ground that
+falls away or climbs, `sky` for cloud and distant ridges, and `extras` for local
+colour no game asks for. Nothing is rebuilt for a tint: terrain and props store a
+material index and the colour behind it is uploaded every frame anyway. The patch's dimensions, the lantern row and the verge pitches stay shared
 constants — `LAMP_COUNT` in particular is baked into three shaders at module
 load, so it has to stay fixed. Add the id to `BiomeId`, bump `SAVE_VERSION` only
 if the shape of the save changes, and give the biome four grounds in
@@ -947,7 +1002,9 @@ for flowers, `r`/`n` for roof and interior — resolved against the materials at
 build time, so one prop set can dress several biomes. Ground cover is shared and
 the tall things are not, which is most of why two places read as different from
 the same generator. Give each a `weight` for how often it appears and a `spacing`
-for how much room it needs.
+for how much room it needs, and mark anything built rather than grown with
+`foundation` so it digs its own footing instead of being refused every slot that
+is not already flat.
 
 **A new food.** Add it to `src/data/foods.ts` with a `DietAxis` and stat deltas.
 Anything with an axis shows up on the feed menu and counts toward branching;

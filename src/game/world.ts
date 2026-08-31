@@ -3,8 +3,10 @@ import {
   SEASONS,
   type Material,
   type Season,
+  type SeasonId,
   type WeatherId,
 } from '../data/seasons'
+import type { Biome } from '../data/biome'
 import { hexToLinear } from '../render/voxel-mesh'
 
 /**
@@ -115,17 +117,24 @@ function seasonPalette(season: Season): Rgb[] {
   return cached
 }
 
-const tintCache = new Map<string, (Rgb | null)[]>()
+const tintCache = new Map<string, Rgb[]>()
 
-/** A biome's overrides in MATERIALS order, with a hole wherever it has none. */
-function tintFor(id: string, materials: Partial<Record<Material, string>>): (Rgb | null)[] {
-  let cached = tintCache.get(id)
+/**
+ * One season's palette as a given place wears it: the season's own colours with
+ * the biome's overrides painted over them, flat ones first and then whatever
+ * that place does differently in this particular season.
+ */
+function tintedFor(biome: Biome, season: SeasonId): Rgb[] {
+  const key = `${biome.id}:${season}`
+  let cached = tintCache.get(key)
   if (!cached) {
-    cached = MATERIALS.map((name: Material) => {
-      const hex = materials[name]
-      return hex ? hexToLinear(hex) : null
+    const base = seasonPalette(SEASONS.find((s) => s.id === season)!)
+    const overrides = { ...biome.materials, ...biome.seasonMaterials?.[season] }
+    cached = MATERIALS.map((name: Material, i) => {
+      const hex = overrides[name]
+      return hex ? hexToLinear(hex) : base[i]!
     })
-    tintCache.set(id, cached)
+    tintCache.set(key, cached)
   }
   return cached
 }
@@ -138,15 +147,23 @@ function tintFor(id: string, materials: Partial<Record<Material, string>>): (Rgb
  * keep in step, and a wood should still look wintry in winter. Nothing is
  * rebuilt for this -- terrain and props store a material index, and the colour
  * behind the index is uploaded fresh every frame anyway.
+ *
+ * The blend across the turn of the season happens *after* the overrides rather
+ * than before, which is the whole reason this takes two seasons instead of a
+ * palette. A wood that repaints its leaves in autumn has to slide from summer's
+ * green to autumn's gold over the same week everything else does; tinting an
+ * already-blended palette could only ever snap on the day the season flipped.
  */
 export function tintPalette(
-  palette: Rgb[],
-  id: string,
-  materials?: Partial<Record<Material, string>>,
+  biome: Biome,
+  season: SeasonId,
+  nextSeason: SeasonId,
+  blend: number,
 ): Rgb[] {
-  if (!materials) return palette
-  const overrides = tintFor(id, materials)
-  return palette.map((colour, i) => overrides[i] ?? colour)
+  const from = tintedFor(biome, season)
+  if (blend <= 0 || nextSeason === season) return from
+  const to = tintedFor(biome, nextSeason)
+  return from.map((colour, i) => mixRgb(colour, to[i]!, blend))
 }
 
 interface SeasonPoint {

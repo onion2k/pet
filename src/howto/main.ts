@@ -649,8 +649,9 @@ chapter(
   </p>
   <p class="note">${VISITORS.map((v) => v.arrival).join(' · ')}</p>
   <p class="note">
-    The ball is the one you can join in with: it rolls properly, and your pet
-    will wander over and shove it about on its own.
+    Whatever rolls is the one you can join in with — a ball in the meadow, a
+    beach ball at the shore, a football on the green, a cone in the wood. It
+    rolls properly, and your pet will wander over and shove it about on its own.
   </p>
 
   <h3>A yard that remembers</h3>

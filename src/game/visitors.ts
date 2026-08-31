@@ -65,6 +65,7 @@ export function roster(biome: Biome, regulars: VisitorId[]): VisitorId[] {
   const here = new Set<VisitorId>([
     ...UNIVERSAL_VISITORS,
     ...Object.values(biome.visitors),
+    ...(biome.extras ?? []),
     ...regulars,
   ])
   // Declaration order, not set order: the renderer places visitors in the order

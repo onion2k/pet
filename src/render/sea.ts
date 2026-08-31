@@ -1,19 +1,21 @@
 import { Mesh, Plane, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
-import { TERRAIN_COLS, TERRAIN_VOXEL, type Shore } from '../data/biome'
+import { TERRAIN_COLS, TERRAIN_VOXEL, type Relief, type Shore } from '../data/biome'
 
 /**
- * The water at the back of a shore.
+ * The water at the front of a shore: the near band of the patch, under the pet
+ * and running off the bottom of the frame.
  *
- * One flat plane rather than anything simulated. What sells water at this
- * resolution is not the surface -- it is four pixels tall by the time the haze
- * has it -- but the three things around it: that the ground goes under it, that
- * it takes the sky's colour where it is far away, and that the sun lies on it
- * in a line. So the plane is cheap and the shading does the work.
+ * One flat plane rather than anything simulated. Everything that sells it is in
+ * the fragment stage, and at this range there is enough of it on screen for
+ * that to be worth doing: the swell travels, the crests take the sun, the
+ * shallows over the sand are a different colour from the water past them, and
+ * the surf runs up the beach and slides back. None of which survived being a
+ * hazed strip at the horizon, which is what this was before.
  *
- * It reads the same haze the terrain does, from the same uniforms, because the
- * horizon is where the two have to agree. A sea that hazed on its own schedule
- * would draw a seam across the frame exactly where it was supposed to disappear.
+ * It reads the same haze the terrain does, from the same uniforms -- the water
+ * is near enough now that the haze barely touches it, but a shore that put its
+ * water further off would still want the two to agree.
  */
 
 const vertex = /* glsl */ `
@@ -62,19 +64,38 @@ const fragment = /* glsl */ `
    * Three sine trains at angles to one another. Not noise: a swell wants to
    * read as travelling, and three periodic terms beat against each other for
    * long enough that the eye never finds the loop.
+   *
+   * Pitched for water a couple of lengths from the camera. At the wavelengths
+   * this had while it was the horizon, one crest now fills the whole visible
+   * band and the sea heaves rather than ripples.
    */
   float swell(vec2 p, float t) {
-    return sin(p.x * 1.6 + t * 0.85) * 0.5
-         + sin(p.y * 2.7 - t * 1.20) * 0.32
-         + sin((p.x + p.y * 0.6) * 3.9 + t * 0.55) * 0.18;
+    return sin(p.x * 3.1 + t * 0.85) * 0.5
+         + sin(p.y * 5.2 - t * 1.20) * 0.32
+         + sin((p.x + p.y * 0.6) * 7.4 + t * 0.55) * 0.18;
   }
 
   void main() {
     vec2 p = vWorld.xz;
     float w = swell(p, uTime);
 
-    // Shallow over the sand, deep once the seabed has dropped away.
-    float away = clamp((uShoreZ - vWorld.z) / 5.0, 0.0, 1.0);
+    // The surf line: how far up the sand the water has run at this moment.
+    //
+    // Two slow sines rather than one, so the wash does not keep time, and the
+    // faster of the two carries a little of x so the line is never straight
+    // across the frame. The water is discarded above the line, which puts the
+    // wet sand the terrain already paints back on show as it drains -- the
+    // retreat is the half of the motion that reads, and it costs nothing.
+    //
+    // At its furthest in the line sits above the natural waterline and the sand
+    // itself hides the plane's edge, so the wash never overruns onto dry beach.
+    float wave = sin(uTime * 0.42) * 0.65 + sin(uTime * 0.67 + vWorld.x * 0.90) * 0.35;
+    float edge = uShoreZ + 0.25 + 0.22 * (1.0 + wave);
+    if (vWorld.z < edge) discard;
+
+    // Shallow against the sand, deep once the seabed has dropped away toward
+    // the camera.
+    float away = clamp((vWorld.z - uShoreZ) / 4.0, 0.0, 1.0);
     vec3 albedo = mix(uShallow, uDeep, away * away);
     albedo *= 0.88 + 0.16 * w;
 
@@ -88,8 +109,11 @@ const fragment = /* glsl */ `
     // sky comes in with distance rather than with a normal nobody would see.
     // Held well under half: past that the sea stops being a colour of its own
     // and becomes a second piece of sky lying on the ground.
-    float grazing = smoothstep(8.0, 26.0, vDepth);
-    lit = mix(lit, uSky, grazing * 0.35);
+    // The far side of this water is the waterline, six or seven lengths off,
+    // and the near side runs under the camera -- so the range is the near one
+    // the shore actually occupies, not the horizon's.
+    float grazing = smoothstep(5.0, 9.5, vDepth);
+    lit = mix(lit, uSky, grazing * 0.28);
 
     // The sun lying on the water. Only the crests catch it, which is what makes
     // it a line of sparks rather than a sheet.
@@ -97,18 +121,23 @@ const fragment = /* glsl */ `
     float glint = pow(crest, 7.0) * uLightIntensity;
     lit += uLightColour * glint * 0.5;
 
+    // Foam along the surf line. Lit rather than white: a white lip would still
+    // be white at midnight, which is the one thing that would give the plane
+    // away as a plane.
+    float lip = smoothstep(0.22, 0.0, vWorld.z - edge);
+    vec3 foam = uLightColour * uLightIntensity * 0.62 + uAmbientColour * uAmbientIntensity * 1.1;
+    lit = mix(lit, foam, lip * 0.5);
+
     lit = mix(lit, mix(vec3(dot(lit, vec3(0.33))), vec3(0.40, 0.44, 0.30), 0.5) * 0.8, uSick);
 
     // Water does not fade out the way the land does, and this is the whole
-    // difference between a sea and a bank of fog.
+    // difference between a sea and a bank of fog. It settles toward a horizon
+    // tint rather than toward the sky, and never gets all the way there.
     //
-    // The patch's far edge is meant to disappear, so the terrain hazes all the
-    // way to the sky over seven units of depth. Water given the same treatment
-    // vanishes completely -- almost everything the player can see of a sea is
-    // the far part, beyond where the sand stops, and hazed to sky that part is
-    // sky. A real sea keeps most of its colour right up to the horizon and then
-    // stops at a line. So the water settles toward a horizon tint rather than
-    // toward the sky, and never gets all the way there.
+    // In front of the pet almost none of this bites -- the far edge of the
+    // water is the waterline, well inside the depth the haze starts at. It is
+    // kept because it is what a shore with its water further off would need,
+    // and because the terrain it meets is hazed on exactly these numbers.
     float haze = smoothstep(uFog.x, uFog.y, vDepth) * 0.85;
     vec3 horizon = mix(uHaze, uDeep, 0.7);
     // Alpha is the bloom mask, so the sparks bloom the way the lantern glass
@@ -129,21 +158,39 @@ export interface SeaLighting {
 
 export interface Sea {
   root: Transform
-  /** Puts the water where this place keeps it, or takes it away entirely. */
-  setShore(shore: Shore | undefined): void
+  /**
+   * Puts the water where this place keeps it, or takes it away entirely. Both
+   * halves are needed: the shore says how high the water stands and what
+   * colour it is, and the relief says where the ground breaks away under it.
+   */
+  setShore(shore: Shore | undefined, relief: Relief | undefined): void
   setLighting(lighting: SeaLighting): void
   setSick(amount: number): void
   update(time: number): void
 }
 
 /**
- * Wider and deeper than the patch. The camera turns forty degrees to follow the
- * pet, so water that stopped at the patch's edge would end mid-frame at either
- * extreme -- and the far edge has to be past where the haze finishes, or the
- * horizon would have a lip on it.
+ * Wider than the patch, and deep enough to run out past the camera. The camera
+ * turns forty degrees to follow the pet, so water that stopped at the patch's
+ * edge would end mid-frame at either extreme; and the near edge has to be
+ * behind the lens, or the bottom of the frame would show where the sea stops.
  */
 const SPAN_X = TERRAIN_COLS * TERRAIN_VOXEL * 2.5
-const SPAN_Z = 60
+const SPAN_Z = 30
+
+/**
+ * How far above its nominal level the water actually sits, in voxels.
+ *
+ * The seabed is voxels and the water is a plane, and the plane's level is given
+ * in the same units the columns are stacked in -- so a column that comes out
+ * exactly `level` high has its top face in exactly the water's plane. That is
+ * the whole wet band, since the wet sand is the sand at or under the waterline,
+ * and two coplanar surfaces are a field of tearing pixels rather than a shore.
+ * Lifting the water a fraction of a voxel puts the sand decisively under it.
+ * Small enough that the waterline does not move: a sixth of a voxel is three
+ * centimetres of a surface seen almost edge-on.
+ */
+const LIFT = 1 / 6
 
 export function createSea(gl: OGLRenderingContext): Sea {
   const root = new Transform()
@@ -185,15 +232,15 @@ export function createSea(gl: OGLRenderingContext): Sea {
 
   return {
     root,
-    setShore(shore) {
-      mesh.visible = shore !== undefined
-      if (!shore) return
-      mesh.position.y = shore.level * TERRAIN_VOXEL
-      // Reaches a little in front of where the ground starts falling, so the
-      // dry sand is always the thing that hides the water's near edge and the
-      // seam is never something the player can be shown.
-      mesh.position.z = shore.from + 1 - SPAN_Z / 2
-      u.uShoreZ!.value = shore.from
+    setShore(shore, relief) {
+      mesh.visible = shore !== undefined && relief?.fall !== undefined
+      if (!shore || !relief?.fall) return
+      mesh.position.y = (shore.level + LIFT) * TERRAIN_VOXEL
+      // Reaches a little behind where the ground starts falling, so the dry
+      // sand is always the thing that hides the water's far edge and the seam
+      // is never something the player can be shown.
+      mesh.position.z = relief.fall.from - 1 + SPAN_Z / 2
+      u.uShoreZ!.value = relief.fall.from
       u.uShallow!.value = hexToLinear(shore.shallow)
       u.uDeep!.value = hexToLinear(shore.deep)
     },
