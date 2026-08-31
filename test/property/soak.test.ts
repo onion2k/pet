@@ -7,6 +7,9 @@ import { load, flushSave } from '../../src/game/save'
 import type { ButtonId } from '../../src/render/shell'
 import type { Stage } from '../../src/game/types'
 import type { IconId } from '../../src/data/icons'
+import { drawScreen } from '../../src/ui/draw'
+import { worldAt } from '../../src/game/world'
+import { fakeHud } from '../fake-hud'
 
 /**
  * The suite next door plays out the situations we thought of: a weekend away, a
@@ -169,6 +172,48 @@ function assertSane(h: Harness, m: Model, played = true): void {
   }
 }
 
+/**
+ * A screen to draw onto, reused across the whole sweep. The game's drawing only
+ * ever tells the hud about rectangles and text, so recording those is the whole
+ * of what a screen is from here -- and one recorder cleared per frame is a lot
+ * cheaper than forty thousand of them.
+ */
+const screen = fakeHud()
+
+/** A fixed sky. Nothing about what the screen *says* depends on the weather. */
+const world = worldAt(0)
+
+/**
+ * The screen, asked what it is showing.
+ *
+ * Everything else in this file asks the game about its own state, which is what
+ * the harness is for and where five of the six bugs found here have been. The
+ * sixth was not: pressing B on the move menu set the refusal, played the
+ * refusing blip, and drew nothing, because the line was only ever drawn on the
+ * main screen. Every state assertion passed. The player saw a dead button.
+ *
+ * So the screen is asked too. Two questions, both cheap:
+ *
+ * - It can be drawn at all. A state random play can reach is a state somebody
+ *   can be sitting in front of, and a throw here is a black screen there.
+ * - If the game has said something, the screen says it. A message with nobody
+ *   drawing it is the game answering a press into the void.
+ */
+function assertShows(h: Harness): void {
+  const app = h.app
+  screen.fake.clear()
+  try {
+    drawScreen(screen.hud, app, world)
+  } catch (error) {
+    throw new Error(`the ${app.mode} screen could not be drawn: ${(error as Error).message}`)
+  }
+  if (app.messageTimer <= 0) return
+  require(
+    screen.fake.said().includes(app.message),
+    () => `the ${app.mode} screen said nothing about "${app.message}"`,
+  )
+}
+
 abstract class Step implements fc.Command<Model, Harness> {
   check(): boolean {
     return true
@@ -176,6 +221,7 @@ abstract class Step implements fc.Command<Model, Harness> {
   run(m: Model, h: Harness): void {
     this.act(h)
     assertSane(h, m)
+    assertShows(h)
   }
   abstract act(h: Harness): void
   abstract toString(): string

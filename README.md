@@ -1108,7 +1108,17 @@ icon selections, and after every one it asks the same short list of questions:
 stats inside their bounds, no number gone to NaN, a stage that never walks
 backwards within a life, a menu cursor still inside its list, a way back to the
 main screen from wherever the run ended, and a save file that reads back the
-same twice. When one fails, fast-check shrinks the run to the few presses that
+same twice.
+
+It draws the screen too, which is not the same question and was added because
+of the one bug in this list the rest of it could not have found. Pressing B on
+the move menu set a refusal, played the refusing blip and drew nothing, because
+the line was only ever drawn on the main screen; every state assertion passed
+and the player saw a dead button. So each step now also asks the screen two
+things: that it can be drawn at all -- a state random play can reach is a state
+somebody can be sat in front of, and a throw here is a black screen there -- and
+that anything the game has said is on it. Four per cent slower, and it catches
+that bug two presses from boot. When one fails, fast-check shrinks the run to the few presses that
 actually matter and prints a seed to reproduce it — which is the point, because
 a failure forty presses deep is not a bug report until it is three presses deep.
 A second property does the same to the save file itself, generating right-shaped
