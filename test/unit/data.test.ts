@@ -19,7 +19,7 @@ import { beat, type JourneyContext, type Leg } from '../../src/data/journey'
 import { blend, EGG_LINES, pick, SICK_LINE, voice } from '../../src/data/voice'
 import { GROWTH_STAGES, plantById, PLANTS } from '../../src/data/plants'
 import { UNIVERSAL_VISITORS, VISITORS, type VisitorRole } from '../../src/data/visitors'
-import { SHELLS, shellById } from '../../src/data/shells'
+import { PATTERNS, SHELLS, shellById, shellStyle } from '../../src/data/shells'
 import { ICON_LABEL, ICON_ORDER, ICON_SIZE, iconRows } from '../../src/data/icons'
 import { glyph, textWidth } from '../../src/data/font'
 import { expandLayers, mirrorRow, rows } from '../../src/data/voxel-format'
@@ -748,6 +748,15 @@ describe('shells', () => {
 
     const midnight = { ...emptySave(), discovered: ['1', '2', '3', '4', '5', '6', '7', '8'] }
     expect(shellById('midnight').unlocked(midnight)).toBe(true)
+
+    const humbug = { ...emptySave(), streak: { days: 14, lastDay: '' } }
+    expect(shellById('humbug').unlocked(humbug)).toBe(true)
+
+    const bubblegum = { ...emptySave(), counters: { sessions: 1, retirements: 3 } }
+    expect(shellById('bubblegum').unlocked(bubblegum)).toBe(true)
+
+    const everyCurio = Object.fromEntries(CURIOS.map((curio) => [curio.id, 1]))
+    expect(shellById('marble').unlocked({ ...emptySave(), curios: everyCurio })).toBe(true)
   })
 
   it('keeps each shell locked one short of its milestone', () => {
@@ -756,6 +765,45 @@ describe('shells', () => {
     expect(
       shellById('midnight').unlocked({ ...emptySave(), discovered: ['1', '2', '3', '4', '5', '6', '7'] }),
     ).toBe(false)
+    expect(shellById('humbug').unlocked({ ...emptySave(), streak: { days: 13, lastDay: '' } })).toBe(
+      false,
+    )
+    expect(
+      shellById('bubblegum').unlocked({ ...emptySave(), counters: { sessions: 9, retirements: 2 } }),
+    ).toBe(false)
+    const allButOne = Object.fromEntries(CURIOS.slice(1).map((curio) => [curio.id, 1]))
+    expect(shellById('marble').unlocked({ ...emptySave(), curios: allButOne })).toBe(false)
+  })
+
+  describe('shellStyle', () => {
+    it('gives a patterned shell both its colours and the number the shader wants', () => {
+      const marble = shellById('marble')
+      const style = shellStyle(marble)
+      expect(style.colour).toBe(marble.colour)
+      expect(style.accent).toBe(marble.accent)
+      expect(style.pattern).toBe(PATTERNS.swirl)
+    })
+
+    it('makes a plain shell its own accent, so the mix has nothing to do', () => {
+      const plum = shellById('plum')
+      const style = shellStyle(plum)
+      expect(style.accent).toBe(plum.colour)
+      expect(style.pattern).toBe(PATTERNS.plain)
+    })
+  })
+
+  it('keeps every accent in range, and names a pattern to go with it', () => {
+    for (const shell of SHELLS) {
+      if (!shell.pattern || shell.pattern === 'plain') {
+        expect(shell.accent, shell.id).toBeUndefined()
+        continue
+      }
+      expect(shell.accent, shell.id).toHaveLength(3)
+      for (const channel of shell.accent!) {
+        expect(channel).toBeGreaterThanOrEqual(0)
+        expect(channel).toBeLessThanOrEqual(1)
+      }
+    }
   })
 
   describe('shellById', () => {

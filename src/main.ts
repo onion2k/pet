@@ -25,6 +25,7 @@ import { Hud } from './render/hud'
 import { Particles } from './render/particles'
 import { PetView } from './render/pet'
 import { drawScreen } from './ui/draw'
+import { shellStyle } from './data/shells'
 import { registerServiceWorker } from './pwa'
 
 /** Native resolution of the pet's screen. Everything above it is upscaling.
@@ -237,7 +238,8 @@ syncMute()
 // Shell colours are earned by lineage milestones and cycled here.
 const shellButton = document.createElement('button')
 const syncShell = () => {
-  shell.setBodyColour(app.currentShell.colour)
+  const style = shellStyle(app.currentShell)
+  shell.setBodyStyle(style.colour, style.accent, style.pattern)
   const extra = app.unlockedShells.length - 1
   shellButton.textContent = `SHELL: ${app.currentShell.name.toUpperCase()}`
   shellButton.title = extra > 0 ? `${extra} earned colour${extra > 1 ? 's' : ''} unlocked` : 'Earn colours by playing'

@@ -3,7 +3,7 @@ import { DEFAULT_START, harness } from '../harness'
 import { emptySave, flushSave, SAVE_VERSION } from '../../src/game/save'
 import { NAMES } from '../../src/game/app'
 import { SHELLS } from '../../src/data/shells'
-import { CURIO_COUNT } from '../../src/data/curios'
+import { CURIO_COUNT, CURIOS } from '../../src/data/curios'
 
 /**
  * A session from the outside: switching the thing on, naming a pet, closing
@@ -408,10 +408,12 @@ describe('settings', () => {
     const h = harness({
       save: {
         ...emptySave(),
-        streak: { days: 10, lastDay: stamp(DEFAULT_START) },
+        streak: { days: 14, lastDay: stamp(DEFAULT_START) },
         album: [{ speciesId: 'mochi', name: 'OLD', retiredAt: 0, legacy: 1 }],
-        curios: { a: 1, b: 1, c: 1, d: 1, e: 1 },
+        // Every curio, since the last shell wants the whole collection.
+        curios: Object.fromEntries(CURIOS.map((curio) => [curio.id, 1])),
         discovered: ['1', '2', '3', '4', '5', '6', '7', '8'],
+        counters: { sessions: 1, retirements: 3 },
       },
     }).start()
     expect(h.app.unlockedShells).toHaveLength(SHELLS.length)
