@@ -261,7 +261,7 @@ const same = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && [...a].sort().join() === [...b].sort().join()
 
 /** World height every form is normalised to, so framing never changes on evolution. */
-const PET_HEIGHT = 1.85
+export const PET_HEIGHT = 1.85
 /** Fraction of the hop cycle spent in the air. The rest is stood on the ground. */
 const HOP_WINDOW = 0.38
 

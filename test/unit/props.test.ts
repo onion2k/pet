@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { LANTERN, PROPS, PROP_KEYS, SHELTER, type Prop } from '../../src/data/props'
 import { expandLayers } from '../../src/data/voxel-format'
 import { PROP_MATERIAL } from '../../src/data/seasons'
-import { PROP_SPACING, SHELTER_COLUMNS } from '../../src/data/biome'
+import { PROP_SPACING, SHELTER_COLUMNS, TERRAIN_VOXEL } from '../../src/data/biome'
+import { PET_HEIGHT } from '../../src/render/pet'
 
 /**
  * The scenery. It is only ever read by the terrain mesher, which this suite
@@ -118,10 +119,40 @@ describe('the fixed pieces', () => {
 
   it('builds the shelter to the footprint the yard is laid out around', () => {
     // The clearing levels ground for exactly this many columns; a model that
-    // outgrew them would have its corners standing on a slope.
-    const layer = expandLayers(SHELTER.model)[0]!
-    expect(layer[0]!.length).toBe(SHELTER_COLUMNS.w)
-    expect(layer.length).toBe(SHELTER_COLUMNS.d)
+    // outgrew them would have its corners standing on a slope. Every course,
+    // not just the first: it is the roof that is most tempting to overhang.
+    for (const layer of expandLayers(SHELTER.model)) {
+      expect(layer.length).toBe(SHELTER_COLUMNS.d)
+      for (const row of layer) expect(row.length).toBe(SHELTER_COLUMNS.w)
+    }
+  })
+
+  it('stands the shelter on stone rather than starting it out of the grass', () => {
+    const layers = expandLayers(SHELTER.model)
+    expect(layers[0]!.join('')).toContain('s')
+  })
+
+  it('leaves the front open to the height of the pet, or it walls the pet in', () => {
+    // The one thing about this model that is load-bearing. The pet walks in to
+    // sleep and is meant to stay visible just inside the doorway; a front that
+    // filled in, or a header beam hung too low, would take it off the screen
+    // and look like a bug in the walking rather than in a wall.
+    const layers = expandLayers(SHELTER.model)
+    const front = (layer: string[]) => layer[layer.length - 1]!
+    const clear = layers.filter((layer) => front(layer).includes('.')).length
+    expect(clear * TERRAIN_VOXEL).toBeGreaterThan(PET_HEIGHT)
+  })
+
+  it('caps the doorway with something, so the front reads as a door', () => {
+    // Above the opening, the front row fills in. Without it the front is not a
+    // doorway, it is a missing wall.
+    const layers = expandLayers(SHELTER.model)
+    const front = (layer: string[]) => layer[layer.length - 1]!
+    const open = layers.findIndex((layer) => front(layer).includes('.'))
+    const capped = layers.findIndex(
+      (layer, i) => i > open && !front(layer).includes('.') && front(layer).includes('w'),
+    )
+    expect(capped, 'nothing spans the top of the doorway').toBeGreaterThan(open)
   })
 
   it('keeps the fixed pieces out of the random scatter', () => {
