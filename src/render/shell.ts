@@ -17,8 +17,12 @@ const plasticVert = /* glsl */ `
   varying vec3 vLocal;
   varying vec3 vTanX;
   varying vec3 vTanY;
+  varying vec3 vShape;
   void main() {
     vNormal = normalMatrix * normal;
+    // Kept in the shell's own space, so a pattern moulded into the plastic
+    // stays put on it however the device is turned.
+    vShape = normal;
     // Local X and Y in view space, so a height gradient measured in the decal's
     // own coordinates can be applied to the shaded normal.
     vTanX = normalMatrix * vec3(1.0, 0.0, 0.0);
@@ -33,6 +37,9 @@ const plasticVert = /* glsl */ `
 const plasticFrag = /* glsl */ `
   precision highp float;
   uniform vec3 uColor;
+  uniform vec3 uAccent;
+  /** Which pattern is moulded in: 0 plain, 1 swirl, 2 dot, 3 stripe. */
+  uniform float uPattern;
   uniform float uGloss;
   uniform float uSpeckle;
   uniform float uRim;
@@ -48,10 +55,53 @@ const plasticFrag = /* glsl */ `
   varying vec3 vLocal;
   varying vec3 vTanX;
   varying vec3 vTanY;
+  varying vec3 vShape;
 
   // Cheap value noise, used only for the moulded-plastic speckle.
   float hash(vec3 p) {
     return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  }
+
+  /** A lattice of dots on whichever plane it is handed. */
+  float dotsAt(vec2 p) {
+    return 1.0 - smoothstep(0.24, 0.32, length(fract(p) - 0.5));
+  }
+
+  /**
+   * How much of the accent colour shows at a point on the case. Everything here
+   * is a function of the shell's own coordinates, so the pattern belongs to the
+   * plastic rather than to the screen it happens to be drawn on.
+   */
+  float patternAt(vec3 p, vec3 shape) {
+    if (uPattern < 0.5) return 0.0;
+
+    if (uPattern < 1.5) {
+      // Swirl. Two colours folded through each other the way marbled plastic
+      // comes out of a mould: each sine bent by the one before it, which is
+      // enough to break up the regularity without a noise texture.
+      vec3 q = p * 3.6;
+      float fold = sin(q.y * 1.6 + q.x * 0.9);
+      float bend = sin(q.x * 1.4 - q.z * 1.7 + fold * 1.7);
+      // The accent is taken where the fold crosses zero rather than either side
+      // of it, which is what makes veins running through the colour instead of
+      // two colours in equal patches.
+      return 1.0 - smoothstep(0.0, 0.55, abs(sin(q.y * 2.6 + bend * 2.3)));
+    }
+
+    if (uPattern < 2.5) {
+      // Dots, laid down the axis each part of the case faces most. Flat on the
+      // front, flat on the sides, and no stretching where it curves between --
+      // a single projection would smear them right round the edge.
+      vec3 w = abs(normalize(shape));
+      w = w * w * w * w;
+      w /= (w.x + w.y + w.z);
+      const float SCALE = 4.6;
+      return dotsAt(p.yz * SCALE) * w.x + dotsAt(p.xz * SCALE) * w.y + dotsAt(p.xy * SCALE) * w.z;
+    }
+
+    // Stripes, leaning a little off the horizontal and carrying right round the
+    // body, since nothing here depends on which way the case is facing.
+    return smoothstep(-0.30, 0.30, sin(p.y * 13.0 + p.x * 3.2));
   }
 
   void main() {
@@ -85,8 +135,10 @@ const plasticFrag = /* glsl */ `
     float spec = pow(max(dot(N, H), 0.0), mix(12.0, 90.0, uGloss)) * mix(0.15, 0.9, uGloss);
     float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.0);
 
-    vec3 col = uColor * (0.22 + 0.72 * key);
-    col += uColor * vec3(0.5, 0.6, 0.95) * fill * 0.30;
+    vec3 plastic = mix(uColor, uAccent, patternAt(vLocal, vShape));
+
+    vec3 col = plastic * (0.22 + 0.72 * key);
+    col += plastic * vec3(0.5, 0.6, 0.95) * fill * 0.30;
     col += vec3(1.0, 0.98, 0.94) * spec;
     col += vec3(0.55, 0.72, 1.0) * fresnel * uRim;
 
@@ -95,7 +147,7 @@ const plasticFrag = /* glsl */ `
 
     // Grooves and drilled holes sit in shadow, deeper ones darker.
     col *= 1.0 - max(0.0, -relief) * 0.95;
-    col += uColor * max(0.0, relief) * 0.25;
+    col += plastic * max(0.0, relief) * 0.25;
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -260,8 +312,15 @@ export interface Shell {
   update(dt: number, time: number): void
   /** Turns the whole device. The idle drift is layered on top of this. */
   setOrbit(yaw: number, pitch: number): void
-  /** Recolours the moulded plastic of the case. */
-  setBodyColour(colour: [number, number, number]): void
+  /**
+   * Recolours the moulded plastic of the case. `accent` is the second colour a
+   * pattern is worked in, and is ignored by the plain pattern.
+   */
+  setBodyStyle(
+    colour: [number, number, number],
+    accent: [number, number, number],
+    pattern: number,
+  ): void
   /** Swaps the textures the screen samples; the bloom target changes each frame. */
   setScreenTextures(scene: Texture, bloomGlow: Texture): void
   setPower(value: number): void
@@ -326,6 +385,9 @@ export function createShell(
       fragment: plasticFrag,
       uniforms: {
         uColor: { value: color },
+        // Buttons are left plain; only the body is ever given a pattern.
+        uAccent: { value: color },
+        uPattern: { value: 0 },
         uGloss: { value: gloss },
         uRim: { value: rim },
         uSpeckle: { value: speckle },
@@ -415,8 +477,10 @@ export function createShell(
       orbitYaw = yaw
       orbitPitch = pitch
     },
-    setBodyColour(colour) {
+    setBodyStyle(colour, accent, pattern) {
       body.program.uniforms.uColor.value = colour
+      body.program.uniforms.uAccent.value = accent
+      body.program.uniforms.uPattern.value = pattern
     },
     setScreenTextures(scene, bloomGlow) {
       screen.program.uniforms.tScene.value = scene

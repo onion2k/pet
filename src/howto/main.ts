@@ -798,10 +798,26 @@ chapter(
   </p>
   <div class="grid">
     ${SHELLS.map((s) => {
-      const rgb = s.colour.map((c) => Math.round(Math.pow(c, 1 / 2.2) * 255)).join(',')
+      // The shells are held in linear light for the shader; the page wants them
+      // back in the sRGB it paints in.
+      const srgb = (c: readonly number[]) =>
+        `rgb(${c.map((v) => Math.round(Math.pow(v, 1 / 2.2) * 255)).join(',')})`
+      const base = srgb(s.colour)
+      const accent = srgb(s.accent ?? s.colour)
+      // A flat square cannot show a moulded pattern honestly, but it can say
+      // which one it is.
+      const fill =
+        s.pattern === 'stripe'
+          ? `repeating-linear-gradient(115deg, ${base} 0 3px, ${accent} 3px 6px)`
+          : s.pattern === 'dot'
+            ? `radial-gradient(${accent} 34%, transparent 36%) 0 0/6px 6px, ${base}`
+            : s.pattern === 'swirl'
+              ? `radial-gradient(circle at 30% 30%, ${accent} 0 2px, transparent 3px),
+                 radial-gradient(circle at 75% 70%, ${accent} 0 2px, transparent 3px), ${base}`
+              : base
       return `
       <div class="card">
-        <b><span class="swatch" style="background:rgb(${rgb})"></span>${s.name}</b>
+        <b><span class="swatch" style="background:${fill}"></span>${s.name}</b>
         <p class="note">${s.hint ? `Earned by: ${s.hint}.` : 'Yours from the start.'}</p>
       </div>`
     }).join('')}
