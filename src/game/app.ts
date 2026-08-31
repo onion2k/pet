@@ -21,7 +21,16 @@ import { VISITORS, type VisitorId } from '../data/visitors'
 import { biomeById, BIOMES, VERGE_SLOTS, VERGE_Z, type Biome } from '../data/biome'
 import type { PlantedThing } from '../render/visitors'
 import { groundsFor, prospectOf, type Ground, type Prospect } from '../data/grounds'
-import { DAY_MS, hoursUntilSunrise, isNight, seasonIdAt, worldAt, worldHour, WORLD_HOUR_MS } from './world'
+import {
+  DAY_MS,
+  hoursUntilSunrise,
+  isNight,
+  nextChange,
+  seasonIdAt,
+  worldAt,
+  worldHour,
+  WORLD_HOUR_MS,
+} from './world'
 import { roster, visitorsPresent, withinHours } from './visitors'
 import {
   COMMON_CURIOS,
@@ -33,6 +42,19 @@ import {
   type Curio,
   type CurioSet,
 } from '../data/curios'
+import {
+  creditTrip,
+  KIT,
+  KIT_COUNT,
+  kitPowers,
+  progressOf,
+  type Day,
+  type KitId,
+  type KitItem,
+  type KitPowers,
+  type KitProgress,
+  type Trip,
+} from '../data/kit'
 import { textWidth } from '../data/font'
 import { SPECIES_COUNT } from '../data/species'
 import type { SeasonId, WeatherId } from '../data/seasons'
@@ -132,6 +154,17 @@ const HEIRLOOM_PER_ANCESTOR = 5
 const HEIRLOOM_CAP = 15
 /** Screens that C can be held to escape from. */
 const ESCAPABLE: Mode[] = ['feed', 'games', 'grounds', 'curios', 'playing', 'move']
+
+/**
+ * Slots on the collection board: every curio, and then every piece of kit. One
+ * cursor runs through both, because they are one screen -- the board is what
+ * the family has, and half of it is for looking at and half of it is for using.
+ */
+const BOARD_SLOTS = CURIOS.length + KIT.length
+
+export type BoardSlot =
+  | { kind: 'curio'; curio: Curio; held: number }
+  | { kind: 'kit'; item: KitItem; owned: boolean }
 
 export interface AppHooks {
   sound(id: SoundId): void
@@ -427,9 +460,32 @@ export class App {
     // at least one leg, so there is always something it could have picked up.
     const supply = findSupply(ground.role, legs, random())!
     const held = this.save.larder[supply.id] ?? 0
-    if (held >= LARDER_CAP) return null
+    if (held >= this.larderCap) return null
     this.save.larder[supply.id] = held + 1
     return supply.what
+  }
+
+  /**
+   * Counts a trip toward everything it was a trip for, and hands back whatever
+   * it finished off.
+   *
+   * No dice at all. A player who wants an umbrella goes out in the rain until
+   * they have one, and the board tells them how many more times -- which makes
+   * the unearned half of it a list of things to go and do rather than a wall
+   * to wait behind.
+   *
+   * The tally belongs to the family, like the curios and the album, so a torch
+   * one pet walked out three dark nights for is still in the porch when the
+   * next one is grown enough to want it.
+   */
+  private recordTrip(trip: Trip): KitItem[] {
+    const { earned, progress } = creditTrip(this.save.kit, this.save.kitProgress, trip)
+    this.save.kitProgress = progress
+    for (const item of earned) {
+      this.save.kit.push(item.id)
+      this.pushTicker(`${this.living.name} now carries ${item.what}`)
+    }
+    return earned
   }
 
   /**
@@ -439,6 +495,13 @@ export class App {
    */
   private bankTheFire(): void {
     const pet = this.living
+    // A hat is a fire the pet did not have to go and gather, so it is tried
+    // first and the kindling stays in the larder for a night that needs it.
+    if (this.kitPowers.warm) {
+      pet.warm = true
+      this.pushTicker(`${pet.name} pulls its hat down for the night`)
+      return
+    }
     const held = this.save.larder[KINDLING] ?? 0
     if (held <= 0) {
       pet.warm = false
@@ -453,6 +516,15 @@ export class App {
   /** What is in the larder, for the feed menu and the status screen. */
   get larder(): Record<string, number> {
     return this.save.larder
+  }
+
+  /**
+   * How much of any one thing the family can keep. A basket is three more of
+   * everything, and this is the one place that says so -- the gathering, the
+   * screens and the tests all ask here rather than each adding it up.
+   */
+  get larderCap(): number {
+    return LARDER_CAP + this.kitPowers.larderBonus
   }
 
   /**
@@ -660,8 +732,91 @@ export class App {
    * choice a choice, so it is read off the live world rather than cached.
    */
   prospect(ground: Ground): Prospect {
-    const world = worldAt(this.worldNow())
-    return prospectOf(ground, world.season.id, world.weather)
+    const { season, weather } = this.today
+    return prospectOf(ground, season, weather, this.kitPowers)
+  }
+
+  /**
+   * Which piece of kit, if any, is the reason a ground reads better than it
+   * otherwise would -- so the menu can say so rather than leaving the player
+   * to notice that the creek quietly stopped saying "not today".
+   *
+   * Worked out by asking the same question with and without, and then one item
+   * at a time, rather than by writing down which item speaks for which ground.
+   * A rule the menu keeps separately from the rule that decides the read is a
+   * rule that will eventually disagree with it.
+   *
+   * Null when no single item did it on its own. No ground today wants both a
+   * season and a sky, so in practice one item is always the answer -- but one
+   * that did would need a hat *and* an umbrella to lift it, and naming either
+   * of them alone would be a plain lie about what the player is looking at.
+   */
+  prospectKit(ground: Ground): KitItem | null {
+    const { season, weather } = this.today
+    const bare = prospectOf(ground, season, weather)
+    if (bare === this.prospect(ground)) return null
+    return this.creditKit(
+      (powers) => prospectOf(ground, season, weather, powers) !== bare,
+    )
+  }
+
+  /**
+   * Which piece of kit the family owns is, on its own, enough to make some
+   * difference -- for saying so on the screen where the difference shows.
+   *
+   * Null when none of them is, which is not the same as nothing having
+   * changed: two things together can lift something neither could alone, and
+   * naming either of them for it would be a plain lie about what the player is
+   * looking at.
+   */
+  private creditKit(changes: (powers: KitPowers) => boolean): KitItem | null {
+    return (
+      KIT.find(
+        (item) => this.save.kit.includes(item.id) && changes(kitPowers([item.id], this.today)),
+      ) ?? null
+    )
+  }
+
+  /** Which piece of kit, if any, is why one more leg is going cheap. */
+  get foragePushKit(): KitItem | null {
+    if (this.kitPowers.pushScale >= 1) return null
+    return this.creditKit((powers) => powers.pushScale < 1)
+  }
+
+  /** The day, for anything that reads the sky rather than the clock. */
+  private get today(): Day {
+    const now = this.worldNow()
+    const world = worldAt(now)
+    return { season: world.season.id, weather: world.weather, night: isNight(now) }
+  }
+
+  /**
+   * When the sky is next going to turn, and what to -- for a family that has
+   * something to read it with. Null without the cone, and null when the
+   * weather is set for as far ahead as there is any point looking.
+   *
+   * The whole of what the cone does. It changes no odds; it tells the player
+   * which day is coming, on the screen where a day is what they are spending.
+   */
+  get forecast(): { weather: WeatherId; hour: number } | null {
+    if (!this.kitPowers.forecasts) return null
+    const change = nextChange(this.worldNow())
+    return change ? { weather: change.weather, hour: worldHour(change.at) } : null
+  }
+
+  /** True when a trip sent now would set out into the dark. */
+  get darkOut(): boolean {
+    return this.today.night
+  }
+
+  /** And true when the family has something to carry into it. */
+  get darkLit(): boolean {
+    return this.kitPowers.lightsTheDark
+  }
+
+  /** What the family's kit is worth today. */
+  private get kitPowers(): KitPowers {
+    return kitPowers(this.save.kit, this.today)
   }
 
   /**
@@ -807,6 +962,8 @@ export class App {
       this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
     },
     bringHome: (legs) => this.bringHome(legs),
+    recordTrip: (trip) => this.recordTrip(trip),
+    kit: () => this.kitPowers,
     gather: (ground, legs) => this.gather(ground, legs),
     applyStats: (delta) => this.applyStats(delta),
     speakNow: (text) => {
@@ -924,6 +1081,19 @@ export class App {
   }
 
   /**
+   * What the cursor is on. The board holds two kinds of thing -- a collection
+   * to fill and a kit to use -- and only one of them can be traded, so the
+   * screen and the button both have to ask which they are looking at.
+   */
+  get boardSlot(): BoardSlot {
+    const curio = CURIOS[this.curioIndex]
+    if (curio) return { kind: 'curio', curio, held: this.save.curios[curio.id] ?? 0 }
+    // The cursor wraps rather than running off the end, so what is left is kit.
+    const item = KIT[this.curioIndex - CURIOS.length]!
+    return { kind: 'kit', item, owned: this.save.kit.includes(item.id) }
+  }
+
+  /**
    * Whether the curio under the cursor has spares to trade.
    *
    * Spares, not copies: the trade has to leave one behind. Spending the last of
@@ -934,9 +1104,9 @@ export class App {
    * the button then refused.
    */
   get canTrade(): boolean {
-    // The cursor wraps rather than running off the end, so it always names one.
-    const curio = CURIOS[this.curioIndex]!
-    return (this.save.curios[curio.id] ?? 0) > TRADE_COST && !!this.tradeFor
+    const slot = this.boardSlot
+    if (slot.kind !== 'curio') return false
+    return slot.held > TRADE_COST && !!this.tradeFor
   }
 
   /**
@@ -945,10 +1115,14 @@ export class App {
    * snowdrop that keeps not turning up.
    */
   private trade(): void {
-    const curio = CURIOS[this.curioIndex]!
+    const slot = this.boardSlot
+    // Kit is not a currency. It has no spares -- a second umbrella is worth
+    // nothing -- so there is nothing on this row to spend.
+    if (slot.kind !== 'curio') return this.say('nothing to trade here', 'refuse')
+    const curio = slot.curio
     const want = this.tradeFor
     if (!want) return this.say('nothing left to want', 'refuse')
-    const held = this.save.curios[curio.id] ?? 0
+    const held = slot.held
     if (held <= TRADE_COST) {
       return this.say(`needs ${TRADE_COST + 1} ${curio.name.toLowerCase()}s`, 'refuse')
     }
@@ -961,16 +1135,40 @@ export class App {
 
   private pressCurios(button: ButtonId): void {
     if (button === 'a') {
-      this.curioIndex = (this.curioIndex + CURIOS.length - 1) % CURIOS.length
+      this.curioIndex = (this.curioIndex + BOARD_SLOTS - 1) % BOARD_SLOTS
       this.hooks.sound('move')
       return
     }
     if (button === 'c') {
-      this.curioIndex = (this.curioIndex + 1) % CURIOS.length
+      this.curioIndex = (this.curioIndex + 1) % BOARD_SLOTS
       this.hooks.sound('move')
       return
     }
     this.trade()
+  }
+
+  /** What the family owns, for the board and for whatever comes to read it. */
+  get kitOwned(): KitId[] {
+    return this.save.kit
+  }
+
+  get kitTally(): { owned: number; of: number } {
+    return { owned: this.save.kit.length, of: KIT_COUNT }
+  }
+
+  /** How near the family is to each thing it has yet to earn. */
+  get kitProgress(): KitProgress {
+    return this.save.kitProgress
+  }
+
+  /** How many qualifying trips this one still wants, for the board to say so. */
+  kitDone(item: KitItem): number {
+    return progressOf(this.save.kitProgress, item)
+  }
+
+  /** Kit the trip came home with, for the screen that tells it. */
+  get forageKit(): KitItem | null {
+    return this.forage.foundKit
   }
 
   get curioTally(): { kinds: number; total: number } {

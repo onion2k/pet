@@ -1,5 +1,6 @@
 import { beat, type JourneyContext, type Leg } from '../data/journey'
 import { findCurio, type Curio } from '../data/curios'
+import type { KitItem, KitPowers, MishapId, Trip } from '../data/kit'
 import { luckOf, type Ground } from '../data/grounds'
 import type { CurioSet } from '../data/curios'
 import { random } from '../engine/random'
@@ -33,6 +34,16 @@ const PUSH_COST = 0.7
 const LUCK_PER_LEG = 0.12
 /** How likely something goes wrong, per leg past the first. */
 const MISHAP_PER_LEG = 0.22
+/**
+ * What the dark does to that.
+ *
+ * The one thing the kit takes away rather than gives, and deliberately a
+ * multiplier on the price of pushing on rather than a risk of its own: a
+ * there-and-back is still safe after dark, so risk is still always chosen.
+ * What the night changes is what it costs to be greedy -- and a torch is the
+ * answer to it, which is what makes a torch a torch rather than a trinket.
+ */
+const NIGHT_MISHAP = 1.6
 /** How often a deep trip brings back something for the yard instead of the board. */
 const YARD_CHANCE = 0.35
 /** How often a trip picks up supplies alongside whatever else it found. */
@@ -60,6 +71,12 @@ export interface ForageHost {
   energy(): number
   /** Which collection sets the lineage has completed, and so what it is good at. */
   boons(): CurioSet[]
+  /**
+   * What the family's kit is worth today. Read once, at the moment the trip
+   * settles, so the trip is judged by the same kit the grounds menu was read
+   * with -- and by the same weather, since both come off the one day.
+   */
+  kit(): KitPowers
   /** Winds the world on by the time the trip took. */
   addWorldTime(ms: number): void
   addCurio(curio: Curio): void
@@ -70,6 +87,13 @@ export interface ForageHost {
    * which case the trip settles into an ordinary find.
    */
   bringHome(legs: number): { what: string; announce: string } | null
+  /**
+   * Hands the trip in, and gets back whatever it earned the family in the way
+   * of kit -- usually nothing, since most trips are one more step toward
+   * something rather than the last one. Told about every trip, good or bad: a
+   * trip that came home empty was still a trip out in the rain.
+   */
+  recordTrip(trip: Trip): KitItem[]
   /**
    * Picks up food and fuel on the way. Unlike a curio this is not the point of
    * the trip -- it happens alongside whatever else did -- so it returns what to
@@ -85,12 +109,15 @@ export interface ForageHost {
 /**
  * What can go wrong out there. Only reachable by pushing on, so the risk is
  * always something the player chose rather than something the game did to them.
+ *
+ * Named, because kit can spare one: an umbrella is the reason the pet did not
+ * come home muddy, and the spare has to survive the line being reworded.
  */
-const MISHAPS: { line: string; effect: Partial<Stats>; spoils: boolean }[] = [
-  { line: 'comes home caked to the eyes in mud', effect: { hygiene: -20 }, spoils: false },
-  { line: 'limps home, footsore', effect: { energy: -14 }, spoils: false },
-  { line: 'comes home late, and with nothing', effect: { happiness: -4 }, spoils: true },
-  { line: 'got caught out, and looks it', effect: { health: -6, hygiene: -10 }, spoils: true },
+const MISHAPS: { id: MishapId; line: string; effect: Partial<Stats>; spoils: boolean }[] = [
+  { id: 'mud', line: 'comes home caked to the eyes in mud', effect: { hygiene: -20 }, spoils: false },
+  { id: 'footsore', line: 'limps home, footsore', effect: { energy: -14 }, spoils: false },
+  { id: 'late', line: 'comes home late, and with nothing', effect: { happiness: -4 }, spoils: true },
+  { id: 'soaked', line: 'got caught out, and looks it', effect: { health: -6, hygiene: -10 }, spoils: true },
 ]
 
 export class Forage {
@@ -101,6 +128,8 @@ export class Forage {
   beats: string[] = []
   /** What it came home with, once it is home. Null until then, and on no luck. */
   found: Curio | null = null
+  /** Kit the trip earned, which is not a find so much as a lesson learned. */
+  foundKit: KitItem | null = null
   /** How many legs it has walked. One is a there-and-back; three is a long way. */
   legs = 1
 
@@ -139,15 +168,21 @@ export class Forage {
     return this.choosing ? Math.max(0, this.timer / PROMPT_SECONDS) : 0
   }
 
-  /** What going on from here would cost. */
+  /**
+   * What going on from here would cost. Kit can discount it -- a board on snow
+   * halves it -- so the number the prompt offers is the number `pushOn` then
+   * charges, which is the whole reason this is read rather than stored.
+   */
   get pushCost(): number {
-    return Math.round((this.ground?.energy ?? 0) * PUSH_COST)
+    const kit = this.host.kit()
+    return Math.round((this.ground?.energy ?? 0) * PUSH_COST * kit.pushScale)
   }
 
   begin(ground: Ground): void {
     this.phase = 'leaving'
     this.beats = []
     this.found = null
+    this.foundKit = null
     this.legs = 1
     this.stage = 'out'
     this.timer = 0
@@ -171,6 +206,7 @@ export class Forage {
     this.dim = 0
     this.beats = []
     this.found = null
+    this.foundKit = null
     this.legs = 1
     this.stage = 'out'
     this.timer = 0
@@ -300,6 +336,20 @@ export class Forage {
    */
   private settle(): void {
     this.timer = BEAT_SECONDS
+    const supplies = this.tell()
+    // What the trip was worth to the family, as against what it brought home.
+    // Told after the result rather than instead of it: a trip that finished
+    // off a pair of boots should still hand over whatever it found, and the
+    // player should hear about both.
+    this.earn(supplies)
+  }
+
+  /**
+   * What happened out there, and what came home. Returns whether the pet
+   * picked anything up on the way, which is the one part of the telling that
+   * the earning also cares about.
+   */
+  private tell(): boolean {
     const ctx = this.ctx!
     const ground = this.ground!
     const name = this.host.petName()
@@ -308,15 +358,31 @@ export class Forage {
     // What the collection is worth. Every set makes the pet better at the job
     // that fills the board, so finishing one pays out every trip after it.
     const boons = this.host.boons()
-    const mishapOdds = extra * MISHAP_PER_LEG * (boons.includes('stones') ? STONES_MISHAP : 1)
-    const mishap = random() < mishapOdds ? pickMishap() : null
+    const kit = this.host.kit()
+    // How far the pet could see, as against how far it walked. A torch does
+    // not carry it further out; it lets it find what was already out there --
+    // so this is what the curios and the supplies are looked for at, and the
+    // legs themselves are what the kit is awarded on. Kit is a reward for the
+    // journey the pet actually made; a curio is a thing lying on the ground.
+    const depth = this.legs + kit.depthBonus
+    const dark = ctx.night && !kit.lightsTheDark ? NIGHT_MISHAP : 1
+    const mishapOdds =
+      extra *
+      MISHAP_PER_LEG *
+      dark *
+      kit.mishapScale *
+      (boons.includes('stones') ? STONES_MISHAP : 1)
+    // Kit spares a mishap rather than swapping it for a different one: with an
+    // umbrella the mud simply did not happen, and nothing else got likelier.
+    const rolled = random() < mishapOdds ? pickMishap() : null
+    const mishap = rolled && kit.spares.includes(rolled.id) ? null : rolled
     const bonus =
       (boons.includes('blooms') ? BLOOMS_LUCK : 0) + (boons.includes('weather') ? WEATHER_LUCK : 0)
     const luck = Math.min(
       0.95,
-      luckOf(ground, ctx.season, ctx.weather) + extra * LUCK_PER_LEG + bonus,
+      luckOf(ground, ctx.season, ctx.weather, kit) + extra * LUCK_PER_LEG + bonus,
     )
-    const curio = findCurio(ctx.season, ctx.weather, random(), ground.favours, this.legs)
+    const curio = findCurio(ctx.season, ctx.weather, random(), ground.favours, depth)
 
     this.host.applyStats({ happiness: 6 })
     if (mishap) this.host.applyStats(mishap.effect)
@@ -333,15 +399,15 @@ export class Forage {
         this.host.speakNow(brought.announce)
         this.host.burst('sparkle', 12)
         this.host.persist()
-        return
+        return false
       }
     }
 
     // Supplies are picked up on the way rather than looked for, so they ride
     // along with whatever the trip was actually about -- including a bad one.
     const supply =
-      !mishap?.spoils && random() < SUPPLY_CHANCE
-        ? this.host.gather(ground, this.legs)
+      !mishap?.spoils && random() < SUPPLY_CHANCE + kit.supplyBonus
+        ? this.host.gather(ground, depth)
         : null
 
     const empty = mishap?.spoils || !curio || random() >= luck
@@ -350,7 +416,7 @@ export class Forage {
       this.beats.push(supply ? `${line}, but with ${supply}` : line)
       this.host.speakNow(supply ? `${name} brought back ${supply}` : `${name} came back with nothing`)
       this.host.persist()
-      return
+      return !!supply
     }
 
     this.found = curio
@@ -362,6 +428,34 @@ export class Forage {
     this.beats.push(supply ? `${line}, and ${supply}` : line)
     this.host.speakNow(`${name} came back with a ${what}`)
     this.host.burst('sparkle', 12)
+    this.host.persist()
+    return !!supply
+  }
+
+  /**
+   * Hands the trip in for what it was worth. Every trip counts toward
+   * something, and now and then one is the last of its kind that was needed --
+   * which is said here, where the player is already looking, rather than left
+   * to the ticker to mention while they are elsewhere.
+   */
+  private earn(supplies: boolean): void {
+    const ctx = this.ctx!
+    const earned = this.host.recordTrip({
+      season: ctx.season,
+      weather: ctx.weather,
+      night: ctx.night,
+      role: ctx.role,
+      legs: this.legs,
+      supplies,
+    })
+    if (earned.length === 0) return
+    // More than one can land at once -- a pushed trip through snow after dark
+    // is three kinds of trip -- and each is worth its own line.
+    const name = this.host.petName()
+    for (const item of earned) this.beats.push(`and now carries ${item.what}`)
+    this.foundKit = earned[0]!
+    this.host.speakNow(`${name} now carries ${earned[0]!.what}`)
+    this.host.burst('sparkle', 16)
     this.host.persist()
   }
 }

@@ -2,7 +2,6 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { Harness, FRAME } from '../harness'
 import { HEALTH_FLOOR } from '../../src/game/tuning'
-import { LARDER_CAP } from '../../src/game/larder'
 import { load, flushSave } from '../../src/game/save'
 import type { ButtonId } from '../../src/render/shell'
 import type { Stage } from '../../src/game/types'
@@ -163,7 +162,7 @@ function assertSane(h: Harness, m: Model, played = true): void {
   // question for `load`, not for the frame that has just been drawn.
   for (const [id, count] of Object.entries(app.larder)) {
     require(
-      Number.isInteger(count) && count >= 0 && count <= LARDER_CAP,
+      Number.isInteger(count) && count >= 0 && count <= app.larderCap,
       () => `larder ${id} holds ${count}`,
     )
   }

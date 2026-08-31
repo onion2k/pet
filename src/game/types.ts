@@ -1,4 +1,5 @@
 import type { BiomeId } from '../data/biome'
+import type { KitId, KitProgress } from '../data/kit'
 import type { PlayAxis } from '../data/yardgames'
 import type { TemperamentId } from './temperament'
 import type { Larder } from './larder'
@@ -139,4 +140,11 @@ export interface SaveFile {
   yard: YardState
   /** Foraged food and fuel, id -> count. The adult's supply line. */
   larder: Larder
+  /**
+   * Kit the family owns. A list rather than a tally: a second umbrella is not
+   * worth anything, so there is nothing to count.
+   */
+  kit: KitId[]
+  /** How near it is to earning each of the rest, in qualifying trips. */
+  kitProgress: KitProgress
 }

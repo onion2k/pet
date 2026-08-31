@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { type Harness } from '../harness'
 import { openScreen, SCREENS } from '../screens'
 import { NAMES, type Mode } from '../../src/game/app'
+import { KIT } from '../../src/data/kit'
 import { CURIOS } from '../../src/data/curios'
 import type { ButtonId } from '../../src/render/shell'
 
@@ -100,7 +101,8 @@ const CONTROLS: Controls = {
   curios: {
     a: {
       does: 'walks back round the board',
-      check: (h) => expect(h.app.curioIndex).toBe(CURIOS.length - 1),
+      // Past the curios and into the kit: one cursor runs through both halves.
+      check: (h) => expect(h.app.curioIndex).toBe(CURIOS.length + KIT.length - 1),
     },
     b: { does: 'trades four of a kind up', check: (h) => expect(h.app.message).not.toBe('') },
     c: { does: 'walks on round the board', check: (h) => expect(h.app.curioIndex).toBe(1) },

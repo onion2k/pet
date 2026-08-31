@@ -3,6 +3,11 @@ import { draw, openScreen, SCREENS } from '../screens'
 import { textWidth } from '../../src/data/font'
 import type { DrawnText } from '../fake-hud'
 import { speciesOf } from '../../src/data/species'
+import { CURIOS } from '../../src/data/curios'
+import { KIT, kitById } from '../../src/data/kit'
+import { DEFAULT_START, harness } from '../harness'
+import { emptySave } from '../../src/game/save'
+import { isNight } from '../../src/game/world'
 
 /**
  * What is on each screen, and where.
@@ -95,6 +100,65 @@ describe('every screen', () => {
   }
 })
 
+/**
+ * The lines a screen only draws for some players.
+ *
+ * The sweep above opens each screen the way a fresh save reaches it, which
+ * means anything drawn only for a family that owns something never gets looked
+ * at -- and the forecast line went in sitting one pixel under a row of the
+ * forage menu for exactly that reason. It fitted the glass and it did not
+ * technically overlap, and it read as one crowded line.
+ */
+describe('a screen with everything on it', () => {
+  const everything = () => {
+    const h = harness({
+      save: {
+        ...emptySave(),
+        kit: KIT.map((item) => item.id),
+        // A dark day, so the menu draws its warning as well as its forecast.
+        worldOffset: darkOffset(),
+      },
+    })
+      .start()
+      .growTo('adult')
+    h.pet.stats.energy = 100
+    h.select('forage')
+    expect(h.app.mode).toBe('grounds')
+    return h
+  }
+
+  /** A world offset that lands the trip after dark. */
+  function darkOffset(): number {
+    for (let step = 0; step < 4000; step++) {
+      const offset = step * 60_000
+      if (isNight(DEFAULT_START + offset)) return offset
+    }
+    throw new Error('the sun never sets')
+  }
+
+  it('draws the forage menu with a forecast and a warning, and crowds nothing', () => {
+    const fake = draw(everything())
+    const said = fake.said()
+    expect(said).toContain(' BY ')
+    expect(said).toContain('THE TORCH IS LIT')
+
+    const boxes = fake.texts.map((t) => ({ t, b: box(t) }))
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!
+        const c = boxes[j]!
+        if (a.t.text === c.t.text && a.b.x1 === c.b.x1 && a.b.y1 === c.b.y1) continue
+        expect(overlaps(a.b, c.b), `"${a.t.text}" sits on "${c.t.text}"`).toBe(false)
+      }
+    }
+    for (const t of fake.texts) {
+      const b = box(t)
+      expect(b.x1, `"${t.text}"`).toBeGreaterThanOrEqual(0)
+      expect(b.x2, `"${t.text}"`).toBeLessThanOrEqual(fake.width)
+    }
+  })
+})
+
 describe('the toast', () => {
   /**
    * The one thing that is allowed on top of the rest, because it is an answer
@@ -169,6 +233,62 @@ describe('what a screen is for', () => {
     const h = openScreen('move')
     const said = draw(h).said()
     for (const biome of h.app.homes) expect(said).toContain(biome.name.toUpperCase())
+  })
+
+  it('the collection screen gives every curio and every piece of kit a slot', () => {
+    const fake = draw(openScreen('curios'))
+    // Sixteen slots and nothing else drawing artwork on this screen, so a
+    // count is enough to catch a row that silently stopped being drawn.
+    expect(fake.glyphs).toHaveLength(CURIOS.length + KIT.length)
+    const art = fake.glyphs.map((g) => g.rows.join('/'))
+    for (const curio of CURIOS) expect(art, curio.id).toContain(curio.glyph)
+    for (const item of KIT) expect(art, item.id).toContain(item.glyph)
+  })
+
+  it('keeps the whole board on the glass, artwork and all', () => {
+    // The glyphs are drawn at double size, which the fake hud does not record,
+    // so the bounds check above cannot see them. Sixteen slots across a screen
+    // 192 wide is close enough to the edge to be worth asserting on.
+    const fake = draw(openScreen('curios'))
+    for (const g of fake.glyphs) {
+      expect(g.x, `slot at ${g.x},${g.y}`).toBeGreaterThanOrEqual(0)
+      expect(g.x + 16, `slot at ${g.x},${g.y}`).toBeLessThanOrEqual(192)
+      expect(g.y + 16, `slot at ${g.x},${g.y}`).toBeLessThanOrEqual(172)
+    }
+  })
+
+  it('the collection screen says what would earn a piece of kit, and how near', () => {
+    // The unearned half of the board is a list of things to go and do, so a
+    // silhouette has to say what to do and how much of it is left.
+    const h = harness({ save: { ...emptySave(), kitProgress: { torch: 2 } } }).start()
+    h.select('status')
+    h.tap('a')
+    const torch = KIT.findIndex((item) => item.id === 'torch')
+    for (let i = 0; i < CURIOS.length + torch; i++) h.tap('c')
+    const said = draw(h).said()
+    expect(said).toContain('TORCH')
+    expect(said).toContain(`${kitById('torch')!.hint} 2/${kitById('torch')!.needs}`)
+  })
+
+  it('the collection screen says what a piece of kit is for once it is earned', () => {
+    const h = harness({ save: { ...emptySave(), kit: ['torch'] } }).start()
+    h.select('status')
+    h.tap('a')
+    const torch = KIT.findIndex((item) => item.id === 'torch')
+    for (let i = 0; i < CURIOS.length + torch; i++) h.tap('c')
+    const said = draw(h).said()
+    expect(said).toContain(kitById('torch')!.note.toUpperCase())
+    expect(said).not.toContain(kitById('torch')!.hint)
+  })
+
+  it('the collection screen says what the cursor is on, of either kind', () => {
+    const h = openScreen('curios')
+    expect(draw(h).said()).toContain(CURIOS[0]!.name.toUpperCase())
+    for (let i = 0; i < CURIOS.length; i++) h.tap('c')
+    const said = draw(h).said()
+    expect(said).toContain(KIT[0]!.name.toUpperCase())
+    // And that it is not a thing to be traded, which is what B does elsewhere.
+    expect(said).toContain('EARNED BY GOING OUT')
   })
 
   it('the main screen keeps the pet in view rather than a menu', () => {

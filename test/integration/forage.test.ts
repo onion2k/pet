@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { harness, type Harness } from '../harness'
+import { DEFAULT_START, harness, type Harness } from '../harness'
 import { emptySave, flushSave } from '../../src/game/save'
-import { MEADOW_GROUNDS } from '../../src/data/grounds'
+import { MEADOW_GROUNDS, type Ground } from '../../src/data/grounds'
 import { LARDER_CAP } from '../../src/game/larder'
 import { YARD_CAPACITY } from '../../src/game/yard'
 import { VERGE_SLOTS } from '../../src/data/biome'
 import { CURIOS, TRADE_COST } from '../../src/data/curios'
+import { KIT, kitById, type KitId } from '../../src/data/kit'
+import { draw } from '../screens'
 import { drawScreen } from '../../src/ui/draw'
-import { worldAt } from '../../src/game/world'
+import { isNight, worldAt } from '../../src/game/world'
+import type { WeatherId } from '../../src/data/seasons'
 import { fakeHud } from '../fake-hud'
 
 /**
@@ -38,6 +41,13 @@ function grownUp(options: Parameters<typeof harness>[0] = {}): Harness {
   h.pet.stats.energy = 100
   return h
 }
+
+/**
+ * A save with the whole kit already found, for tests about something else.
+ * A trip that could turn up kit turns up kit instead of a curio, and the world
+ * these tests start in is a dark one -- which is a torch waiting to happen.
+ */
+const fullKit = () => ({ ...emptySave(), kit: KIT.map((item) => item.id) })
 
 /** Sends the pet to a named ground, whatever the cursor was on. */
 function sendTo(h: Harness, ground: string): Harness {
@@ -243,8 +253,11 @@ describe('a trip', () => {
   })
 
   it('can bring back a curio, which lands on the collection board', () => {
-    // Every roll at zero: no mishap, a find, and the luck check passes.
-    const h = grownUp({ random: () => 0 })
+    // Every roll at zero: no mishap, a find, and the luck check passes. The
+    // kit is owned outright so that the trip cannot come home with a torch
+    // instead -- the world starts these tests after dark, and a dark trip is
+    // exactly the kind that turns one up.
+    const h = grownUp({ random: () => 0, save: fullKit() })
     h.select('forage')
     h.tap('b')
     runTrip(h, 'c')
@@ -253,8 +266,82 @@ describe('a trip', () => {
     expect(h.app.forageFound).not.toBeUndefined()
   })
 
+  it('earns a piece of kit by making the trips it is earned by, and keeps it', () => {
+    // Three trips out in the dark, and the pet takes to carrying a torch. No
+    // dice anywhere in it: the same three trips always do it.
+    const torch = kitById('torch')!
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: true }) } })
+      .start()
+      .growTo('adult')
+    for (let trip = 1; trip <= torch.needs; trip++) {
+      expect(h.app.kitOwned, `before trip ${trip}`).not.toContain('torch')
+      h.pet.stats.energy = 100
+      h.pet.sick = false
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    expect(h.app.kitOwned).toContain('torch')
+    expect(h.app.forageKit?.id).toBe('torch')
+  })
+
+  it('counts a trip that came home with nothing, which is the point', () => {
+    // The worst days are the ones a player most wants kit for. A trip that
+    // found nothing was still a trip out in the dark.
+    const h = harness({
+      // Every roll at the top: no find, no supplies, nothing at all.
+      random: () => 0.99,
+      save: { ...emptySave(), worldOffset: offsetWith({ night: true }) },
+    })
+      .start()
+      .growTo('adult')
+    for (let trip = 0; trip < kitById('torch')!.needs; trip++) {
+      h.pet.stats.energy = 100
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    expect(h.app.curioTally.total).toBe(0)
+    expect(h.app.kitOwned).toContain('torch')
+  })
+
+  it('says what it earned, and stops counting once it has it', () => {
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: true }) } })
+      .start()
+      .growTo('adult')
+    for (let trip = 0; trip < kitById('torch')!.needs; trip++) {
+      h.pet.stats.energy = 100
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    h.until('the news of it', () => h.app.tickerText.includes('NOW CARRIES A TORCH'))
+
+    const before = h.app.kitProgress.torch
+    h.pet.stats.energy = 100
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    expect(h.app.kitOwned.filter((id) => id === 'torch')).toHaveLength(1)
+    expect(h.app.kitProgress.torch).toBe(before)
+  })
+
+  it('keeps the tally between trips, and saves it', () => {
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: true }) } })
+      .start()
+      .growTo('adult')
+    h.pet.stats.energy = 100
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    expect(h.app.kitProgress.torch).toBe(1)
+    expect(h.app.kitOwned).toEqual([])
+    flushSave()
+    expect(h.stored()!.kitProgress.torch).toBe(1)
+  })
+
   it('saves what it brought home', () => {
-    const h = grownUp({ random: () => 0 })
+    const h = grownUp({ random: () => 0, save: fullKit() })
     h.select('forage')
     h.tap('b')
     runTrip(h, 'c')
@@ -280,9 +367,13 @@ describe('what the trip changes', () => {
     const h = forageRepeatedly(grownUp({ random: () => 0.3 }), 24, 'c')
     const larder = h.app.larder
     expect(Object.keys(larder).length).toBeGreaterThan(0)
+    // The cap the family actually has: two dozen trips is enough to earn a
+    // basket, and a basket is three more of everything.
+    const cap = h.app.larderCap
+    expect(cap).toBeGreaterThanOrEqual(LARDER_CAP)
     for (const [id, count] of Object.entries(larder)) {
       expect(count, id).toBeGreaterThan(0)
-      expect(count, id).toBeLessThanOrEqual(LARDER_CAP)
+      expect(count, id).toBeLessThanOrEqual(cap)
     }
   })
 
@@ -385,6 +476,207 @@ describe('a pet that goes away mid-trip', () => {
   })
 })
 
+/**
+ * A world offset that lands the day on a particular sky, so a test about the
+ * kit can have the weather the kit is for. Stepped by the weather spell rather
+ * than by the day, since the sky turns more than once a day.
+ */
+function offsetWith(want: { season?: string; weather?: WeatherId; night?: boolean }): number {
+  for (let step = 0; step < 4000; step++) {
+    const offset = step * 60_000
+    const at = DEFAULT_START + offset
+    const world = worldAt(at)
+    if (want.season && world.season.id !== want.season) continue
+    if (want.weather && world.weather !== want.weather) continue
+    if (want.night !== undefined && isNight(at) !== want.night) continue
+    return offset
+  }
+  throw new Error(`no day with ${JSON.stringify(want)}`)
+}
+
+describe('what the kit is worth', () => {
+  /** An adult living on a day of the given sky, with the given kit. */
+  const kitted = (kit: KitId[], want: { season?: string; weather?: WeatherId; night?: boolean }) =>
+    harness({ save: { ...emptySave(), kit, worldOffset: offsetWith(want) } })
+      .start()
+      .growTo('adult')
+
+  it('reads a wet day differently with an umbrella, and says which', () => {
+    const hill = MEADOW_GROUNDS.find((g) => g.id === 'hill')!
+    const bare = kitted([], { weather: 'rain' })
+    expect(bare.app.prospect(hill)).toBe('poor')
+    expect(bare.app.prospectKit(hill)).toBeNull()
+
+    const withOne = kitted(['umbrella'], { weather: 'rain' })
+    expect(withOne.app.prospect(hill)).toBe('fair')
+    expect(withOne.app.prospectKit(hill)?.id).toBe('umbrella')
+  })
+
+  it('says nothing on a ground the kit had nothing to do with', () => {
+    const wall = MEADOW_GROUNDS.find((g) => g.id === 'wall')!
+    const h = kitted(['umbrella'], { weather: 'rain' })
+    // The old wall minds neither the season nor the sky, so it was already
+    // fair and the umbrella cannot take the credit for it.
+    expect(h.app.prospect(wall)).toBe('fair')
+    expect(h.app.prospectKit(wall)).toBeNull()
+  })
+
+  it('lets waders stand in a creek on a dry day', () => {
+    const creek = MEADOW_GROUNDS.find((g) => g.id === 'creek')!
+    expect(kitted([], { weather: 'clear' }).app.prospect(creek)).toBe('poor')
+    const h = kitted(['waders'], { weather: 'clear' })
+    expect(h.app.prospect(creek)).toBe('fair')
+    expect(h.app.prospectKit(creek)?.id).toBe('waders')
+  })
+
+  it('puts the reading on the menu where the player is choosing', () => {
+    const h = kitted(['umbrella'], { weather: 'rain' })
+    h.pet.stats.energy = 100
+    h.select('forage')
+    expect(h.app.mode).toBe('grounds')
+    expect(draw(h).said()).toContain('(UMBRELLA)')
+  })
+
+  it('credits nobody when it took two things together to lift the read', () => {
+    // No ground today wants both a season and a sky. One that did would be
+    // poor twice over on the wrong day, and neither the hat nor the umbrella
+    // could lift it alone -- so the menu says nothing rather than picking one
+    // of them and taking its name in vain.
+    const fussy: Ground = {
+      ...MEADOW_GROUNDS[0]!,
+      seasons: ['autumn'],
+      weather: ['clear'],
+    }
+    const h = kitted(['hat', 'umbrella'], { season: 'winter', weather: 'snow' })
+    // Snow is not wet, so bring the umbrella's weather along by hand: what is
+    // being tested is the pair, not which day the pair happens on.
+    const wet = kitted(['hat', 'umbrella'], { season: 'winter', weather: 'mist' })
+    expect(h.app.prospect(fussy)).toBe('poor')
+    expect(wet.app.prospect(fussy)).toBe('fair')
+    expect(wet.app.prospectKit(fussy)).toBeNull()
+  })
+
+  it('warns about the dark, and says when there is a light for it', () => {
+    // The one place the kit makes things worse rather than better, so it is
+    // said out loud on the screen where the trip is chosen.
+    const dark = offsetWith({ night: true })
+    const bare = harness({ save: { ...emptySave(), worldOffset: dark } }).start().growTo('adult')
+    bare.pet.stats.energy = 100
+    bare.select('forage')
+    expect(draw(bare).said()).toContain('DARK OUT: PUSHING ON IS RISKIER')
+
+    const lit = harness({ save: { ...emptySave(), kit: ['torch'], worldOffset: dark } })
+      .start()
+      .growTo('adult')
+    lit.pet.stats.energy = 100
+    lit.select('forage')
+    const said = draw(lit).said()
+    expect(said).toContain('THE TORCH IS LIT')
+    expect(said).not.toContain('DARK OUT: PUSHING ON IS RISKIER')
+  })
+
+  it('says nothing about the dark in broad daylight', () => {
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: false }) } })
+      .start()
+      .growTo('adult')
+    h.pet.stats.energy = 100
+    h.select('forage')
+    const said = draw(h).said()
+    expect(said).not.toContain('DARK OUT: PUSHING ON IS RISKIER')
+    expect(said).not.toContain('THE TORCH IS LIT')
+  })
+
+  it('names the board that made one more leg cheap', () => {
+    const snowy = { season: 'winter', weather: 'snow' as WeatherId }
+    const bare = kitted([], snowy)
+    expect(bare.app.foragePushKit).toBeNull()
+
+    const h = kitted(['snowboard'], snowy)
+    expect(h.app.foragePushKit?.id).toBe('snowboard')
+
+    // And on a day the board is no use, it takes no credit.
+    expect(kitted(['snowboard'], { weather: 'rain' }).app.foragePushKit).toBeNull()
+  })
+
+  it('puts the discount on the prompt that offers the leg', () => {
+    // A cheap push is invisible as a number: the player has no baseline to
+    // compare it against, so the prompt has to name what made it cheap.
+    const h = kitted(['snowboard'], { season: 'winter', weather: 'snow' })
+    h.pet.stats.energy = 100
+    h.select('forage')
+    h.tap('b')
+    for (let i = 0; i < 60 * 120 && !h.app.forageChoosing; i++) h.advance(1 / 60, 1 / 60)
+    expect(h.app.forageChoosing).toBe(true)
+    expect(draw(h).said()).toContain(`B GO ON (-${h.app.foragePushCost} SNOWBOARD)   C HOME`)
+  })
+
+  it('holds more in the larder for a family with a basket', () => {
+    expect(kitted([], {}).app.larderCap).toBe(LARDER_CAP)
+    expect(kitted(['basket'], {}).app.larderCap).toBeGreaterThan(LARDER_CAP)
+
+    // And the gathering actually uses the bigger number.
+    const h = harness({ save: { ...emptySave(), kit: ['basket'] }, random: 4 })
+      .start()
+      .growTo('adult')
+    for (let trip = 0; trip < 40; trip++) {
+      h.pet.stats.energy = 100
+      h.pet.sick = false
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    expect(Math.max(0, ...Object.values(h.app.larder))).toBeGreaterThan(LARDER_CAP)
+  })
+
+  it('tells a family with a pine cone when the sky is going to turn', () => {
+    const bare = kitted([], {})
+    expect(bare.app.forecast).toBeNull()
+
+    const h = kitted(['pinecone'], {})
+    const forecast = h.app.forecast
+    expect(forecast).not.toBeNull()
+    // What it says is what the sky actually does when it gets there, because
+    // the forecast is the same function the sky is painted from.
+    expect(forecast!.weather).not.toBe(worldAt(h.app.worldNow()).weather)
+
+    h.pet.stats.energy = 100
+    h.select('forage')
+    expect(draw(h).said()).toContain(forecast!.weather.toUpperCase())
+  })
+
+  it('says nothing when the sky is set for as far as the cone can tell', () => {
+    // A run of one weather right across the window the cone looks over. Rare,
+    // and the difference between "nothing coming" and a made-up answer.
+    const settled = 165_240_000
+    const h = harness({ save: { ...emptySave(), kit: ['pinecone'], worldOffset: settled } })
+      .start()
+      .growTo('adult')
+    expect(h.app.forecast).toBeNull()
+  })
+
+  it('keeps the pet warm in a bobble hat, without burning the kindling for it', () => {
+    const h = kitted(['hat'], { season: 'winter' })
+    h.app.larder.kindling = 2
+    h.pet.stats.energy = 20
+    h.select('sleep')
+    expect(h.pet.asleep).toBe(true)
+    expect(h.pet.warm).toBe(true)
+    // The fire it did not have to bank is still in the larder for a night
+    // that needs one.
+    expect(h.app.larder.kindling).toBe(2)
+    h.until('the news of it', () => h.app.tickerText.includes('PULLS ITS HAT DOWN'))
+  })
+
+  it('still burns the kindling out of season, since a hat is for the cold', () => {
+    const h = kitted(['hat'], { season: 'summer' })
+    h.app.larder.kindling = 2
+    h.pet.stats.energy = 20
+    h.select('sleep')
+    expect(h.pet.warm).toBe(true)
+    expect(h.app.larder.kindling).toBe(1)
+  })
+})
+
 describe('the collection board', () => {
   const withCurios = (curios: Record<string, number>) =>
     harness({ save: { ...emptySave(), curios } }).start()
@@ -392,7 +684,11 @@ describe('the collection board', () => {
   const cursorTo = (h: Harness, id: string) => {
     h.select('status')
     h.tap('a')
-    while (CURIOS[h.app.curioIndex]!.id !== id) h.tap('c')
+    // Bounded by the board rather than by the curios: the cursor runs on into
+    // the kit, and walking off the end of the curios used to throw here.
+    for (let step = 0; step < CURIOS.length && CURIOS[h.app.curioIndex]?.id !== id; step++) {
+      h.tap('c')
+    }
     return h
   }
 
@@ -403,8 +699,31 @@ describe('the collection board', () => {
     expect(h.app.mode).toBe('curios')
     h.tap('c')
     expect(h.app.curioIndex).toBe(1)
+    // One cursor for the whole board, so walking back off the first curio
+    // arrives at the last piece of kit rather than the last curio.
     h.tap('a').tap('a')
-    expect(h.app.curioIndex).toBe(CURIOS.length - 1)
+    expect(h.app.curioIndex).toBe(CURIOS.length + KIT.length - 1)
+    expect(h.app.boardSlot.kind).toBe('kit')
+  })
+
+  it('knows which half of the board the cursor is on', () => {
+    const h = harness().start()
+    h.select('status')
+    h.tap('a')
+    expect(h.app.boardSlot).toEqual({ kind: 'curio', curio: CURIOS[0], held: 0 })
+    for (let i = 0; i < CURIOS.length; i++) h.tap('c')
+    expect(h.app.boardSlot).toEqual({ kind: 'kit', item: KIT[0], owned: false })
+  })
+
+  it('has nothing to trade on a piece of kit, and says so rather than refusing quietly', () => {
+    const h = withCurios({ pebble: 9 })
+    h.select('status')
+    h.tap('a')
+    for (let i = 0; i < CURIOS.length; i++) h.tap('c')
+    expect(h.app.canTrade).toBe(false)
+    h.tap('b')
+    expect(h.app.message).toBe('NOTHING TO TRADE HERE')
+    expect(h.app.curioCounts.pebble).toBe(9)
   })
 
   it('reports the tally', () => {

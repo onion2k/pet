@@ -222,6 +222,48 @@ export function hoursUntilSunrise(now: number): number {
   return delta > 0 ? delta : delta + HOURS
 }
 
+/** The weather at a moment, which is a hash of which spell it falls in. */
+export function weatherAt(now: number): WeatherId {
+  return pickWeather(seasonAt(now).season, hash(Math.floor(now / WEATHER_MS)))
+}
+
+/**
+ * How many spells ahead the sky is worth looking. Eight is a little over two
+ * world days, which is far enough that a run of the same weather that long is
+ * better described as settled than as about to break.
+ */
+const FORECAST_SPELLS = 8
+
+/**
+ * When the sky next changes, and what to. Null when it is set for as far as
+ * there is any point looking.
+ *
+ * The weather is a hash of the spell number, so this is not a guess or a
+ * simulation -- it is the same function the sky is painted from, asked about a
+ * moment that has not arrived. What is worth knowing is when the present
+ * weather *breaks*, not what the next spell holds, since a spell often rolls
+ * the same weather twice and "next: clear" in clear weather tells nobody
+ * anything.
+ */
+export function nextChange(now: number): { weather: WeatherId; at: number } | null {
+  const current = weatherAt(now)
+  const until = (Math.floor(now / WEATHER_MS) + FORECAST_SPELLS) * WEATHER_MS
+  // The weather depends on two step functions and nothing else -- which spell
+  // it is, and which season -- so it can only turn where one of them does.
+  // Walking the spell boundaries alone misses the ones the calendar causes: the
+  // same roll lands on snow in winter and on rain in autumn, so a season
+  // turning over mid-spell changes the sky without the spell number moving.
+  let at = now
+  while (at < until) {
+    const spellEnds = (Math.floor(at / WEATHER_MS) + 1) * WEATHER_MS
+    const seasonEnds = (Math.floor(at / SEASON_MS) + 1) * SEASON_MS
+    at = Math.min(spellEnds, seasonEnds)
+    const weather = weatherAt(at)
+    if (weather !== current) return { weather, at }
+  }
+  return null
+}
+
 /** Just the season id, for callers that need nothing else. */
 export function seasonIdAt(now: number): Season['id'] {
   return seasonAt(now).season.id
@@ -237,7 +279,7 @@ export function worldAt(now: number): WorldState {
   const daylight = smoothstep(-0.1, 0.3, sunHeight)
 
   // --- weather ------------------------------------------------------------
-  const weather = pickWeather(season, hash(Math.floor(now / WEATHER_MS)))
+  const weather = weatherAt(now)
   const dull = overcast(weather)
 
   // --- palette ------------------------------------------------------------

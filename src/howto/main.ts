@@ -3,6 +3,7 @@ import './style.css'
 import { registerServiceWorker } from '../pwa'
 
 import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
+import { KIT, KIT_COUNT } from '../data/kit'
 import { FOODS } from '../data/foods'
 import { MEADOW_GROUNDS } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER, iconRows, type IconId } from '../data/icons'
@@ -30,6 +31,10 @@ import { meadowMap } from './map'
  * far out the rare things live, what the odds are of coming home muddy. Those
  * are the game's to reveal, and a booklet that printed them would hand the
  * player the answers to the only questions worth having.
+ *
+ * The kit is the one exception, and prints what earns every piece of it. There
+ * are no dice in that half to spoil -- and a list of things to go and do is no
+ * use to anybody kept secret.
  */
 
 const book = document.getElementById('book')!
@@ -616,8 +621,69 @@ const curiosSection = chapter(
     Leaving your pet alone for a good while still turns something up now and
     then, but only one of the ordinary things and only occasionally. Being away
     is the consolation prize; sending your pet out is the way to fill the board.
+  </p>
+
+  <h3>The kit</h3>
+  <p>
+    A second row runs beneath the curios, and it holds a different kind of
+    thing. Curios are for the shelf; these ${KIT_COUNT} are practical — and
+    none of them is <em>found</em>. Each one is earned by doing the job it then
+    helps with: take your pet out in the rain enough times and it starts
+    carrying an umbrella. The board says how many more trips each one wants, so
+    the half you have not earned is a list of things to go and do.
+  </p>
+  <div class="grid">
+    ${KIT.map(
+      (k) => `
+      <div class="curio" data-kit="${k.id}">
+        <div class="plate"></div>
+        <div><b>${k.name}</b><div class="note">${k.note}</div>
+        <span class="tag">${k.needs} ${k.hint.toLowerCase()}</span></div>
+      </div>`,
+    ).join('')}
+  </div>
+  <p class="note">
+    A trip counts toward everything it was, and every trip counts: one pushed
+    through snow after dark is three kinds of trip at once, and one that came
+    home with nothing was still a trip out in the rain. Kit belongs to the
+    family rather than to the pet that earned it, so it is still in the porch
+    for the next one. It cannot be traded — a second umbrella would be worth
+    nothing, so there is nothing to spend.
+  </p>
+  <div class="callout">
+    <b>What it changes.</b> An umbrella, a pair of waders and a bobble hat each
+    take something out of the reckoning when you send your pet out — so a day,
+    or a place, that was <em>not today</em> becomes one worth a try. Watch the
+    forage menu: it names whichever of them is speaking for a ground. They can
+    never make a day <em>look promising</em>, though. Forgiving a bad day is
+    not the same as making a good one, and the sky is still worth reading.
+  </div>
+  <p>
+    Boots, a board and a torch work on the far end of a trip instead — the only
+    place anything ever goes wrong. Boots keep your pet out of trouble; the
+    board makes one more leg cheap while there is snow to ride it on. And the
+    torch is for the one thing that makes a trip <em>worse</em>: after dark,
+    pushing on is riskier than it is by day. A lit torch puts that back the way
+    it was, and sees a little further out besides. The forage menu tells you
+    which of the two you are looking at.
+  </p>
+  <p class="note">
+    A trip there and back is as safe after dark as it ever was. It is only
+    going further that the night charges for — risk here is always chosen.
+  </p>
+  <p>
+    The last two are quieter. A basket brings supplies home more often and
+    lets your larder hold more of them, which is what turns a grown pet's
+    foraging from topping up into laying in. And a pine cone closes before
+    rain: carry one and the forage menu tells you when the weather is going to
+    break, and what into. Sometimes it says nothing, which means the sky is set
+    for as far as a cone can tell.
   </p>`,
 )
+
+for (const item of KIT) {
+  fill(curiosSection, `[data-kit="${item.id}"] .plate`, artTile(item.glyph.split('/'), item.colour, 5))
+}
 
 for (const curio of CURIOS) {
   fill(curiosSection, `[data-curio="${curio.id}"] .plate`, artTile(curio.glyph.split('/'), curio.colour, 5))
@@ -719,6 +785,7 @@ chapter(
   <div class="grid">
     <div class="card tint-sun"><b>FOUND ${SPECIES_COUNT}</b><p class="note">Forms your family has ever reached, across every generation. Never lost, except to NEW PET.</p></div>
     <div class="card tint-berry"><b>CURIOS ${CURIO_COUNT}</b><p class="note">The collection board. Also belongs to the family rather than to one pet.</p></div>
+    <div class="card tint-sun"><b>KIT ${KIT_COUNT}</b><p class="note">The row beneath the curios: things to use rather than to look at. The family's, and kept.</p></div>
     <div class="card tint-cool"><b>The album</b><p class="note">A slot for every form, drawn in that creature's own colours. Forms your family has never grown show as silhouettes — which is what makes the branches worth chasing.</p></div>
     <div class="card tint-grass"><b>The streak</b><p class="note">Days you have visited. Consecutive days build it; a missed day takes one off rather than wiping it out.</p></div>
   </div>

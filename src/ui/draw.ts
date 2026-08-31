@@ -1,4 +1,5 @@
 import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
+import { KIT, KIT_COUNT } from '../data/kit'
 import { textWidth } from '../data/font'
 import { PROSPECT_LABEL, type Prospect } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
@@ -25,6 +26,13 @@ const TOP_BAND = 16
 const BOTTOM_BAND = 21
 /** The news crawl, sitting just above the lower icon strip. */
 const TICKER_BAND = 11
+
+/** A world hour as the device writes it, which the forecast borrows. */
+function onTheHour(hour: number): string {
+  const h = String(Math.floor(hour)).padStart(2, '0')
+  const m = String(Math.floor((hour % 1) * 60)).padStart(2, '0')
+  return `${h}:${m}`
+}
 
 function duration(ms: number): string {
   const minutes = Math.floor(ms / 60_000)
@@ -264,9 +272,7 @@ function drawStatus(hud: Hud, app: App, world: WorldState): void {
   const left = Math.round(hud.safeInset(10)) + 2
   hud.text(left, 10, pet.name, ACCENT, 2)
   // The world's own clock, so the season and the weather are legible somewhere.
-  const clock = `${String(Math.floor(world.hour)).padStart(2, '0')}:${String(
-    Math.floor((world.hour % 1) * 60),
-  ).padStart(2, '0')}`
+  const clock = onTheHour(world.hour)
   hud.text(hud.width - left - textWidth(clock), 11, clock, DIM)
   hud.text(left, 24, `${speciesOf(pet.speciesId).name.toUpperCase()} / ${pet.stage.toUpperCase()}`, COOL)
   hud.text(6, 32, `AGE ${duration(pet.ageMs)}`, DIM)
@@ -376,7 +382,14 @@ function drawBoardHeading(hud: Hud, y: number, label: string): void {
 
 function drawCurioBoard(hud: Hud, app: App): void {
   const counts = app.curioCounts
-  drawBoardHeading(hud, 38, `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}`)
+  // The kit is counted here but not drawn here: the right-hand column is full
+  // to the last row, and the album may not lose one. The board itself lives on
+  // the curios screen, which A opens from this one.
+  drawBoardHeading(
+    hud,
+    38,
+    `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}  KIT ${app.kitTally.owned}`,
+  )
   CURIOS.forEach((curio, i) => {
     const x = BOARD_X + (i % 4) * CELL
     const y = 50 + Math.floor(i / 4) * 18
@@ -473,42 +486,100 @@ function drawWelcome(hud: Hud, app: App): void {
  * The collection, with something to do on it. Spares used to be a number in the
  * corner of a glyph and nothing more; here they are a currency, so a season the
  * player keeps missing stops being a wall the year takes an hour to come round.
+ *
+ * Eight to a row, which is what makes the kit fit: sixteen slots at the four
+ * across the board used to use is four rows, and four rows walk straight over
+ * the name, the sets and the footer.
  */
+/**
+ * Where slot `i` sits: the collection along the top, the kit along the bottom.
+ * Eight is what the glass holds at this pitch, and a test holds both lists to
+ * it -- a ninth curio would otherwise quietly walk off the right-hand edge.
+ */
+export const SLOTS_PER_ROW = 8
+const SLOT_PITCH = 23
+const SLOT_LEFT = 4
+const slotAt = (i: number) => {
+  const kit = i >= CURIOS.length
+  return {
+    x: SLOT_LEFT + ((kit ? i - CURIOS.length : i) % SLOTS_PER_ROW) * SLOT_PITCH,
+    y: kit ? 56 : 20,
+  }
+}
+/** The kit's own heading, sat between the two rows. */
+const KIT_LABEL_Y = 44
+
 function drawCurios(hud: Hud, app: App): void {
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   const tally = app.curioTally
-  hud.textCentered(hud.width / 2, 8, `CURIOS ${tally.kinds}/${CURIO_COUNT}`, ACCENT)
+  hud.textCentered(hud.width / 2, 6, `CURIOS ${tally.kinds}/${CURIO_COUNT}`, ACCENT)
 
+  // Two rows of eight rather than four of four. The two halves of the board
+  // are different kinds of thing -- one to fill, one to use -- so each gets a
+  // row and a name, and the shape of the screen says what the words would
+  // otherwise have to.
   const counts = app.curioCounts
   CURIOS.forEach((curio, i) => {
-    const x = 20 + (i % 4) * 40
-    const y = 20 + Math.floor(i / 4) * 32
+    const { x, y } = slotAt(i)
     const held = counts[curio.id] ?? 0
-    const selected = app.curioIndex === i
-    if (selected) hud.rect(x - 6, y - 4, 32, 28, '#1b2338')
+    if (app.curioIndex === i) hud.rect(x - 3, y - 3, 22, 22, '#1b2338')
     hud.glyph(x, y, curio.glyph.split('/'), held > 0 ? curio.colour : MISSING, 2)
-    if (held > 1) hud.text(x + 18, y + 9, String(Math.min(9, held)), '#8b95c0')
+    // As on the status board: the spare count sits on the artwork, over its own
+    // backing, rather than costing the row the space to write it underneath.
+    if (held > 1) {
+      hud.rect(x + 9, y + 9, 7, 8, '#05050b')
+      hud.text(x + 10, y + 10, String(Math.min(9, held)), '#8b95c0')
+    }
   })
 
-  const held = CURIOS[app.curioIndex]
-  const count = held ? (counts[held.id] ?? 0) : 0
-  hud.textCentered(hud.width / 2, 88, (held?.name ?? '').toUpperCase(), count > 0 ? INK : DIM)
-  hud.textCentered(hud.width / 2, 98, count > 0 ? `HAVE ${count}` : 'NOT FOUND', DIM)
+  const owned = new Set(app.kitOwned)
+  hud.text(4, KIT_LABEL_Y, `KIT ${owned.size}/${KIT_COUNT}`, DIM)
+  KIT.forEach((item, i) => {
+    const { x, y } = slotAt(CURIOS.length + i)
+    if (app.curioIndex === CURIOS.length + i) hud.rect(x - 3, y - 3, 22, 22, '#1b2338')
+    hud.glyph(x, y, item.glyph.split('/'), owned.has(item.id) ? item.colour : MISSING, 2)
+  })
+
+  // What the cursor is on. A curio says how many; a piece of kit says what it
+  // is for, because owning it is the whole of what there is to know.
+  const slot = app.boardSlot
+  const found = slot.kind === 'curio' ? slot.held > 0 : slot.owned
+  const name = slot.kind === 'curio' ? slot.curio.name : slot.item.name
+  // An unearned thing says what would earn it and how far off that is, which
+  // turns this half of the board from a wall into a list of things to go and
+  // do. "NOT FOUND" was honest about a thing that was found; it would be a
+  // dead end for a thing that is worked toward.
+  const under =
+    slot.kind === 'curio'
+      ? slot.held > 0
+        ? `HAVE ${slot.held}`
+        : 'NOT FOUND'
+      : slot.owned
+        ? slot.item.note
+        : `${slot.item.hint} ${app.kitDone(slot.item)}/${slot.item.needs}`
+  hud.textCentered(hud.width / 2, 82, name.toUpperCase(), found ? INK : DIM)
+  hud.textCentered(hud.width / 2, 92, under.toUpperCase(), DIM)
 
   // What the sets are worth, which is the reason to finish one. Kept clear of
   // the hold-to-go-back strip, which owns the last fourteen rows.
   const boons = app.boons
-  hud.rect(20, 110, hud.width - 40, 1, '#22283c')
+  hud.rect(20, 104, hud.width - 40, 1, '#22283c')
   CURIO_SETS.forEach((set, i) => {
     const done = boons.includes(set.id)
-    const y = 116 + i * 8
+    const y = 110 + i * 8
     hud.text(20, y, set.name.toUpperCase(), done ? GOOD : DIM)
     hud.text(72, y, done ? set.boon.toUpperCase() : '---', done ? COOL : '#33384d')
   })
 
   const want = app.tradeFor
   const footer = hud.height - 26
-  if (!want) hud.textCentered(hud.width / 2, footer, 'THE BOARD IS FULL', GOOD)
+  if (slot.kind === 'kit') {
+    // Kit has no spares and so nothing to trade. The one line there is room
+    // for says where it comes from instead, since that is the thing a player
+    // looking at a row of silhouettes most needs to know -- what each one is
+    // *for* is already on the line above it.
+    hud.textCentered(hud.width / 2, footer, 'EARNED BY GOING OUT', DIM)
+  } else if (!want) hud.textCentered(hud.width / 2, footer, 'THE BOARD IS FULL', GOOD)
   else if (app.canTrade) {
     const line = `B TRADE ${TRADE_COST} FOR ${want.name.toUpperCase()}`
     hud.textCentered(hud.width / 2, footer, line, ACCENT)
@@ -532,6 +603,17 @@ function drawGrounds(hud: Hud, app: App): void {
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   hud.textCentered(hud.width / 2, 8, 'WHERE TO?', ACCENT)
 
+  // What the sky is about to do, for a pet carrying something that can tell.
+  // On this screen rather than the status page because here is where the
+  // weather is a thing the player is spending rather than a thing they are
+  // reading -- and up with the heading, because it is the standing condition
+  // every row below is being judged against rather than a note about one.
+  const forecast = app.forecast
+  if (forecast) {
+    const line = `${forecast.weather.toUpperCase()} BY ${onTheHour(forecast.hour)}`
+    hud.textCentered(hud.width / 2, 16, line, COOL)
+  }
+
   menu.forEach((ground, i) => {
     const y = 26 + i * 26
     const selected = app.groundIndex === i
@@ -539,12 +621,32 @@ function drawGrounds(hud: Hud, app: App): void {
     hud.text(12, y, ground.name.toUpperCase(), selected ? INK : DIM)
     hud.text(12, y + 8, ground.note.toUpperCase(), selected ? DIM : '#33384d')
     const read = app.prospect(ground)
-    hud.text(12, y + 16, PROSPECT_LABEL[read].toUpperCase(), PROSPECT_INK[read])
+    // What the kit is doing, said where it is doing it. Without this the creek
+    // simply stops saying "not today" one afternoon and the player is left to
+    // work out why -- and a piece of kit whose whole job is to change this line
+    // ought to be able to take the credit for having changed it.
+    const credit = app.prospectKit(ground)
+    const label = PROSPECT_LABEL[read].toUpperCase()
+    hud.text(12, y + 16, label, PROSPECT_INK[read])
+    if (credit) {
+      hud.text(12 + textWidth(label) + 4, y + 16, `(${credit.name.toUpperCase()})`, COOL)
+    }
     // What it costs, against the name, so the trade is on one line.
     const cost = `-${ground.energy}`
     hud.text(hud.width - 12 - textWidth(cost), y, cost, selected ? COOL : '#33384d')
     if (selected) hud.text(4, y, '>', ACCENT)
   })
+
+  // The dark is the one thing in the game that makes a trip worse rather than
+  // better, so it is said out loud on the screen where the trip is chosen --
+  // and so is the answer to it, since a torch that works silently is a torch
+  // the player never finds out they are carrying.
+  if (app.darkOut) {
+    const lit = app.darkLit
+    const line = lit ? 'THE TORCH IS LIT' : 'DARK OUT: PUSHING ON IS RISKIER'
+    hud.textCentered(hud.width / 2, hud.height - 36, line, lit ? COOL : BAD)
+  }
+
 
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B GO', DIM)
 }
@@ -612,14 +714,20 @@ function drawForage(hud: Hud, app: App): void {
     y += gap
   })
 
-  const found = app.forageFound
+  // Whatever it came home with, drawn under the last beat. Kit and curio are
+  // the same size of artwork and the same kind of moment, so they share a slot.
+  const found = app.forageFound ?? app.forageKit
   if (found) hud.glyph(hud.width / 2 - 8, y + 2, found.glyph.split('/'), found.colour, 2)
 
   // Push your luck. The bar is the answer running out, and running out means
   // coming home -- so looking away is a decision the game makes for you kindly.
   if (app.forageChoosing) {
     const bottom = hud.height - 26
-    hud.textCentered(hud.width / 2, bottom, `B GO ON (-${app.foragePushCost})   C HOME`, ACCENT)
+    // A discounted leg names what discounted it. The number alone cannot say
+    // it: a player has no baseline to compare a cheap push against.
+    const board = app.foragePushKit
+    const cost = board ? `-${app.foragePushCost} ${board.name.toUpperCase()}` : `-${app.foragePushCost}`
+    hud.textCentered(hud.width / 2, bottom, `B GO ON (${cost})   C HOME`, ACCENT)
     const width = hud.width - 60
     hud.rect(30, bottom + 12, width, 2, '#1c1c2c')
     hud.rect(30, bottom + 12, Math.round(width * app.forageChooseProgress), 2, ACCENT)

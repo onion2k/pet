@@ -71,22 +71,25 @@ as it turns, and the mouldings catch it at a raking angle.
 A **HOW TO PLAY** link sits at the top right of the page, and behind it is
 `how-to-play.html`: an illustrated instructions booklet covering the buttons,
 the icon ring, the five stats, the food, the three games, the whole family tree,
-foraging, the curio board, the world's clock, and a map of the meadow with the
-four grounds laid out by how far off they are. It does not yet know the family
-can move house — the map and its prose are still the meadow's alone.
+foraging, the curio board and the kit, the world's clock, and a map of the
+meadow with the four grounds laid out by how far off they are. It does not yet
+know the family can move house — the map and its prose are still the meadow's
+alone.
 
 Almost none of it is written twice. The creatures are drawn from their own voxel
 models (`howto/voxel-sprite.ts`), so a picture in the booklet cannot disagree
 with the thing that hatches. The minigame illustrations are real `GameSession`s,
 wound forward a few frames and asked to draw themselves onto a canvas the same
 192x172 as the glass — which is what the drawing half of `Hud` was split into
-`render/pixels.ts` for. The tables of food, grounds, curios, forms, shells and
-visitors are read out of the same data the game plays from.
+`render/pixels.ts` for. The tables of food, grounds, curios, kit, forms, shells
+and visitors are read out of the same data the game plays from.
 
 What it deliberately leaves out is the dice: which curio wants which weather,
 how far out the rare things live, what the odds are of coming home muddy. Those
 are the game's to reveal, and a booklet that printed them would hand the player
-the answers to the only questions worth having.
+the answers to the only questions worth having. The kit is the exception, and
+prints what earns each piece — because there are no dice in it to spoil, and a
+list of things to go and do is no use to anybody kept secret.
 
 ## The long game
 
@@ -111,7 +114,8 @@ Care keeps a pet well; the lineage is why you keep coming back.
   pushed, so completing CURIOS x/8 takes visits at different times and trips
   that went badly. They live on a **collection board** — reached with A from the
   status screen — where every curio has a slot, found ones in their own colour
-  and the rest as flat silhouettes. Showing the gaps is the point.
+  and the rest as flat silhouettes. Showing the gaps is the point. The kit
+  shares that board, on a row of its own beneath them.
 
   The board has a verb: **three spares trade up** for whichever curio is still
   missing, so a season you keep failing to catch stops being a wall the year
@@ -121,6 +125,71 @@ Care keeps a pet well; the lineage is why you keep coming back.
   find, or able to read the sky. Being left alone for twenty minutes or more
   still turns something up now and then, but only one of the ordinary things,
   and only a quarter of the time: absence is the consolation, not the equal.
+- **The kit.** The other half of the board, and the half the pet *uses*. Eight
+  things — an umbrella, a bobble hat, a snowboard, a torch, stout boots,
+  waders, a basket and a pine cone — each tied to a condition the world already
+  produces, and none of them found. **Every one is earned by doing the job it
+  then helps with:** go out in the rain three times and the pet takes to
+  carrying an umbrella; push past the first leg often enough and it puts boots
+  on. There are no dice anywhere in it, and the board says how many more trips
+  each one wants — so the half you have not earned is a list of things to go
+  and do rather than a wall to wait behind. Kit belongs to the family rather
+  than to the pet carrying it, so a torch one pet walked out three dark nights
+  for is still in the porch for the next, and NEW PET takes it, tally and all.
+
+  It is not a currency and cannot be traded: a second umbrella is worth nothing,
+  so there is nothing to spend. The rule the whole list obeys is that kit does
+  not make a good day better — it makes a bad day playable. Which is why simply
+  owning a thing is enough to have it, and why a full kit does not so much make
+  every day good as make every day legible.
+
+  A trip counts toward everything it was, and every trip counts. One pushed
+  through snow after dark is three kinds of trip at once, and a trip that came
+  home with nothing was still a trip out in the rain — which matters, because
+  the worst days are exactly the ones a player most wants kit for.
+
+  Three of them read the day so far. An **umbrella** takes wet weather out of
+  the reckoning, so the long hill is worth a try in the rain rather than not
+  today — and the pet never comes home caked in mud. **Waders** are its mirror:
+  a ground that wanted rain stops needing it, so the creek is workable on a dry
+  afternoon. A **bobble hat** does the same for winter, and keeps the pet warm
+  through a winter night without burning the kindling it went out to fetch.
+  The grounds menu names whichever of them is speaking for a ground, so the
+  read never silently changes underneath you.
+
+  Forgiving a miss is not the same as manufacturing a hit: the best a forgiven
+  day can read is *worth a try*, never *looks promising*. If a full kit could
+  make any old day promising, the sky would stop being worth reading, which is
+  the one thing this game asks of a player.
+
+  Three more work on the far end of a trip, which is the only place anything
+  ever goes wrong. **Stout boots** cut the odds of a mishap and mean the pet
+  never limps home footsore. A **snowboard** halves the price of one more leg
+  while there is snow to ride, so a snowy day is the day to go deep — and the
+  prompt that offers the leg names the board that made it cheap. A **torch**
+  answers the dark, which is the one thing in the game the kit makes *worse*:
+  after nightfall, pushing on is riskier than it is by day, and a lit torch
+  puts it back the way it was and sees a leg further out besides. The forage
+  menu says so both ways round, so neither the risk nor the answer to it is
+  something the player has to work out for themselves.
+
+  The dark is a multiplier on the price of being greedy rather than a risk of
+  its own, so a there-and-back after dark is exactly as safe as it always was.
+  Risk in this game is always chosen.
+
+  The last two are about the supply line and the sky. A **basket** brings
+  supplies home more often and lets the larder hold three more of anything, so
+  a foraging adult can actually bank a stock rather than topping one up. And a
+  **pine cone**, which closes before rain, tells you when the weather is going
+  to break and what to — printed under WHERE TO?, because that is the screen
+  where a day is a thing you are spending rather than a thing you are reading.
+
+  The forecast is not a guess. The weather is a hash of which spell of the
+  world's clock a moment falls in, so the cone asks the same function the sky
+  is painted from about a moment that has not arrived. It reports the next
+  *change* rather than the next spell — "clear" in clear weather tells nobody
+  anything — and says nothing at all when the sky is set for as far ahead as it
+  looks.
 - **The album.** A second board under the curios, one slot per form, each drawn
   in its own body colour taken straight from its voxel model so the board and
   the creature always agree. Forms the family has never grown show as
