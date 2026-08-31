@@ -9,7 +9,7 @@ import { CURIOS, TRADE_COST } from '../../src/data/curios'
 import { KIT, type KitId } from '../../src/data/kit'
 import { draw } from '../screens'
 import { drawScreen } from '../../src/ui/draw'
-import { worldAt } from '../../src/game/world'
+import { isNight, worldAt } from '../../src/game/world'
 import type { WeatherId } from '../../src/data/seasons'
 import { fakeHud } from '../fake-hud'
 
@@ -441,12 +441,14 @@ describe('a pet that goes away mid-trip', () => {
  * kit can have the weather the kit is for. Stepped by the weather spell rather
  * than by the day, since the sky turns more than once a day.
  */
-function offsetWith(want: { season?: string; weather?: WeatherId }): number {
+function offsetWith(want: { season?: string; weather?: WeatherId; night?: boolean }): number {
   for (let step = 0; step < 4000; step++) {
     const offset = step * 60_000
-    const world = worldAt(DEFAULT_START + offset)
+    const at = DEFAULT_START + offset
+    const world = worldAt(at)
     if (want.season && world.season.id !== want.season) continue
     if (want.weather && world.weather !== want.weather) continue
+    if (want.night !== undefined && isNight(at) !== want.night) continue
     return offset
   }
   throw new Error(`no day with ${JSON.stringify(want)}`)
@@ -454,7 +456,7 @@ function offsetWith(want: { season?: string; weather?: WeatherId }): number {
 
 describe('what the kit is worth', () => {
   /** An adult living on a day of the given sky, with the given kit. */
-  const kitted = (kit: KitId[], want: { season?: string; weather?: WeatherId }) =>
+  const kitted = (kit: KitId[], want: { season?: string; weather?: WeatherId; night?: boolean }) =>
     harness({ save: { ...emptySave(), kit, worldOffset: offsetWith(want) } })
       .start()
       .growTo('adult')
@@ -512,6 +514,60 @@ describe('what the kit is worth', () => {
     expect(h.app.prospect(fussy)).toBe('poor')
     expect(wet.app.prospect(fussy)).toBe('fair')
     expect(wet.app.prospectKit(fussy)).toBeNull()
+  })
+
+  it('warns about the dark, and says when there is a light for it', () => {
+    // The one place the kit makes things worse rather than better, so it is
+    // said out loud on the screen where the trip is chosen.
+    const dark = offsetWith({ night: true })
+    const bare = harness({ save: { ...emptySave(), worldOffset: dark } }).start().growTo('adult')
+    bare.pet.stats.energy = 100
+    bare.select('forage')
+    expect(draw(bare).said()).toContain('DARK OUT: PUSHING ON IS RISKIER')
+
+    const lit = harness({ save: { ...emptySave(), kit: ['torch'], worldOffset: dark } })
+      .start()
+      .growTo('adult')
+    lit.pet.stats.energy = 100
+    lit.select('forage')
+    const said = draw(lit).said()
+    expect(said).toContain('THE TORCH IS LIT')
+    expect(said).not.toContain('DARK OUT: PUSHING ON IS RISKIER')
+  })
+
+  it('says nothing about the dark in broad daylight', () => {
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: false }) } })
+      .start()
+      .growTo('adult')
+    h.pet.stats.energy = 100
+    h.select('forage')
+    const said = draw(h).said()
+    expect(said).not.toContain('DARK OUT: PUSHING ON IS RISKIER')
+    expect(said).not.toContain('THE TORCH IS LIT')
+  })
+
+  it('names the board that made one more leg cheap', () => {
+    const snowy = { season: 'winter', weather: 'snow' as WeatherId }
+    const bare = kitted([], snowy)
+    expect(bare.app.foragePushKit).toBeNull()
+
+    const h = kitted(['snowboard'], snowy)
+    expect(h.app.foragePushKit?.id).toBe('snowboard')
+
+    // And on a day the board is no use, it takes no credit.
+    expect(kitted(['snowboard'], { weather: 'rain' }).app.foragePushKit).toBeNull()
+  })
+
+  it('puts the discount on the prompt that offers the leg', () => {
+    // A cheap push is invisible as a number: the player has no baseline to
+    // compare it against, so the prompt has to name what made it cheap.
+    const h = kitted(['snowboard'], { season: 'winter', weather: 'snow' })
+    h.pet.stats.energy = 100
+    h.select('forage')
+    h.tap('b')
+    for (let i = 0; i < 60 * 120 && !h.app.forageChoosing; i++) h.advance(1 / 60, 1 / 60)
+    expect(h.app.forageChoosing).toBe(true)
+    expect(draw(h).said()).toContain(`B GO ON (-${h.app.foragePushCost} SNOWBOARD)   C HOME`)
   })
 
   it('keeps the pet warm in a bobble hat, without burning the kindling for it', () => {

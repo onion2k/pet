@@ -254,12 +254,30 @@ export interface KitPowers {
   spares: MishapId[]
   /** The pet is warm through the night without a fire banked against it. */
   warm: boolean
+  /** Multiplier on the odds of a trip going wrong. Boots, always. */
+  mishapScale: number
+  /** Multiplier on what going one leg further costs. The board, in snow. */
+  pushScale: number
+  /**
+   * Legs' worth of reach, without the walking. A torch does not carry the pet
+   * further out; it lets it find what was already out there.
+   */
+  depthBonus: number
+  /** The dark has stopped being a risk, because the pet is carrying a light. */
+  lightsTheDark: boolean
 }
 
-/** The day a piece of kit is being asked about. */
+/**
+ * The day a piece of kit is being asked about.
+ *
+ * Whether it is dark is part of the day rather than part of the trip, because
+ * a torch is a torch whoever is asking -- the forage, the menu warning the
+ * player about the dark, and anything later that wants to know.
+ */
 export interface Day {
   season: SeasonId
   weather: WeatherId
+  night: boolean
 }
 
 /** Weather you would want an umbrella or a pair of waders for. */
@@ -276,20 +294,40 @@ export const isWet = (weather: WeatherId): boolean => WET.includes(weather)
  */
 export function kitPowers(owned: KitId[], day: Day): KitPowers {
   const has = (id: KitId) => owned.includes(id)
+  // An umbrella is the reason the pet did not come home caked in mud, and a
+  // pair of boots the reason it is not footsore. Kit spares a mishap rather
+  // than swapping it for another one: nothing becomes likelier because the pet
+  // went out better equipped.
+  const spares: MishapId[] = []
+  if (has('umbrella')) spares.push('mud')
+  if (has('boots')) spares.push('footsore')
   return {
     forgivesWeather: has('umbrella') && isWet(day.weather),
     forgivesSeason: has('hat') && day.season === 'winter',
     wades: has('waders'),
-    // An umbrella is the reason the pet did not come home caked in mud. It
-    // spares the mishap rather than swapping it for another one: nothing else
-    // becomes likelier because you took an umbrella out.
-    spares: has('umbrella') ? ['mud'] : [],
+    spares,
     // A hat is a fire the pet did not have to go and gather. Only in winter,
     // or it would quietly retire the kindling it took an adult to learn to
     // fetch -- and a hat is for the cold, which is what winter is.
     warm: has('hat') && day.season === 'winter',
+    // Boots are the one thing here that asks nothing of the day. They are
+    // also the smallest: they only matter to a player who pushes on, since
+    // nothing goes wrong on a there-and-back.
+    mishapScale: has('boots') ? BOOTS_MISHAP : 1,
+    // Snow is what a board is for, and what it does with it is make the far
+    // end of a trip cheap -- so a snowy day is the day to go deep.
+    pushScale: has('snowboard') && day.weather === 'snow' ? BOARD_PUSH : 1,
+    depthBonus: has('torch') && day.night ? TORCH_REACH : 0,
+    lightsTheDark: has('torch') && day.night,
   }
 }
+
+/** What a pair of boots does to the odds of a trip going wrong. */
+const BOOTS_MISHAP = 0.55
+/** What a board does to the price of one more leg, on snow. */
+const BOARD_PUSH = 0.5
+/** How much further into the dark a lit torch can see, in legs. */
+const TORCH_REACH = 1
 
 /** No kit at all, for anything that has to read powers without a family. */
 export const NO_KIT: KitPowers = {
@@ -298,15 +336,16 @@ export const NO_KIT: KitPowers = {
   wades: false,
   spares: [],
   warm: false,
+  mishapScale: 1,
+  pushScale: 1,
+  depthBonus: 0,
+  lightsTheDark: false,
 }
 
-/** The trip a piece of kit might turn up on. */
-export interface KitDay {
-  season: SeasonId
-  weather: WeatherId
-  night: boolean
+/** The trip a piece of kit might turn up on: a day, and how the trip went. */
+export interface KitDay extends Day {
   role: GroundRole
-  /** How many legs the pet walked. */
+  /** How deep into the trip the pet got. */
   depth: number
 }
 

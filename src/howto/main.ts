@@ -648,9 +648,19 @@ const curiosSection = chapter(
     never make a day <em>look promising</em>, though. Forgiving a bad day is
     not the same as making a good one, and the sky is still worth reading.
   </div>
+  <p>
+    Boots, a board and a torch work on the far end of a trip instead — the only
+    place anything ever goes wrong. Boots keep your pet out of trouble; the
+    board makes one more leg cheap while there is snow to ride it on. And the
+    torch is for the one thing that makes a trip <em>worse</em>: after dark,
+    pushing on is riskier than it is by day. A lit torch puts that back the way
+    it was, and sees a little further out besides. The forage menu tells you
+    which of the two you are looking at.
+  </p>
   <p class="note">
-    The other five are found and kept and do nothing yet. That part is on its
-    way, a family of them at a time.
+    A trip there and back is as safe after dark as it ever was. It is only
+    going further that the night charges for — risk here is always chosen.
+    The creel and the spyglass are found and kept and do nothing yet.
   </p>`,
 )
 

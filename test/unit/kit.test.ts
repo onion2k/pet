@@ -152,7 +152,11 @@ describe('what a day turns up', () => {
 })
 
 describe('what the kit is worth today', () => {
-  const day = (season: (typeof SEASON_IDS)[number], weather: WeatherId): Day => ({ season, weather })
+  const day = (season: (typeof SEASON_IDS)[number], weather: WeatherId): Day => ({
+    season,
+    weather,
+    night: false,
+  })
 
   it('is worth nothing at all to a family with none', () => {
     for (const season of SEASON_IDS) {
@@ -192,24 +196,60 @@ describe('what the kit is worth today', () => {
     }
   })
 
+  it('cuts the odds of a trip going wrong, for a pet in boots', () => {
+    // The one thing here that asks nothing of the day, and so the one thing
+    // that has to be small: it only pays out on a trip that was pushed.
+    for (const season of SEASON_IDS) {
+      for (const weather of WEATHERS) {
+        const powers = kitPowers(['boots'], day(season, weather))
+        expect(powers.mishapScale).toBeLessThan(1)
+        expect(powers.mishapScale).toBeGreaterThan(0)
+        expect(powers.spares).toEqual(['footsore'])
+      }
+    }
+    expect(kitPowers([], day('spring', 'clear')).mishapScale).toBe(1)
+  })
+
+  it('only rides the board on snow', () => {
+    for (const weather of WEATHERS) {
+      const powers = kitPowers(['snowboard'], day('winter', weather))
+      expect(powers.pushScale, weather).toBe(weather === 'snow' ? 0.5 : 1)
+    }
+  })
+
+  it('only lights the torch after dark', () => {
+    const lit = kitPowers(['torch'], { season: 'spring', weather: 'clear', night: true })
+    expect(lit.lightsTheDark).toBe(true)
+    expect(lit.depthBonus).toBe(1)
+    const day = kitPowers(['torch'], { season: 'spring', weather: 'clear', night: false })
+    expect(day.lightsTheDark).toBe(false)
+    expect(day.depthBonus).toBe(0)
+  })
+
   it('adds up, so a family with the lot gets all of it at once', () => {
-    const powers = kitPowers(['umbrella', 'hat', 'waders'], day('winter', 'mist'))
-    expect(powers).toEqual({
-      forgivesWeather: true,
+    const owned: KitId[] = ['umbrella', 'hat', 'waders', 'boots', 'snowboard', 'torch']
+    expect(kitPowers(owned, { season: 'winter', weather: 'snow', night: true })).toEqual({
+      forgivesWeather: false,
       forgivesSeason: true,
       wades: true,
-      spares: ['mud'],
+      spares: ['mud', 'footsore'],
       warm: true,
+      mishapScale: 0.55,
+      pushScale: 0.5,
+      depthBonus: 1,
+      lightsTheDark: true,
     })
   })
 
-  it('says nothing about the four that have not been taught to speak yet', () => {
-    // Boots, the snowboard, the torch, the creel and the spyglass are found and
-    // owned but do not read yet. This is the line that will have to change.
-    const quiet: KitId[] = ['boots', 'snowboard', 'torch', 'creel', 'spyglass']
+  it('says nothing about the two that have not been taught to speak yet', () => {
+    // The creel and the spyglass are found and owned but do not read yet.
+    // This is the line that will have to change when they do.
+    const quiet: KitId[] = ['creel', 'spyglass']
     for (const season of SEASON_IDS) {
       for (const weather of WEATHERS) {
-        expect(kitPowers(quiet, day(season, weather))).toEqual(NO_KIT)
+        for (const night of [false, true]) {
+          expect(kitPowers(quiet, { season, weather, night })).toEqual(NO_KIT)
+        }
       }
     }
   })

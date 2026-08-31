@@ -616,6 +616,16 @@ function drawGrounds(hud: Hud, app: App): void {
     if (selected) hud.text(4, y, '>', ACCENT)
   })
 
+  // The dark is the one thing in the game that makes a trip worse rather than
+  // better, so it is said out loud on the screen where the trip is chosen --
+  // and so is the answer to it, since a torch that works silently is a torch
+  // the player never finds out they are carrying.
+  if (app.darkOut) {
+    const lit = app.darkLit
+    const line = lit ? 'THE TORCH IS LIT' : 'DARK OUT: PUSHING ON IS RISKIER'
+    hud.textCentered(hud.width / 2, hud.height - 36, line, lit ? COOL : BAD)
+  }
+
   hud.textCentered(hud.width / 2, hud.height - 24, 'A/C PICK   B GO', DIM)
 }
 
@@ -691,7 +701,11 @@ function drawForage(hud: Hud, app: App): void {
   // coming home -- so looking away is a decision the game makes for you kindly.
   if (app.forageChoosing) {
     const bottom = hud.height - 26
-    hud.textCentered(hud.width / 2, bottom, `B GO ON (-${app.foragePushCost})   C HOME`, ACCENT)
+    // A discounted leg names what discounted it. The number alone cannot say
+    // it: a player has no baseline to compare a cheap push against.
+    const board = app.foragePushKit
+    const cost = board ? `-${app.foragePushCost} ${board.name.toUpperCase()}` : `-${app.foragePushCost}`
+    hud.textCentered(hud.width / 2, bottom, `B GO ON (${cost})   C HOME`, ACCENT)
     const width = hud.width - 60
     hud.rect(30, bottom + 12, width, 2, '#1c1c2c')
     hud.rect(30, bottom + 12, Math.round(width * app.forageChooseProgress), 2, ACCENT)

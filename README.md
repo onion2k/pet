@@ -153,9 +153,24 @@ Care keeps a pet well; the lineage is why you keep coming back.
   make any old day promising, the sky would stop being worth reading, which is
   the one thing this game asks of a player.
 
-  The other five — the snowboard, the torch, stout boots, the creel and the
-  spyglass — are found and owned and do nothing yet. Their notes say what they
-  are for rather than what they do, and the code that reads them is on its way.
+  Three more work on the far end of a trip, which is the only place anything
+  ever goes wrong. **Stout boots** cut the odds of a mishap and mean the pet
+  never limps home footsore. A **snowboard** halves the price of one more leg
+  while there is snow to ride, so a snowy day is the day to go deep — and the
+  prompt that offers the leg names the board that made it cheap. A **torch**
+  answers the dark, which is the one thing in the game the kit makes *worse*:
+  after nightfall, pushing on is riskier than it is by day, and a lit torch
+  puts it back the way it was and sees a leg further out besides. The forage
+  menu says so both ways round, so neither the risk nor the answer to it is
+  something the player has to work out for themselves.
+
+  The dark is a multiplier on the price of being greedy rather than a risk of
+  its own, so a there-and-back after dark is exactly as safe as it always was.
+  Risk in this game is always chosen.
+
+  The last two — the creel and the spyglass — are found and owned and do
+  nothing yet. Their notes say what they are for rather than what they do, and
+  the code that reads them is on its way.
 - **The album.** A second board under the curios, one slot per form, each drawn
   in its own body colour taken straight from its voxel model so the board and
   the creature always agree. Forms the family has never grown show as

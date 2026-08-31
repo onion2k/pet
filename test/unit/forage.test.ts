@@ -23,6 +23,8 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
     bursts: [] as string[],
     worldTime: 0,
     persists: 0,
+    /** How deep each trip looked, which a torch can raise without walking. */
+    depths: [] as number[],
     broughtHome: 0,
     gathered: 0,
   }
@@ -53,8 +55,9 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
       calls.broughtHome++
       return null
     },
-    gather: () => {
+    gather: (_ground, depth) => {
       calls.gathered++
+      calls.depths.push(depth)
       return null
     },
     applyStats: (delta) => calls.stats.push(delta),
@@ -653,7 +656,7 @@ describe('what it comes home with', () => {
     // The hill wants a clear day. On a wet one it is a poor prospect and the
     // find usually fails; an umbrella takes the rain out of that reckoning, so
     // the same dice come home with something.
-    const wet = { season: 'spring', weather: 'rain' } as const
+    const wet = { season: 'spring', weather: 'rain', night: false } as const
     const trip = (kit: KitPowers) => {
       setRandom(scripted([0.6]))
       const stub = stubHost({
@@ -725,6 +728,104 @@ describe('what it comes home with', () => {
       for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
     }
     expect(seen.some((b) => b.includes('mud, with a hard little seed'))).toBe(true)
+  })
+
+  /** How many of sixty seeded trips to the hill went wrong, given a world. */
+  function mishapsOver(
+    kit: KitPowers,
+    ctx: Partial<JourneyContext> = {},
+  ): number {
+    let count = 0
+    for (let seed = 0; seed < 60; seed++) {
+      setRandom(seeded(seed))
+      const stub = stubHost({
+        kit: () => kit,
+        journeyContext: (ground) => ({
+          role: ground.role,
+          place: ground.place,
+          season: 'spring',
+          weather: 'clear',
+          night: false,
+          speciesId: 'blob',
+          ...ctx,
+        }),
+      })
+      const forage = new Forage(stub.host)
+      forage.begin(HILL)
+      const seen: string[] = []
+      for (let i = 0; i < 60 * 120 && forage.active; i++) {
+        stub.setAway(forage.outOfSight)
+        forage.advance(1 / 60)
+        if (forage.choosing) forage.pushOn()
+        for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
+      }
+      if (seen.some((b) => /mud|limps|late|caught out/.test(b))) count++
+    }
+    return count
+  }
+
+  it('makes the dark cost something, but only to a trip that pushed on', () => {
+    // The one thing the kit takes away. It is a multiplier on the price of
+    // being greedy rather than a risk of its own, so a there-and-back after
+    // dark is exactly as safe as it always was -- risk is still always chosen.
+    expect(mishapsOver(NO_KIT, { night: true })).toBeGreaterThan(mishapsOver(NO_KIT))
+  })
+
+  it('lets a torch put the dark back the way it was', () => {
+    const lit = kitPowers(['torch'], { season: 'spring', weather: 'clear', night: true })
+    expect(mishapsOver(lit, { night: true })).toBeLessThan(mishapsOver(NO_KIT, { night: true }))
+  })
+
+  it('keeps a pet in boots out of trouble', () => {
+    const boots = kitPowers(['boots'], { season: 'spring', weather: 'clear', night: false })
+    expect(mishapsOver(boots)).toBeLessThan(mishapsOver(NO_KIT))
+  })
+
+  it('sells one more leg cheap to a pet on a board, and charges what it quoted', () => {
+    const snow = { season: 'winter', weather: 'snow', night: false } as const
+    const cost = (kit: KitPowers) => {
+      setRandom(seeded(3))
+      const spent: number[] = []
+      const stub = stubHost({
+        kit: () => kit,
+        applyStats: (delta) => {
+          if (delta.energy !== undefined) spent.push(-delta.energy)
+        },
+      })
+      const forage = new Forage(stub.host)
+      forage.begin(HILL)
+      let quoted = 0
+      for (let i = 0; i < 60 * 120 && forage.active; i++) {
+        stub.setAway(forage.outOfSight)
+        forage.advance(1 / 60)
+        if (forage.choosing) {
+          quoted = forage.pushCost
+          forage.pushOn()
+        }
+      }
+      return { quoted, spent }
+    }
+    const bare = cost(NO_KIT)
+    const board = cost(kitPowers(['snowboard'], snow))
+    expect(board.quoted).toBeLessThan(bare.quoted)
+    // The prompt offered a price; the push has to charge that one.
+    expect(board.spent).toContain(board.quoted)
+  })
+
+  it('sees a leg further into the dark with a torch lit', () => {
+    // Depth is what the trip looks for a find at, and a torch adds one --
+    // without the pet having walked it.
+    const found = (kit: KitPowers) => {
+      setRandom(() => 0)
+      const stub = stubHost({ kit: () => kit })
+      const forage = new Forage(stub.host)
+      forage.begin(WALL)
+      runToEnd(forage, stub)
+      return stub.calls.depths
+    }
+    expect(found(NO_KIT)).toEqual([1])
+    const lit = kitPowers(['torch'], { season: 'spring', weather: 'clear', night: true })
+    expect(found(lit)).toEqual([2])
   })
 
   it('makes a completed set of stones pay out on every trip after it', () => {

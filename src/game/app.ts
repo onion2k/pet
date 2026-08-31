@@ -734,19 +734,49 @@ export class App {
     const { season, weather } = this.today
     const bare = prospectOf(ground, season, weather)
     if (bare === this.prospect(ground)) return null
+    return this.creditKit(
+      (powers) => prospectOf(ground, season, weather, powers) !== bare,
+    )
+  }
+
+  /**
+   * Which piece of kit the family owns is, on its own, enough to make some
+   * difference -- for saying so on the screen where the difference shows.
+   *
+   * Null when none of them is, which is not the same as nothing having
+   * changed: two things together can lift something neither could alone, and
+   * naming either of them for it would be a plain lie about what the player is
+   * looking at.
+   */
+  private creditKit(changes: (powers: KitPowers) => boolean): KitItem | null {
     return (
       KIT.find(
-        (item) =>
-          this.save.kit.includes(item.id) &&
-          prospectOf(ground, season, weather, kitPowers([item.id], this.today)) !== bare,
+        (item) => this.save.kit.includes(item.id) && changes(kitPowers([item.id], this.today)),
       ) ?? null
     )
   }
 
+  /** Which piece of kit, if any, is why one more leg is going cheap. */
+  get foragePushKit(): KitItem | null {
+    if (this.kitPowers.pushScale >= 1) return null
+    return this.creditKit((powers) => powers.pushScale < 1)
+  }
+
   /** The day, for anything that reads the sky rather than the clock. */
   private get today(): Day {
-    const world = worldAt(this.worldNow())
-    return { season: world.season.id, weather: world.weather }
+    const now = this.worldNow()
+    const world = worldAt(now)
+    return { season: world.season.id, weather: world.weather, night: isNight(now) }
+  }
+
+  /** True when a trip sent now would set out into the dark. */
+  get darkOut(): boolean {
+    return this.today.night
+  }
+
+  /** And true when the family has something to carry into it. */
+  get darkLit(): boolean {
+    return this.kitPowers.lightsTheDark
   }
 
   /** What the family's kit is worth today. */

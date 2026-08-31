@@ -190,8 +190,8 @@ describe('grounds', () => {
    */
   describe('prospectOf, with kit', () => {
     const powers = (owned: KitId[], day: Day) => kitPowers(owned, day)
-    const wet: Day = { season: 'spring', weather: 'rain' }
-    const dry: Day = { season: 'spring', weather: 'clear' }
+    const wet: Day = { season: 'spring', weather: 'rain', night: false }
+    const dry: Day = { season: 'spring', weather: 'clear', night: false }
 
     it('changes nothing at all for a family with none', () => {
       for (const ground of GROUNDS) {
@@ -199,7 +199,7 @@ describe('grounds', () => {
           for (const weather of WEATHERS) {
             const bare = prospectOf(ground, season, weather)
             expect(prospectOf(ground, season, weather, NO_KIT)).toBe(bare)
-            expect(prospectOf(ground, season, weather, powers([], { season, weather }))).toBe(bare)
+            expect(prospectOf(ground, season, weather, powers([], { season, weather, night: false }))).toBe(bare)
           }
         }
       }
@@ -215,7 +215,7 @@ describe('grounds', () => {
       // Nothing to forgive: the hill is poor in snow because it wanted clear,
       // and an umbrella has nothing to say about snow.
       expect(prospectOf(groundById('hill'), 'winter', 'snow')).toBe('poor')
-      const snowy: Day = { season: 'winter', weather: 'snow' }
+      const snowy: Day = { season: 'winter', weather: 'snow', night: false }
       expect(prospectOf(groundById('hill'), 'winter', 'snow', powers(['umbrella'], snowy))).toBe(
         'poor',
       )
@@ -235,7 +235,7 @@ describe('grounds', () => {
 
     it('takes winter out of the reckoning, for a pet in a bobble hat', () => {
       const hollow = groundById('hollow')
-      const cold: Day = { season: 'winter', weather: 'clear' }
+      const cold: Day = { season: 'winter', weather: 'clear', night: false }
       expect(prospectOf(hollow, 'winter', 'clear')).toBe('poor')
       expect(prospectOf(hollow, 'winter', 'clear', powers(['hat'], cold))).toBe('fair')
     })
@@ -253,7 +253,7 @@ describe('grounds', () => {
         for (const season of SEASON_IDS) {
           for (const weather of WEATHERS) {
             const bare = prospectOf(ground, season, weather)
-            const kitted = prospectOf(ground, season, weather, powers(all, { season, weather }))
+            const kitted = prospectOf(ground, season, weather, powers(all, { season, weather, night: false }))
             if (bare === 'poor') expect(kitted, `${ground.id} ${season} ${weather}`).not.toBe('good')
             // And it can never make a day worse than it already was.
             if (bare === 'good') expect(kitted, `${ground.id} ${season} ${weather}`).toBe('good')
@@ -266,7 +266,7 @@ describe('grounds', () => {
   describe('luckOf, with kit', () => {
     it('pays out the better read the kit just bought', () => {
       const hill = groundById('hill')
-      const wet: Day = { season: 'spring', weather: 'rain' }
+      const wet: Day = { season: 'spring', weather: 'rain', night: false }
       const bare = luckOf(hill, 'spring', 'rain')
       const kitted = luckOf(hill, 'spring', 'rain', kitPowers(['umbrella'], wet))
       expect(kitted).toBeGreaterThan(bare)
@@ -277,7 +277,7 @@ describe('grounds', () => {
       for (const ground of GROUNDS) {
         for (const season of SEASON_IDS) {
           for (const weather of WEATHERS) {
-            const luck = luckOf(ground, season, weather, kitPowers(all, { season, weather }))
+            const luck = luckOf(ground, season, weather, kitPowers(all, { season, weather, night: false }))
             expect(luck).toBeLessThanOrEqual(0.95)
           }
         }

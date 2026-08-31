@@ -34,6 +34,16 @@ const PUSH_COST = 0.7
 const LUCK_PER_LEG = 0.12
 /** How likely something goes wrong, per leg past the first. */
 const MISHAP_PER_LEG = 0.22
+/**
+ * What the dark does to that.
+ *
+ * The one thing the kit takes away rather than gives, and deliberately a
+ * multiplier on the price of pushing on rather than a risk of its own: a
+ * there-and-back is still safe after dark, so risk is still always chosen.
+ * What the night changes is what it costs to be greedy -- and a torch is the
+ * answer to it, which is what makes a torch a torch rather than a trinket.
+ */
+const NIGHT_MISHAP = 1.6
 /** How often a deep trip brings back something for the yard instead of the board. */
 const YARD_CHANCE = 0.35
 /** How often a trip picks up supplies alongside whatever else it found. */
@@ -158,9 +168,14 @@ export class Forage {
     return this.choosing ? Math.max(0, this.timer / PROMPT_SECONDS) : 0
   }
 
-  /** What going on from here would cost. */
+  /**
+   * What going on from here would cost. Kit can discount it -- a board on snow
+   * halves it -- so the number the prompt offers is the number `pushOn` then
+   * charges, which is the whole reason this is read rather than stored.
+   */
   get pushCost(): number {
-    return Math.round((this.ground?.energy ?? 0) * PUSH_COST)
+    const kit = this.host.kit()
+    return Math.round((this.ground?.energy ?? 0) * PUSH_COST * kit.pushScale)
   }
 
   begin(ground: Ground): void {
@@ -330,7 +345,19 @@ export class Forage {
     // that fills the board, so finishing one pays out every trip after it.
     const boons = this.host.boons()
     const kit = this.host.kit()
-    const mishapOdds = extra * MISHAP_PER_LEG * (boons.includes('stones') ? STONES_MISHAP : 1)
+    // How far the pet could see, as against how far it walked. A torch does
+    // not carry it further out; it lets it find what was already out there --
+    // so this is what the curios and the supplies are looked for at, and the
+    // legs themselves are what the kit is awarded on. Kit is a reward for the
+    // journey the pet actually made; a curio is a thing lying on the ground.
+    const depth = this.legs + kit.depthBonus
+    const dark = ctx.night && !kit.lightsTheDark ? NIGHT_MISHAP : 1
+    const mishapOdds =
+      extra *
+      MISHAP_PER_LEG *
+      dark *
+      kit.mishapScale *
+      (boons.includes('stones') ? STONES_MISHAP : 1)
     // Kit spares a mishap rather than swapping it for a different one: with an
     // umbrella the mud simply did not happen, and nothing else got likelier.
     const rolled = random() < mishapOdds ? pickMishap() : null
@@ -341,7 +368,7 @@ export class Forage {
       0.95,
       luckOf(ground, ctx.season, ctx.weather, kit) + extra * LUCK_PER_LEG + bonus,
     )
-    const curio = findCurio(ctx.season, ctx.weather, random(), ground.favours, this.legs)
+    const curio = findCurio(ctx.season, ctx.weather, random(), ground.favours, depth)
 
     this.host.applyStats({ happiness: 6 })
     if (mishap) this.host.applyStats(mishap.effect)
@@ -393,7 +420,7 @@ export class Forage {
     // along with whatever the trip was actually about -- including a bad one.
     const supply =
       !mishap?.spoils && random() < SUPPLY_CHANCE
-        ? this.host.gather(ground, this.legs)
+        ? this.host.gather(ground, depth)
         : null
 
     const empty = mishap?.spoils || !curio || random() >= luck
