@@ -17,37 +17,57 @@ const WIDTH = 512
 const HEIGHT = 328
 const FLAT = 128
 
-/** Softens the height field so the relief has moulded edges, not stamped ones. */
+/**
+ * Softens the height field so the relief has moulded edges, not stamped ones.
+ *
+ * Across, then down, with the window slid rather than re-added at every pixel:
+ * a box blur that keeps a running total costs the same whatever its radius, and
+ * this one runs on every cold start.
+ */
 function blur(data: Uint8ClampedArray, radius: number): void {
-  const line = new Float32Array(Math.max(WIDTH, HEIGHT))
-  const read = (x: number, y: number) => data[(y * WIDTH + x) * 4] ?? FLAT
-  const write = (x: number, y: number, v: number) => {
-    const i = (y * WIDTH + x) * 4
-    data[i] = v
-    data[i + 1] = v
-    data[i + 2] = v
-  }
   const span = radius * 2 + 1
+  // The map is grey and fully opaque, so one channel carries all of it.
+  const grey = new Uint8Array(WIDTH * HEIGHT)
+  for (let i = 0, p = 0; i < grey.length; i++, p += 4) grey[i] = data[p] ?? FLAT
+  // Clamped rather than kept in floats, so the two passes round between them
+  // exactly as they did when each wrote itself back into the image.
+  const across = new Uint8ClampedArray(WIDTH * HEIGHT)
 
   for (let y = 0; y < HEIGHT; y++) {
+    const row = y * WIDTH
+    // The window starts half off the left edge, and the edge pixel stands in
+    // for everything beyond it.
+    let sum = grey[row]! * (radius + 1)
+    for (let k = 1; k <= radius; k++) sum += grey[row + Math.min(k, WIDTH - 1)]!
     for (let x = 0; x < WIDTH; x++) {
-      let sum = 0
-      for (let k = -radius; k <= radius; k++) {
-        sum += read(Math.min(WIDTH - 1, Math.max(0, x + k)), y)
-      }
-      line[x] = sum / span
+      across[row + x] = sum / span
+      sum -= grey[row + Math.max(0, x - radius)]!
+      sum += grey[row + Math.min(WIDTH - 1, x + radius + 1)]!
     }
-    for (let x = 0; x < WIDTH; x++) write(x, y, line[x]!)
   }
-  for (let x = 0; x < WIDTH; x++) {
-    for (let y = 0; y < HEIGHT; y++) {
-      let sum = 0
-      for (let k = -radius; k <= radius; k++) {
-        sum += read(x, Math.min(HEIGHT - 1, Math.max(0, y + k)))
-      }
-      line[y] = sum / span
+
+  // A running total per column, carried down a row at a time. Walking the
+  // columns one at a time would be the obvious way round and is much the
+  // slower: every step of it jumps a whole row through memory.
+  const column = new Float32Array(WIDTH)
+  for (let x = 0; x < WIDTH; x++) column[x] = across[x]! * (radius + 1)
+  for (let k = 1; k <= radius; k++) {
+    const row = Math.min(k, HEIGHT - 1) * WIDTH
+    for (let x = 0; x < WIDTH; x++) column[x]! += across[row + x]!
+  }
+
+  for (let y = 0; y < HEIGHT; y++) {
+    const row = y * WIDTH
+    const leaving = Math.max(0, y - radius) * WIDTH
+    const entering = Math.min(HEIGHT - 1, y + radius + 1) * WIDTH
+    for (let x = 0; x < WIDTH; x++) {
+      const i = (row + x) * 4
+      const v = column[x]! / span
+      data[i] = v
+      data[i + 1] = v
+      data[i + 2] = v
+      column[x]! += across[entering + x]! - across[leaving + x]!
     }
-    for (let y = 0; y < HEIGHT; y++) write(x, y, line[y]!)
   }
 }
 
@@ -78,7 +98,9 @@ export function createFrontDecal(gl: OGLRenderingContext): Texture {
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH
   canvas.height = HEIGHT
-  const ctx = canvas.getContext('2d')
+  // The height field is read straight back out to be blurred, which on a
+  // GPU-backed canvas means waiting on a readback.
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) throw new Error('2D canvas unavailable')
 
   ctx.fillStyle = `rgb(${FLAT},${FLAT},${FLAT})`
