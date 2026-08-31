@@ -662,7 +662,8 @@ const curiosSection = chapter(
     Boots, a board and a torch work on the far end of a trip instead — the only
     place anything ever goes wrong. Boots keep your pet out of trouble; the
     board makes one more leg cheap while there is snow to ride it on. And the
-    torch is for the one thing that makes a trip <em>worse</em>: after dark,
+    torch — an electric one — is for the one thing that makes a trip
+    <em>worse</em>: after dark,
     pushing on is riskier than it is by day. A lit torch puts that back the way
     it was, and sees a little further out besides. The forage menu tells you
     which of the two you are looking at.

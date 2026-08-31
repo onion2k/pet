@@ -137,11 +137,14 @@ Care keeps a pet well; the lineage is why you keep coming back.
   than to the pet carrying it, so a torch one pet walked out three dark nights
   for is still in the porch for the next, and NEW PET takes it, tally and all.
 
-  Earn the bobble hat and you will see it: the pet puts it on when it snows and
-  takes it off again in spring. Kit shows when it is *doing* something rather
-  than whenever it is owned — a pet wearing all eight at once would be a hat
-  stand, and would say nothing about the day. The rest of the eight have no
-  picture yet. See [Kit on the pet](#kit-on-the-pet).
+  Six of the eight are visible on the pet: the hat goes on when it snows, the
+  umbrella up in the rain, the torch out after dark, the boots stay on and
+  become waders in the wet, and the basket rides on its back. Kit shows when it
+  is *doing* something rather than whenever it is owned — a pet wearing all
+  eight at once would be a hat stand, and would say nothing about the day. The
+  snowboard leans by the shelter door on a snowy day, and so does the umbrella
+  on every day it is not up. Only the pine cone has no look. See
+  [Kit on the pet](#kit-on-the-pet).
 
   It is not a currency and cannot be traded: a second umbrella is worth nothing,
   so there is nothing to spend. The rule the whole list obeys is that kit does
@@ -316,8 +319,11 @@ rectangles, because what they cover is rectangular.
 
 ### Kit on the pet
 
-Earn a bobble hat and the pet wears it when it snows, so the yard says what the
-weather is doing — which is the one channel that never did.
+Six of the eight are visible on the pet. It puts its bobble hat on when it
+snows, its umbrella up in the rain, its torch out after dark; it wears its
+boots always and swaps them for waders in the wet; the basket rides on its back
+and shows when it turns. So the yard says what the weather is doing — which is
+the one channel that never did.
 
 It is the face's trick a second time, and cost almost nothing because of that. A
 hat is a small voxel model merged into the pet's own mesh with the head's `part`
@@ -337,6 +343,54 @@ Kit is built at the wearer's own voxel size, so its blocks line up with the
 head's. That is not the same as being one size for everyone: the forms are
 normalised to a single world height but are not all the same number of voxels
 tall, so a voxel is a shade bigger on a shorter creature and its hat is too.
+
+Four anchors carry the lot, and which part each piece rides on is the whole of
+how it moves: the crown for a hat, which twists with the look-around; a hand
+for the umbrella and the torch, which counter-swing with the walk; both feet
+for boots, which pivot from the hip and stay planted; the back for the basket,
+which rides with the body. Two of those are a *pair* — a pet does not put one
+boot on — and two are held, in different hands, so a wet night does not put the
+umbrella and the torch in the same fist.
+
+Placement wants two ideas beyond "stand it on the anchor". Things sink: a hat
+resting exactly on the crown floats, so it goes down a voxel and the brim
+grips. And things are held **outward**, away from the model's middle: an arm
+ends at the body's own edge, so a torch tall enough to be worth drawing
+vanishes behind the head without it. A single number does for both hands,
+because outward is signed by the side the hand is on.
+
+What decides whether a thing is worn at all is `shows(day)` on the item. Kit
+shows when it is *doing* something rather than whenever it is owned — a pet
+wearing all eight at once would be a hat stand and would say nothing about the
+day. Boots and the basket are the exceptions and are worn always: they say
+something about the family rather than about the sky.
+
+The torch is the one piece that does more than sit there: an **electric torch**
+— the British sort, not a burning brand — and the only kit with an emissive
+voxel in it. That much makes it read after dark and feeds the bloom pass on its
+own. Beyond that it carries a light of its own, in the same slot machinery the
+lanterns use: `LAMP_COUNT` gained a slot that follows the pet's hand, so the
+ground it walks over is lit as it goes.
+
+Where that light goes is worked out from the glow rather than written down —
+the middle of whatever voxels are emissive — so a lamp can never end up
+somewhere the light is not, and anything given a bright voxel later becomes a
+light for free. Its resting place is used, not its true one: the kit is drawn
+inside the pet's mesh and bent about by the vertex shader, so where a voxel
+truly ends up is only known on the card. For a light with a soft falloff that
+is near enough, and the alternative is reading geometry back off the GPU every
+frame to move a lamp by a few hundredths.
+
+Two pieces belong in the yard rather than on the pet, and are stood by the
+shelter door instead — built exactly the way plantings are, since they are the
+same sort of thing: put somewhere, never moving, and rebuilt only when they
+change. A **snowboard** is bigger than the pet and cannot be carried
+convincingly, so on a snowy day it simply leans there, ready. And the
+**umbrella** is furled against the wall on every day it is not up, which makes
+it the one object that *moves* with the weather: in the pet's hand when it is
+wet and by the door when it is not, so where it is says which. A test holds it
+to being in exactly one of those two places on every day the world can
+produce — nowhere at all would read as having lost it.
 
 Being part of the one mesh is what buys all of that, and what it costs is a
 rebuild whenever the kit changes — which is why `setWorn` is called every frame

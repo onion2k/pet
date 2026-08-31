@@ -48,6 +48,7 @@ import {
   KIT_COUNT,
   kitPowers,
   progressOf,
+  stowedToday,
   wornToday,
   type Day,
   type KitId,
@@ -1163,6 +1164,15 @@ export class App {
    */
   get worn(): KitId[] {
     return wornToday(this.save.kit, this.today)
+  }
+
+  /**
+   * Kit the family owns that is not in the pet's hands today, for the yard to
+   * stand by the door. The umbrella is here on every day it is not up, so the
+   * one object moves with the weather rather than winking in and out.
+   */
+  get stowed(): KitId[] {
+    return stowedToday(this.save.kit, this.today)
   }
 
   /** How near the family is to each thing it has yet to earn. */

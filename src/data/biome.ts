@@ -418,12 +418,13 @@ export const SHELTER_COLUMNS = { w: 13, d: 11 }
 export const LAMP_ROW_Z = -1.15
 export const LAMP_ROW_X = [-7.6, -5.0, -2.4, 2.6, 5.2, 7.6]
 /**
- * How many lights the shaders carry: the lantern row, the shelter's own, and
- * one spare for a jack-o-lantern when there is one. Every slot is lit, so an
- * unused one has to be parked out of range -- left at the origin it would sit
- * at the camera and light whatever came near it.
+ * How many lights the shaders carry: the lantern row, the shelter's own, one
+ * spare for a jack-o-lantern when there is one, and one that follows the pet's
+ * hand when it is carrying something lit. Every slot is lit, so an unused one
+ * has to be parked out of range -- left at the origin it would sit at the
+ * camera and light whatever came near it.
  */
-export const LAMP_COUNT = LAMP_ROW_X.length + 2
+export const LAMP_COUNT = LAMP_ROW_X.length + 3
 /** Where an unused light slot is parked: far enough that its falloff is zero. */
 export const LAMP_PARKED: readonly [number, number, number] = [0, -10000, 0]
 
