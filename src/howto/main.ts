@@ -3,6 +3,7 @@ import './style.css'
 import { registerServiceWorker } from '../pwa'
 
 import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
+import { KIT, KIT_COUNT } from '../data/kit'
 import { FOODS } from '../data/foods'
 import { MEADOW_GROUNDS } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER, iconRows, type IconId } from '../data/icons'
@@ -616,8 +617,39 @@ const curiosSection = chapter(
     Leaving your pet alone for a good while still turns something up now and
     then, but only one of the ordinary things and only occasionally. Being away
     is the consolation prize; sending your pet out is the way to fill the board.
-  </p>`,
+  </p>
+
+  <h3>The kit</h3>
+  <p>
+    A second row runs beneath the curios, and it holds a different kind of
+    thing. Curios are for the shelf; these ${KIT_COUNT} are practical. Each one
+    turns up only on the sort of day it is for — so the world hands your pet
+    the tool at about the moment you first wished it had one.
+  </p>
+  <div class="grid">
+    ${KIT.map(
+      (k) => `
+      <div class="curio" data-kit="${k.id}">
+        <div class="plate"></div>
+        <div><b>${k.name}</b><div class="note">${k.note}</div></div>
+      </div>`,
+    ).join('')}
+  </div>
+  <p class="note">
+    Kit belongs to the family rather than to the pet carrying it, so anything
+    one pet fetches home is still there for the next. It cannot be traded —
+    a second umbrella would be worth nothing, so there is nothing to spend.
+  </p>
+  <div class="callout">
+    <b>Still being made.</b> Right now the kit is something to find and to keep,
+    and no more than that: none of it has been taught to change what a day is
+    worth yet. That part is on its way, one family of them at a time.
+  </div>`,
 )
+
+for (const item of KIT) {
+  fill(curiosSection, `[data-kit="${item.id}"] .plate`, artTile(item.glyph.split('/'), item.colour, 5))
+}
 
 for (const curio of CURIOS) {
   fill(curiosSection, `[data-curio="${curio.id}"] .plate`, artTile(curio.glyph.split('/'), curio.colour, 5))
@@ -719,6 +751,7 @@ chapter(
   <div class="grid">
     <div class="card tint-sun"><b>FOUND ${SPECIES_COUNT}</b><p class="note">Forms your family has ever reached, across every generation. Never lost, except to NEW PET.</p></div>
     <div class="card tint-berry"><b>CURIOS ${CURIO_COUNT}</b><p class="note">The collection board. Also belongs to the family rather than to one pet.</p></div>
+    <div class="card tint-sun"><b>KIT ${KIT_COUNT}</b><p class="note">The row beneath the curios: things to use rather than to look at. The family's, and kept.</p></div>
     <div class="card tint-cool"><b>The album</b><p class="note">A slot for every form, drawn in that creature's own colours. Forms your family has never grown show as silhouettes — which is what makes the branches worth chasing.</p></div>
     <div class="card tint-grass"><b>The streak</b><p class="note">Days you have visited. Consecutive days build it; a missed day takes one off rather than wiping it out.</p></div>
   </div>

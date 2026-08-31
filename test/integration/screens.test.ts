@@ -3,6 +3,8 @@ import { draw, openScreen, SCREENS } from '../screens'
 import { textWidth } from '../../src/data/font'
 import type { DrawnText } from '../fake-hud'
 import { speciesOf } from '../../src/data/species'
+import { CURIOS } from '../../src/data/curios'
+import { KIT } from '../../src/data/kit'
 
 /**
  * What is on each screen, and where.
@@ -169,6 +171,38 @@ describe('what a screen is for', () => {
     const h = openScreen('move')
     const said = draw(h).said()
     for (const biome of h.app.homes) expect(said).toContain(biome.name.toUpperCase())
+  })
+
+  it('the collection screen gives every curio and every piece of kit a slot', () => {
+    const fake = draw(openScreen('curios'))
+    // Sixteen slots and nothing else drawing artwork on this screen, so a
+    // count is enough to catch a row that silently stopped being drawn.
+    expect(fake.glyphs).toHaveLength(CURIOS.length + KIT.length)
+    const art = fake.glyphs.map((g) => g.rows.join('/'))
+    for (const curio of CURIOS) expect(art, curio.id).toContain(curio.glyph)
+    for (const item of KIT) expect(art, item.id).toContain(item.glyph)
+  })
+
+  it('keeps the whole board on the glass, artwork and all', () => {
+    // The glyphs are drawn at double size, which the fake hud does not record,
+    // so the bounds check above cannot see them. Sixteen slots across a screen
+    // 192 wide is close enough to the edge to be worth asserting on.
+    const fake = draw(openScreen('curios'))
+    for (const g of fake.glyphs) {
+      expect(g.x, `slot at ${g.x},${g.y}`).toBeGreaterThanOrEqual(0)
+      expect(g.x + 16, `slot at ${g.x},${g.y}`).toBeLessThanOrEqual(192)
+      expect(g.y + 16, `slot at ${g.x},${g.y}`).toBeLessThanOrEqual(172)
+    }
+  })
+
+  it('the collection screen says what the cursor is on, of either kind', () => {
+    const h = openScreen('curios')
+    expect(draw(h).said()).toContain(CURIOS[0]!.name.toUpperCase())
+    for (let i = 0; i < CURIOS.length; i++) h.tap('c')
+    const said = draw(h).said()
+    expect(said).toContain(KIT[0]!.name.toUpperCase())
+    // And that it is not a thing to be traded, which is what B does elsewhere.
+    expect(said).toContain('THE PET USES THESE')
   })
 
   it('the main screen keeps the pet in view rather than a menu', () => {

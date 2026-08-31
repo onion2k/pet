@@ -3,6 +3,7 @@ import { Forage, type ForageHost } from '../../src/game/forage'
 import { groundById, type Ground } from '../../src/data/grounds'
 import { resetRandom, scripted, seeded, setRandom } from '../../src/engine/random'
 import type { Curio } from '../../src/data/curios'
+import { kitById } from '../../src/data/kit'
 import type { JourneyContext } from '../../src/data/journey'
 import type { Stats } from '../../src/game/types'
 
@@ -43,6 +44,9 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
       calls.worldTime += ms
     },
     addCurio: (curio) => calls.curios.push(curio),
+    // Nothing to find by default: kit is the rarest thing out there, and a
+    // trip that keeps turning one up is not the trip most of these test.
+    takeKit: () => null,
     bringHome: () => {
       calls.broughtHome++
       return null
@@ -70,6 +74,8 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
 
 const WALL = groundById('wall')
 const HILL = groundById('hill')
+/** One piece of kit, for the trips that are about coming home carrying one. */
+const TORCH = kitById('torch')!
 
 /** Runs frames until the trip is idle again, or gives up loudly. */
 function runToEnd(forage: Forage, away: { setAway(v: boolean): void }, maxSeconds = 120): number {
@@ -580,6 +586,76 @@ describe('what it comes home with', () => {
     expect(forage.legs).toBe(2)
     expect(seen).toContain('comes home with a bramble cutting')
     expect(stub.calls.spoken).toContain('PIP planted a bramble')
+  })
+
+  it('says what kit it came home with, in place of a find', () => {
+    // Every roll at the top: no mishap, no yard find, and the luck check for a
+    // curio fails -- so the only thing this trip can be about is the kit.
+    setRandom(() => 0.99)
+    const stub = stubHost({ takeKit: () => TORCH })
+    const forage = new Forage(stub.host)
+    forage.begin(WALL)
+    const seen: string[] = []
+    for (let i = 0; i < 60 * 120 && forage.active; i++) {
+      stub.setAway(forage.outOfSight)
+      forage.advance(1 / 60)
+      for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
+    }
+    expect(seen).toContain('comes home with a torch')
+    expect(stub.calls.spoken).toContain('PIP came back with a torch')
+    expect(forage.foundKit).toBe(TORCH)
+    // The kit is the whole story of the trip, so nothing was added to the board.
+    expect(stub.calls.curios).toEqual([])
+  })
+
+  it('says the mishap and the kit together, since one does not spoil the other', () => {
+    // Rolls at zero: a mishap that does not spoil the trip, and kit anyway.
+    setRandom(() => 0)
+    const stub = stubHost({ bringHome: () => null, takeKit: () => TORCH })
+    const forage = new Forage(stub.host)
+    forage.begin(HILL)
+    const seen: string[] = []
+    for (let i = 0; i < 60 * 120 && forage.active; i++) {
+      stub.setAway(forage.outOfSight)
+      forage.advance(1 / 60)
+      if (forage.choosing) forage.pushOn()
+      for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
+    }
+    expect(seen.some((b) => b.includes('mud, carrying a torch'))).toBe(true)
+  })
+
+  it('never looks for kit on a trip that was spoiled before it got anywhere', () => {
+    // A spoiling mishap takes the whole trip with it, kit included: the pet did
+    // not get where it was going, so there was nowhere to find anything. Run
+    // over seeds rather than a scripted trip, because how many dice a trip
+    // throws before it settles depends on the sentences it happened to pick.
+    let spoiled = 0
+    for (let seed = 0; seed < 40; seed++) {
+      setRandom(seeded(seed))
+      let asked = 0
+      const stub = stubHost({
+        takeKit: () => {
+          asked++
+          return TORCH
+        },
+      })
+      const forage = new Forage(stub.host)
+      forage.begin(HILL)
+      const seen: string[] = []
+      for (let i = 0; i < 60 * 120 && forage.active; i++) {
+        stub.setAway(forage.outOfSight)
+        forage.advance(1 / 60)
+        if (forage.choosing) forage.pushOn()
+        for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
+      }
+      const wasted = seen.some((b) => b.includes('and with nothing') || b.includes('caught out'))
+      if (!wasted) continue
+      spoiled++
+      expect(asked, `seed ${seed}`).toBe(0)
+      expect(forage.foundKit, `seed ${seed}`).toBeNull()
+    }
+    // Or the assertion above never ran and this test proved nothing.
+    expect(spoiled).toBeGreaterThan(0)
   })
 
   it('says the mishap and the yard find together on a bad deep trip', () => {

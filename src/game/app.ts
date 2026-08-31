@@ -33,6 +33,7 @@ import {
   type Curio,
   type CurioSet,
 } from '../data/curios'
+import { KIT, KIT_CHANCE, KIT_COUNT, kitPool, pickKit, type KitDay, type KitId, type KitItem } from '../data/kit'
 import { textWidth } from '../data/font'
 import { SPECIES_COUNT } from '../data/species'
 import type { SeasonId, WeatherId } from '../data/seasons'
@@ -132,6 +133,17 @@ const HEIRLOOM_PER_ANCESTOR = 5
 const HEIRLOOM_CAP = 15
 /** Screens that C can be held to escape from. */
 const ESCAPABLE: Mode[] = ['feed', 'games', 'grounds', 'curios', 'playing', 'move']
+
+/**
+ * Slots on the collection board: every curio, and then every piece of kit. One
+ * cursor runs through both, because they are one screen -- the board is what
+ * the family has, and half of it is for looking at and half of it is for using.
+ */
+const BOARD_SLOTS = CURIOS.length + KIT.length
+
+export type BoardSlot =
+  | { kind: 'curio'; curio: Curio; held: number }
+  | { kind: 'kit'; item: KitItem; owned: boolean }
 
 export interface AppHooks {
   sound(id: SoundId): void
@@ -430,6 +442,26 @@ export class App {
     if (held >= LARDER_CAP) return null
     this.save.larder[supply.id] = held + 1
     return supply.what
+  }
+
+  /**
+   * What the trip turned up in the way of kit, if anything.
+   *
+   * The roll lives here rather than in the trip because ownership does: kit is
+   * the family's, like the curios and the album, so a torch found by one pet is
+   * still in the porch when the next one is grown enough to want it.
+   */
+  private takeKit(day: KitDay): KitItem | null {
+    // Asked on every trip, and most trips have nothing out there for them, so
+    // the pool is checked before any dice are thrown: a die spent on a day
+    // with no kit on it would shift every other roll the trip makes.
+    const pool = kitPool(this.save.kit, day)
+    if (pool.length === 0) return null
+    if (random() >= KIT_CHANCE) return null
+    const item = pickKit(pool, random())
+    this.save.kit.push(item.id)
+    this.pushTicker(`${this.living.name} found ${item.what}`)
+    return item
   }
 
   /**
@@ -807,6 +839,7 @@ export class App {
       this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
     },
     bringHome: (legs) => this.bringHome(legs),
+    takeKit: (day) => this.takeKit(day),
     gather: (ground, legs) => this.gather(ground, legs),
     applyStats: (delta) => this.applyStats(delta),
     speakNow: (text) => {
@@ -924,6 +957,19 @@ export class App {
   }
 
   /**
+   * What the cursor is on. The board holds two kinds of thing -- a collection
+   * to fill and a kit to use -- and only one of them can be traded, so the
+   * screen and the button both have to ask which they are looking at.
+   */
+  get boardSlot(): BoardSlot {
+    const curio = CURIOS[this.curioIndex]
+    if (curio) return { kind: 'curio', curio, held: this.save.curios[curio.id] ?? 0 }
+    // The cursor wraps rather than running off the end, so what is left is kit.
+    const item = KIT[this.curioIndex - CURIOS.length]!
+    return { kind: 'kit', item, owned: this.save.kit.includes(item.id) }
+  }
+
+  /**
    * Whether the curio under the cursor has spares to trade.
    *
    * Spares, not copies: the trade has to leave one behind. Spending the last of
@@ -934,9 +980,9 @@ export class App {
    * the button then refused.
    */
   get canTrade(): boolean {
-    // The cursor wraps rather than running off the end, so it always names one.
-    const curio = CURIOS[this.curioIndex]!
-    return (this.save.curios[curio.id] ?? 0) > TRADE_COST && !!this.tradeFor
+    const slot = this.boardSlot
+    if (slot.kind !== 'curio') return false
+    return slot.held > TRADE_COST && !!this.tradeFor
   }
 
   /**
@@ -945,10 +991,14 @@ export class App {
    * snowdrop that keeps not turning up.
    */
   private trade(): void {
-    const curio = CURIOS[this.curioIndex]!
+    const slot = this.boardSlot
+    // Kit is not a currency. It has no spares -- a second umbrella is worth
+    // nothing -- so there is nothing on this row to spend.
+    if (slot.kind !== 'curio') return this.say('nothing to trade here', 'refuse')
+    const curio = slot.curio
     const want = this.tradeFor
     if (!want) return this.say('nothing left to want', 'refuse')
-    const held = this.save.curios[curio.id] ?? 0
+    const held = slot.held
     if (held <= TRADE_COST) {
       return this.say(`needs ${TRADE_COST + 1} ${curio.name.toLowerCase()}s`, 'refuse')
     }
@@ -961,16 +1011,30 @@ export class App {
 
   private pressCurios(button: ButtonId): void {
     if (button === 'a') {
-      this.curioIndex = (this.curioIndex + CURIOS.length - 1) % CURIOS.length
+      this.curioIndex = (this.curioIndex + BOARD_SLOTS - 1) % BOARD_SLOTS
       this.hooks.sound('move')
       return
     }
     if (button === 'c') {
-      this.curioIndex = (this.curioIndex + 1) % CURIOS.length
+      this.curioIndex = (this.curioIndex + 1) % BOARD_SLOTS
       this.hooks.sound('move')
       return
     }
     this.trade()
+  }
+
+  /** What the family owns, for the board and for whatever comes to read it. */
+  get kitOwned(): KitId[] {
+    return this.save.kit
+  }
+
+  get kitTally(): { owned: number; of: number } {
+    return { owned: this.save.kit.length, of: KIT_COUNT }
+  }
+
+  /** Kit the trip came home with, for the screen that tells it. */
+  get forageKit(): KitItem | null {
+    return this.forage.foundKit
   }
 
   get curioTally(): { kinds: number; total: number } {

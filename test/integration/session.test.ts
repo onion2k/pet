@@ -276,6 +276,7 @@ describe('saving', () => {
           streak: { days: 9, lastDay: '2024-05-01' },
           home: 'woodland',
           larder: { berries: 2 },
+          kit: ['torch', 'umbrella'],
         },
       }).start()
 
@@ -295,6 +296,8 @@ describe('saving', () => {
       expect(h.app.discoveredIds).toEqual([])
       expect(h.app.curioCounts).toEqual({})
       expect(h.app.larder).toEqual({})
+      // The kit is the family's, like the curios, so it goes the same way.
+      expect(h.app.kitOwned).toEqual([])
     })
 
     it('takes the house too, since the house belonged to the family', () => {

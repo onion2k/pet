@@ -6,6 +6,7 @@ import { LARDER_CAP } from '../../src/game/larder'
 import { YARD_CAPACITY } from '../../src/game/yard'
 import { VERGE_SLOTS } from '../../src/data/biome'
 import { CURIOS, TRADE_COST } from '../../src/data/curios'
+import { KIT } from '../../src/data/kit'
 import { drawScreen } from '../../src/ui/draw'
 import { worldAt } from '../../src/game/world'
 import { fakeHud } from '../fake-hud'
@@ -38,6 +39,13 @@ function grownUp(options: Parameters<typeof harness>[0] = {}): Harness {
   h.pet.stats.energy = 100
   return h
 }
+
+/**
+ * A save with the whole kit already found, for tests about something else.
+ * A trip that could turn up kit turns up kit instead of a curio, and the world
+ * these tests start in is a dark one -- which is a torch waiting to happen.
+ */
+const fullKit = () => ({ ...emptySave(), kit: KIT.map((item) => item.id) })
 
 /** Sends the pet to a named ground, whatever the cursor was on. */
 function sendTo(h: Harness, ground: string): Harness {
@@ -243,8 +251,11 @@ describe('a trip', () => {
   })
 
   it('can bring back a curio, which lands on the collection board', () => {
-    // Every roll at zero: no mishap, a find, and the luck check passes.
-    const h = grownUp({ random: () => 0 })
+    // Every roll at zero: no mishap, a find, and the luck check passes. The
+    // kit is owned outright so that the trip cannot come home with a torch
+    // instead -- the world starts these tests after dark, and a dark trip is
+    // exactly the kind that turns one up.
+    const h = grownUp({ random: () => 0, save: fullKit() })
     h.select('forage')
     h.tap('b')
     runTrip(h, 'c')
@@ -253,8 +264,46 @@ describe('a trip', () => {
     expect(h.app.forageFound).not.toBeUndefined()
   })
 
-  it('saves what it brought home', () => {
+  it('can bring back a piece of kit, which the family keeps', () => {
+    // The world starts these tests after dark, and the dark is what a torch is
+    // for -- so this is the trip that turns one up, on dice that always find.
     const h = grownUp({ random: () => 0 })
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    expect(h.app.kitOwned).toEqual(['torch'])
+    expect(h.app.kitTally).toEqual({ owned: 1, of: KIT.length })
+    expect(h.app.forageKit?.id).toBe('torch')
+    // Kit is the whole story of the trip it comes home on, so the board does
+    // not also gain a curio for it.
+    expect(h.app.curioTally.total).toBe(0)
+  })
+
+  it('says what it found, and never finds the same thing twice', () => {
+    const h = grownUp({ random: () => 0 })
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    h.until('the news of it', () => h.app.tickerText.includes('FOUND A TORCH'))
+
+    h.pet.stats.energy = 100
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    expect(h.app.kitOwned).toEqual(['torch'])
+  })
+
+  it('saves the kit, so it outlives the tab', () => {
+    const h = grownUp({ random: () => 0 })
+    h.select('forage')
+    h.tap('b')
+    runTrip(h, 'c')
+    flushSave()
+    expect(h.stored()!.kit).toEqual(['torch'])
+  })
+
+  it('saves what it brought home', () => {
+    const h = grownUp({ random: () => 0, save: fullKit() })
     h.select('forage')
     h.tap('b')
     runTrip(h, 'c')
@@ -392,7 +441,11 @@ describe('the collection board', () => {
   const cursorTo = (h: Harness, id: string) => {
     h.select('status')
     h.tap('a')
-    while (CURIOS[h.app.curioIndex]!.id !== id) h.tap('c')
+    // Bounded by the board rather than by the curios: the cursor runs on into
+    // the kit, and walking off the end of the curios used to throw here.
+    for (let step = 0; step < CURIOS.length && CURIOS[h.app.curioIndex]?.id !== id; step++) {
+      h.tap('c')
+    }
     return h
   }
 
@@ -403,8 +456,31 @@ describe('the collection board', () => {
     expect(h.app.mode).toBe('curios')
     h.tap('c')
     expect(h.app.curioIndex).toBe(1)
+    // One cursor for the whole board, so walking back off the first curio
+    // arrives at the last piece of kit rather than the last curio.
     h.tap('a').tap('a')
-    expect(h.app.curioIndex).toBe(CURIOS.length - 1)
+    expect(h.app.curioIndex).toBe(CURIOS.length + KIT.length - 1)
+    expect(h.app.boardSlot.kind).toBe('kit')
+  })
+
+  it('knows which half of the board the cursor is on', () => {
+    const h = harness().start()
+    h.select('status')
+    h.tap('a')
+    expect(h.app.boardSlot).toEqual({ kind: 'curio', curio: CURIOS[0], held: 0 })
+    for (let i = 0; i < CURIOS.length; i++) h.tap('c')
+    expect(h.app.boardSlot).toEqual({ kind: 'kit', item: KIT[0], owned: false })
+  })
+
+  it('has nothing to trade on a piece of kit, and says so rather than refusing quietly', () => {
+    const h = withCurios({ pebble: 9 })
+    h.select('status')
+    h.tap('a')
+    for (let i = 0; i < CURIOS.length; i++) h.tap('c')
+    expect(h.app.canTrade).toBe(false)
+    h.tap('b')
+    expect(h.app.message).toBe('NOTHING TO TRADE HERE')
+    expect(h.app.curioCounts.pebble).toBe(9)
   })
 
   it('reports the tally', () => {

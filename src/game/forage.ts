@@ -1,5 +1,6 @@
 import { beat, type JourneyContext, type Leg } from '../data/journey'
 import { findCurio, type Curio } from '../data/curios'
+import type { KitDay, KitItem } from '../data/kit'
 import { luckOf, type Ground } from '../data/grounds'
 import type { CurioSet } from '../data/curios'
 import { random } from '../engine/random'
@@ -71,6 +72,13 @@ export interface ForageHost {
    */
   bringHome(legs: number): { what: string; announce: string } | null
   /**
+   * Tries to turn up a piece of kit. Null when there is nothing out there for
+   * this kind of day, or when the family already owns everything that is --
+   * which is most trips, most of the time. The host rolls it, as it rolls the
+   * yard and the supplies; the trip only decides whether to look.
+   */
+  takeKit(day: KitDay): KitItem | null
+  /**
    * Picks up food and fuel on the way. Unlike a curio this is not the point of
    * the trip -- it happens alongside whatever else did -- so it returns what to
    * add to the end of the line, or null when the pet's arms were full.
@@ -101,6 +109,8 @@ export class Forage {
   beats: string[] = []
   /** What it came home with, once it is home. Null until then, and on no luck. */
   found: Curio | null = null
+  /** Kit it came home with, which is a different and rarer kind of find. */
+  foundKit: KitItem | null = null
   /** How many legs it has walked. One is a there-and-back; three is a long way. */
   legs = 1
 
@@ -148,6 +158,7 @@ export class Forage {
     this.phase = 'leaving'
     this.beats = []
     this.found = null
+    this.foundKit = null
     this.legs = 1
     this.stage = 'out'
     this.timer = 0
@@ -171,6 +182,7 @@ export class Forage {
     this.dim = 0
     this.beats = []
     this.found = null
+    this.foundKit = null
     this.legs = 1
     this.stage = 'out'
     this.timer = 0
@@ -332,6 +344,33 @@ export class Forage {
         )
         this.host.speakNow(brought.announce)
         this.host.burst('sparkle', 12)
+        this.host.persist()
+        return
+      }
+    }
+
+    // Kit is the rarest thing out there and, when it happens, it is the whole
+    // story of the trip: the umbrella turns up on the day the pet wanted one.
+    // So it is tried before the find and comes home in place of it, supplies
+    // and all -- a trip that brought back a torch does not also need to
+    // mention the brambles. The odds live with the host, along with the roll:
+    // most days have no kit on them at all, and asking on those days must not
+    // cost the trip a die.
+    if (!mishap?.spoils) {
+      const item = this.host.takeKit({
+        season: ctx.season,
+        weather: ctx.weather,
+        night: ctx.night,
+        role: ground.role,
+        depth: this.legs,
+      })
+      if (item) {
+        this.foundKit = item
+        this.beats.push(
+          mishap ? `${mishap.line}, carrying ${item.what}` : `comes home with ${item.what}`,
+        )
+        this.host.speakNow(`${name} came back with ${item.what}`)
+        this.host.burst('sparkle', 16)
         this.host.persist()
         return
       }

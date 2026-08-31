@@ -71,17 +71,18 @@ as it turns, and the mouldings catch it at a raking angle.
 A **HOW TO PLAY** link sits at the top right of the page, and behind it is
 `how-to-play.html`: an illustrated instructions booklet covering the buttons,
 the icon ring, the five stats, the food, the three games, the whole family tree,
-foraging, the curio board, the world's clock, and a map of the meadow with the
-four grounds laid out by how far off they are. It does not yet know the family
-can move house — the map and its prose are still the meadow's alone.
+foraging, the curio board and the kit, the world's clock, and a map of the
+meadow with the four grounds laid out by how far off they are. It does not yet
+know the family can move house — the map and its prose are still the meadow's
+alone.
 
 Almost none of it is written twice. The creatures are drawn from their own voxel
 models (`howto/voxel-sprite.ts`), so a picture in the booklet cannot disagree
 with the thing that hatches. The minigame illustrations are real `GameSession`s,
 wound forward a few frames and asked to draw themselves onto a canvas the same
 192x172 as the glass — which is what the drawing half of `Hud` was split into
-`render/pixels.ts` for. The tables of food, grounds, curios, forms, shells and
-visitors are read out of the same data the game plays from.
+`render/pixels.ts` for. The tables of food, grounds, curios, kit, forms, shells
+and visitors are read out of the same data the game plays from.
 
 What it deliberately leaves out is the dice: which curio wants which weather,
 how far out the rare things live, what the odds are of coming home muddy. Those
@@ -111,7 +112,8 @@ Care keeps a pet well; the lineage is why you keep coming back.
   pushed, so completing CURIOS x/8 takes visits at different times and trips
   that went badly. They live on a **collection board** — reached with A from the
   status screen — where every curio has a slot, found ones in their own colour
-  and the rest as flat silhouettes. Showing the gaps is the point.
+  and the rest as flat silhouettes. Showing the gaps is the point. The kit
+  shares that board, on a row of its own beneath them.
 
   The board has a verb: **three spares trade up** for whichever curio is still
   missing, so a season you keep failing to catch stops being a wall the year
@@ -121,6 +123,27 @@ Care keeps a pet well; the lineage is why you keep coming back.
   find, or able to read the sky. Being left alone for twenty minutes or more
   still turns something up now and then, but only one of the ordinary things,
   and only a quarter of the time: absence is the consolation, not the equal.
+- **The kit.** The other half of the board, and the half the pet *uses*. Eight
+  things — an umbrella, a bobble hat, a snowboard, a torch, stout boots,
+  waders, a creel and a spyglass — each tied to a condition the world already
+  produces, and each turning up only on the day it is for: the umbrella in the
+  rain, the snowboard in snow, the torch on a trip that set out after dark. The
+  world hands you the tool at about the moment you first wanted one. Kit belongs
+  to the family rather than to the pet carrying it, so a torch fetched by one
+  is still in the porch for the next, and NEW PET takes it the way it takes
+  everything else.
+
+  It is not a currency and cannot be traded: a second umbrella is worth nothing,
+  so there is nothing to spend. The rule the whole list obeys is that kit does
+  not make a good day better — it makes a bad day playable. Which is why simply
+  owning a thing is enough to have it, and why a full kit does not so much make
+  every day good as make every day legible.
+
+  **None of it changes the odds yet.** The items are found, owned and shown;
+  what each one is *for* arrives with the code that reads it, a family at a
+  time — the weather kit first, then the depth and the dark, then supplies and
+  the sky. The notes on the board say what a thing is for rather than what it
+  does, for exactly that reason.
 - **The album.** A second board under the curios, one slot per form, each drawn
   in its own body colour taken straight from its voxel model so the board and
   the creature always agree. Forms the family has never grown show as

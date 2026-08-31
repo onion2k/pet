@@ -4,11 +4,12 @@ import { TEMPERAMENTS, type TemperamentId } from './temperament'
 import { HEALTH_FLOOR } from './tuning'
 import { now as clockNow } from '../engine/clock'
 import { BIOMES, knownBiome, type BiomeId } from '../data/biome'
+import { isKitId } from '../data/kit'
 import type { PlayAxis } from '../data/yardgames'
 import { emptyYard, type Planting } from './yard'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 /**
  * The slice of `localStorage` the save needs, behind a seam. A test supplies a
@@ -137,6 +138,10 @@ const MIGRATIONS: Record<number, (raw: any) => any> = {
       strays: raw.yard?.strays ?? [],
     },
   }),
+  // 7 -> 8 adds the kit. Nobody has found any of it yet, which is what an
+  // empty list means -- and it is the family's rather than the pet's, so it
+  // sits beside the curios and outlives whoever carried it home.
+  7: (raw) => ({ ...raw, kit: [] }),
 }
 
 /** A pet that has never been played with out in the yard. */
@@ -177,6 +182,7 @@ export function emptySave(): SaveFile {
     home: 'meadow',
     yard: emptyYard(),
     larder: {},
+    kit: [],
   }
 }
 
@@ -344,6 +350,10 @@ function repair(data: Record<string, unknown>): SaveFile {
     home: knownBiome(data.home),
     yard: { gardens: gardens(yard.gardens), strays: arr(yard.strays, []) },
     larder: rec(data.larder, base.larder),
+    // Filtered to what this build still has an item for, the same way the
+    // species album is: kit from a branch, or from a build since rolled back,
+    // would otherwise sit on the board as a slot nothing can draw.
+    kit: [...new Set(arr<unknown>(data.kit, []).filter(isKitId))],
   }
 }
 

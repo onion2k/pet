@@ -238,6 +238,11 @@ describe('migrations', () => {
     expect(load().larder).toEqual({})
   })
 
+  it('adds an empty kit at version 7', () => {
+    store.data[KEY] = JSON.stringify({ ...emptySave(), version: 7, kit: undefined })
+    expect(load().kit).toEqual([])
+  })
+
   it('preserves a lineage through every migration from the oldest format', () => {
     const pet = { ...newPet('KIRA', 10), discovered: ['egg', 'blob'] }
     store.data[KEY] = JSON.stringify({ pet, muted: false })
@@ -272,6 +277,19 @@ describe('repair', () => {
       gardens: {},
       strays: [],
     })
+  })
+
+  it('replaces a kit that is not a list', () => {
+    expect(damaged({ kit: 'umbrella' }).kit).toEqual([])
+    expect(damaged({ kit: null }).kit).toEqual([])
+  })
+
+  it('drops kit this build has no item for, rather than leaving a slot it cannot draw', () => {
+    expect(damaged({ kit: ['torch', 'jetpack', 7, null] }).kit).toEqual(['torch'])
+  })
+
+  it('keeps one of each piece of kit, however many times the file says it', () => {
+    expect(damaged({ kit: ['torch', 'torch', 'creel'] }).kit).toEqual(['torch', 'creel'])
   })
 
   it('replaces a yard that is not an object at all', () => {

@@ -1,4 +1,5 @@
 import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
+import { KIT, KIT_COUNT } from '../data/kit'
 import { textWidth } from '../data/font'
 import { PROSPECT_LABEL, type Prospect } from '../data/grounds'
 import { ICON_LABEL, ICON_ORDER } from '../data/icons'
@@ -376,7 +377,14 @@ function drawBoardHeading(hud: Hud, y: number, label: string): void {
 
 function drawCurioBoard(hud: Hud, app: App): void {
   const counts = app.curioCounts
-  drawBoardHeading(hud, 38, `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}`)
+  // The kit is counted here but not drawn here: the right-hand column is full
+  // to the last row, and the album may not lose one. The board itself lives on
+  // the curios screen, which A opens from this one.
+  drawBoardHeading(
+    hud,
+    38,
+    `CURIOS ${app.curioTally.kinds}/${CURIO_COUNT}  KIT ${app.kitTally.owned}`,
+  )
   CURIOS.forEach((curio, i) => {
     const x = BOARD_X + (i % 4) * CELL
     const y = 50 + Math.floor(i / 4) * 18
@@ -473,42 +481,95 @@ function drawWelcome(hud: Hud, app: App): void {
  * The collection, with something to do on it. Spares used to be a number in the
  * corner of a glyph and nothing more; here they are a currency, so a season the
  * player keeps missing stops being a wall the year takes an hour to come round.
+ *
+ * Eight to a row, which is what makes the kit fit: sixteen slots at the four
+ * across the board used to use is four rows, and four rows walk straight over
+ * the name, the sets and the footer.
  */
+/**
+ * Where slot `i` sits: the collection along the top, the kit along the bottom.
+ * Eight is what the glass holds at this pitch, and a test holds both lists to
+ * it -- a ninth curio would otherwise quietly walk off the right-hand edge.
+ */
+export const SLOTS_PER_ROW = 8
+const SLOT_PITCH = 23
+const SLOT_LEFT = 4
+const slotAt = (i: number) => {
+  const kit = i >= CURIOS.length
+  return {
+    x: SLOT_LEFT + ((kit ? i - CURIOS.length : i) % SLOTS_PER_ROW) * SLOT_PITCH,
+    y: kit ? 56 : 20,
+  }
+}
+/** The kit's own heading, sat between the two rows. */
+const KIT_LABEL_Y = 44
+
 function drawCurios(hud: Hud, app: App): void {
   hud.rect(0, 0, hud.width, hud.height, panel(0.045))
   const tally = app.curioTally
-  hud.textCentered(hud.width / 2, 8, `CURIOS ${tally.kinds}/${CURIO_COUNT}`, ACCENT)
+  hud.textCentered(hud.width / 2, 6, `CURIOS ${tally.kinds}/${CURIO_COUNT}`, ACCENT)
 
+  // Two rows of eight rather than four of four. The two halves of the board
+  // are different kinds of thing -- one to fill, one to use -- so each gets a
+  // row and a name, and the shape of the screen says what the words would
+  // otherwise have to.
   const counts = app.curioCounts
   CURIOS.forEach((curio, i) => {
-    const x = 20 + (i % 4) * 40
-    const y = 20 + Math.floor(i / 4) * 32
+    const { x, y } = slotAt(i)
     const held = counts[curio.id] ?? 0
-    const selected = app.curioIndex === i
-    if (selected) hud.rect(x - 6, y - 4, 32, 28, '#1b2338')
+    if (app.curioIndex === i) hud.rect(x - 3, y - 3, 22, 22, '#1b2338')
     hud.glyph(x, y, curio.glyph.split('/'), held > 0 ? curio.colour : MISSING, 2)
-    if (held > 1) hud.text(x + 18, y + 9, String(Math.min(9, held)), '#8b95c0')
+    // As on the status board: the spare count sits on the artwork, over its own
+    // backing, rather than costing the row the space to write it underneath.
+    if (held > 1) {
+      hud.rect(x + 9, y + 9, 7, 8, '#05050b')
+      hud.text(x + 10, y + 10, String(Math.min(9, held)), '#8b95c0')
+    }
   })
 
-  const held = CURIOS[app.curioIndex]
-  const count = held ? (counts[held.id] ?? 0) : 0
-  hud.textCentered(hud.width / 2, 88, (held?.name ?? '').toUpperCase(), count > 0 ? INK : DIM)
-  hud.textCentered(hud.width / 2, 98, count > 0 ? `HAVE ${count}` : 'NOT FOUND', DIM)
+  const owned = new Set(app.kitOwned)
+  hud.text(4, KIT_LABEL_Y, `KIT ${owned.size}/${KIT_COUNT}`, DIM)
+  KIT.forEach((item, i) => {
+    const { x, y } = slotAt(CURIOS.length + i)
+    if (app.curioIndex === CURIOS.length + i) hud.rect(x - 3, y - 3, 22, 22, '#1b2338')
+    hud.glyph(x, y, item.glyph.split('/'), owned.has(item.id) ? item.colour : MISSING, 2)
+  })
+
+  // What the cursor is on. A curio says how many; a piece of kit says what it
+  // is for, because owning it is the whole of what there is to know.
+  const slot = app.boardSlot
+  const found = slot.kind === 'curio' ? slot.held > 0 : slot.owned
+  const name = slot.kind === 'curio' ? slot.curio.name : slot.item.name
+  const under =
+    slot.kind === 'curio'
+      ? slot.held > 0
+        ? `HAVE ${slot.held}`
+        : 'NOT FOUND'
+      : slot.owned
+        ? slot.item.note
+        : 'NOT FOUND'
+  hud.textCentered(hud.width / 2, 82, name.toUpperCase(), found ? INK : DIM)
+  hud.textCentered(hud.width / 2, 92, under.toUpperCase(), DIM)
 
   // What the sets are worth, which is the reason to finish one. Kept clear of
   // the hold-to-go-back strip, which owns the last fourteen rows.
   const boons = app.boons
-  hud.rect(20, 110, hud.width - 40, 1, '#22283c')
+  hud.rect(20, 104, hud.width - 40, 1, '#22283c')
   CURIO_SETS.forEach((set, i) => {
     const done = boons.includes(set.id)
-    const y = 116 + i * 8
+    const y = 110 + i * 8
     hud.text(20, y, set.name.toUpperCase(), done ? GOOD : DIM)
     hud.text(72, y, done ? set.boon.toUpperCase() : '---', done ? COOL : '#33384d')
   })
 
   const want = app.tradeFor
   const footer = hud.height - 26
-  if (!want) hud.textCentered(hud.width / 2, footer, 'THE BOARD IS FULL', GOOD)
+  if (slot.kind === 'kit') {
+    // Kit has no spares and so nothing to trade. Saying what it does have --
+    // that it is the pet's to use rather than the board's to fill -- is worth
+    // more than a prompt for a button that would only refuse.
+    hud.textCentered(hud.width / 2, footer, 'THE PET USES THESE', DIM)
+  } else if (!want) hud.textCentered(hud.width / 2, footer, 'THE BOARD IS FULL', GOOD)
   else if (app.canTrade) {
     const line = `B TRADE ${TRADE_COST} FOR ${want.name.toUpperCase()}`
     hud.textCentered(hud.width / 2, footer, line, ACCENT)
@@ -612,7 +673,9 @@ function drawForage(hud: Hud, app: App): void {
     y += gap
   })
 
-  const found = app.forageFound
+  // Whatever it came home with, drawn under the last beat. Kit and curio are
+  // the same size of artwork and the same kind of moment, so they share a slot.
+  const found = app.forageFound ?? app.forageKit
   if (found) hud.glyph(hud.width / 2 - 8, y + 2, found.glyph.split('/'), found.colour, 2)
 
   // Push your luck. The bar is the answer running out, and running out means
