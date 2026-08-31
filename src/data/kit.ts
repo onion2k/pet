@@ -1,4 +1,4 @@
-import type { DayPreference, GroundRole } from './grounds'
+import type { GroundRole } from './grounds'
 import type { SeasonId, WeatherId } from './seasons'
 
 /**
@@ -16,11 +16,12 @@ import type { SeasonId, WeatherId } from './seasons'
  * every day good, it makes every day legible -- which is the thing the game
  * keeps asking the player to pay attention to.
  *
- * Nothing in this file does anything yet. The items are found, they are owned,
- * and the board shows them; what each one is *for* arrives with the code that
- * reads it. The notes below are written as purpose rather than as effect for
- * exactly that reason -- an umbrella is for a wet day whether or not the odds
- * have been taught about it.
+ * None of it is found. Every piece is earned by doing the job it then helps
+ * with: the pet goes out in the rain three times and takes to carrying an
+ * umbrella; it walks past the first leg often enough and puts boots on. So a
+ * player never gets a thing before they have met the problem it solves, and
+ * never watches a lottery decide whether they get one at all -- the board is a
+ * list of what to go and do, and the doing is the game.
  */
 export type KitId =
   | 'umbrella'
@@ -51,20 +52,34 @@ export interface KitItem {
   /** What it is for, in the feed and forage menus' voice. */
   note: string
   /**
-   * The day it is for, which is also the day it turns up on. Absent means it
-   * does not mind, and something that does not mind needs another gate or it
-   * is simply the first thing anybody finds.
+   * What kind of trip counts toward earning it, and how many of them.
+   *
+   * Every one of these is the job the thing then helps with: the pet goes out
+   * in the rain three times and takes to carrying an umbrella; it walks past
+   * the first leg often enough and puts boots on. Nothing here is a lottery,
+   * and nothing is handed over before the player has met the problem it
+   * solves -- which is the difference between a reward and a drop.
    */
-  wants?: DayPreference
-  /** True for kit that only turns up on a trip that set out after dark. */
-  night?: boolean
-  /** The kind of ground that turns it up. Absent means any of them. */
-  role?: GroundRole
-  /** How many legs the pet must have walked. As the geode: the far things. */
-  depth?: number
+  counts(trip: Trip): boolean
+  needs: number
+  /**
+   * The qualifying trips, named, for the board to print under a silhouette.
+   * A noun phrase, because the screen puts the tally after it: "TRIPS IN THE
+   * WET 1/3".
+   */
+  hint: string
   /** 8x8 artwork, in the same format as the curios and the menu icons. */
   glyph: string
   colour: string
+}
+
+/** A trip that has just happened, for deciding what it was worth. */
+export interface Trip extends Day {
+  role: GroundRole
+  /** How many legs the pet walked. One is a there-and-back. */
+  legs: number
+  /** Whether it picked anything up on the way. */
+  supplies: boolean
 }
 
 const art = (...rows: string[]): string => rows.join('/')
@@ -75,7 +90,9 @@ export const KIT: KitItem[] = [
     name: 'Umbrella',
     what: 'an umbrella',
     note: 'For a day of rain.',
-    wants: { weather: ['rain', 'mist'] },
+    counts: (trip) => isWet(trip.weather),
+    needs: 3,
+    hint: 'TRIPS IN THE WET',
     colour: '#6f9ee8',
     glyph: art(
       '...##...',
@@ -93,7 +110,9 @@ export const KIT: KitItem[] = [
     name: 'Bobble hat',
     what: 'a bobble hat',
     note: 'For the cold.',
-    wants: { weather: ['snow'] },
+    counts: (trip) => trip.season === 'winter',
+    needs: 3,
+    hint: 'TRIPS IN WINTER',
     colour: '#e2604f',
     glyph: art(
       '...##...',
@@ -111,8 +130,9 @@ export const KIT: KitItem[] = [
     name: 'Snowboard',
     what: 'a snowboard',
     note: 'For getting somewhere, fast.',
-    wants: { weather: ['snow'] },
-    depth: 2,
+    counts: (trip) => trip.weather === 'snow',
+    needs: 3,
+    hint: 'TRIPS IN THE SNOW',
     colour: '#5fd0e8',
     glyph: art(
       '......##',
@@ -130,7 +150,9 @@ export const KIT: KitItem[] = [
     name: 'Torch',
     what: 'a torch',
     note: 'For the dark.',
-    night: true,
+    counts: (trip) => trip.night,
+    needs: 3,
+    hint: 'TRIPS AFTER DARK',
     colour: '#ffb03a',
     glyph: art(
       '...#....',
@@ -148,7 +170,9 @@ export const KIT: KitItem[] = [
     name: 'Stout boots',
     what: 'a pair of stout boots',
     note: 'For a long way out.',
-    depth: 2,
+    counts: (trip) => trip.legs > 1,
+    needs: 5,
+    hint: 'TRIPS PUSHED FURTHER',
     colour: '#8a6242',
     glyph: art(
       '........',
@@ -166,7 +190,9 @@ export const KIT: KitItem[] = [
     name: 'Waders',
     what: 'a pair of waders',
     note: 'For standing in water.',
-    role: 'wet',
+    counts: (trip) => trip.role === 'wet',
+    needs: 3,
+    hint: 'TRIPS TO WET GROUND',
     colour: '#4f8f6a',
     glyph: art(
       '..####..',
@@ -184,7 +210,9 @@ export const KIT: KitItem[] = [
     name: 'Basket',
     what: 'a basket',
     note: 'For carrying more home.',
-    wants: { seasons: ['autumn'] },
+    counts: (trip) => trip.supplies,
+    needs: 5,
+    hint: 'TRIPS THAT GATHERED',
     colour: '#c69a5a',
     glyph: art(
       '..####..',
@@ -205,8 +233,9 @@ export const KIT: KitItem[] = [
     // before the rain is folk knowledge, and a player who has not met it would
     // otherwise be holding a fir cone and wondering what it was for.
     note: 'It closes before rain.',
-    role: 'sheltered',
-    depth: 3,
+    counts: () => true,
+    needs: 20,
+    hint: 'TRIPS OF ANY KIND',
     colour: '#96562e',
     glyph: art(
       '..####..',
@@ -365,60 +394,45 @@ export const NO_KIT: KitPowers = {
   forecasts: false,
 }
 
-/** The trip a piece of kit might turn up on: a day, and how the trip went. */
-export interface KitDay extends Day {
-  role: GroundRole
-  /** How deep into the trip the pet got. */
-  depth: number
+/**
+ * How far along the family is toward each piece of kit it has yet to earn.
+ *
+ * Kept as a plain tally per item rather than as a pile of counters with names
+ * -- "trips in the rain", "trips after dark" -- because what a trip is worth
+ * is the item's business, and a tally the item owns cannot fall out of step
+ * with the rule that fills it.
+ */
+export type KitProgress = Partial<Record<KitId, number>>
+
+/** What a trip did for a family: what it earned them, and how much nearer. */
+export interface KitEarned {
+  /** Kit the trip finished off, in board order. */
+  earned: KitItem[]
+  /** The tally afterwards. */
+  progress: KitProgress
 }
 
 /**
- * How often a trip that could turn up kit does. Rarer than a curio: there are
- * eight of these in the whole family's life, and each one is a small permanent
- * change to what the weather means.
+ * Counts a trip toward everything it was a trip for.
+ *
+ * Pure, and takes the tally rather than the save, so the rule that decides
+ * what a family has earned can be read straight through without a game around
+ * it. A trip can finish more than one thing at once -- a pushed trip through
+ * snow after dark is three kinds of trip -- and all of them are handed back.
  */
-export const KIT_CHANCE = 0.14
-
-/** Whether this trip is the kind of trip that turns this item up. */
-function suits(item: KitItem, day: KitDay): boolean {
-  if (item.night && !day.night) return false
-  if (item.role && item.role !== day.role) return false
-  if ((item.depth ?? 1) > day.depth) return false
-  const wants = item.wants
-  if (wants?.seasons && !wants.seasons.includes(day.season)) return false
-  if (wants?.weather && !wants.weather.includes(day.weather)) return false
-  return true
+export function creditTrip(owned: KitId[], progress: KitProgress, trip: Trip): KitEarned {
+  const next: KitProgress = { ...progress }
+  const earned: KitItem[] = []
+  for (const item of KIT) {
+    if (owned.includes(item.id) || !item.counts(trip)) continue
+    const done = (next[item.id] ?? 0) + 1
+    next[item.id] = done
+    if (done >= item.needs) earned.push(item)
+  }
+  return { earned, progress: next }
 }
 
-/**
- * Everything this trip could have turned up: what the day suits, less what the
- * family already has.
- *
- * The world hands you the tool at the moment you first wanted it -- the
- * umbrella turns up in the rain, the snowboard in snow, the torch on a trip
- * that set out after dark. Better than a lottery, and it is how the rest of the
- * game already reads the calendar.
- *
- * This is deliberately the only thing that decides what kit is reachable, and
- * deliberately one function: earning it rather than finding it means replacing
- * what is in here, and nothing else. Separate from the pick because an empty
- * pool must not cost a roll -- a day with no kit on it would otherwise shift
- * every other die the trip throws, and the trip throws them for the weather.
- */
-export function kitPool(owned: KitId[], day: KitDay): KitItem[] {
-  return KIT.filter((item) => !owned.includes(item.id) && suits(item, day))
-}
-
-/**
- * Which of them this trip actually turned up.
- *
- * Split from the pool rather than folded into it because an empty pool must
- * not cost a roll, and only the caller knows whether it has one to spend. The
- * pool has to be non-empty: there is nothing sensible to hand back otherwise,
- * and a null here would be a branch no trip can ever take.
- */
-export function pickKit(pool: KitItem[], roll: number): KitItem {
-  // A roll of exactly 1, or one nudged past it by floating point, would index
-  // off the end -- as in `findCurio`, the last of the pool is the answer.
-  return pool[Math.min(pool.length - 1, Math.floor(roll * pool.length))]!
+/** How near the family is to earning one, for the board to show under it. */
+export function progressOf(progress: KitProgress, item: KitItem): number {
+  return Math.min(item.needs, progress[item.id] ?? 0)
 }

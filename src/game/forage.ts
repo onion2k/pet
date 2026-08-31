@@ -1,6 +1,6 @@
 import { beat, type JourneyContext, type Leg } from '../data/journey'
 import { findCurio, type Curio } from '../data/curios'
-import type { KitDay, KitItem, KitPowers, MishapId } from '../data/kit'
+import type { KitItem, KitPowers, MishapId, Trip } from '../data/kit'
 import { luckOf, type Ground } from '../data/grounds'
 import type { CurioSet } from '../data/curios'
 import { random } from '../engine/random'
@@ -88,12 +88,12 @@ export interface ForageHost {
    */
   bringHome(legs: number): { what: string; announce: string } | null
   /**
-   * Tries to turn up a piece of kit. Null when there is nothing out there for
-   * this kind of day, or when the family already owns everything that is --
-   * which is most trips, most of the time. The host rolls it, as it rolls the
-   * yard and the supplies; the trip only decides whether to look.
+   * Hands the trip in, and gets back whatever it earned the family in the way
+   * of kit -- usually nothing, since most trips are one more step toward
+   * something rather than the last one. Told about every trip, good or bad: a
+   * trip that came home empty was still a trip out in the rain.
    */
-  takeKit(day: KitDay): KitItem | null
+  recordTrip(trip: Trip): KitItem[]
   /**
    * Picks up food and fuel on the way. Unlike a curio this is not the point of
    * the trip -- it happens alongside whatever else did -- so it returns what to
@@ -128,7 +128,7 @@ export class Forage {
   beats: string[] = []
   /** What it came home with, once it is home. Null until then, and on no luck. */
   found: Curio | null = null
-  /** Kit it came home with, which is a different and rarer kind of find. */
+  /** Kit the trip earned, which is not a find so much as a lesson learned. */
   foundKit: KitItem | null = null
   /** How many legs it has walked. One is a there-and-back; three is a long way. */
   legs = 1
@@ -336,6 +336,20 @@ export class Forage {
    */
   private settle(): void {
     this.timer = BEAT_SECONDS
+    const supplies = this.tell()
+    // What the trip was worth to the family, as against what it brought home.
+    // Told after the result rather than instead of it: a trip that finished
+    // off a pair of boots should still hand over whatever it found, and the
+    // player should hear about both.
+    this.earn(supplies)
+  }
+
+  /**
+   * What happened out there, and what came home. Returns whether the pet
+   * picked anything up on the way, which is the one part of the telling that
+   * the earning also cares about.
+   */
+  private tell(): boolean {
     const ctx = this.ctx!
     const ground = this.ground!
     const name = this.host.petName()
@@ -385,34 +399,7 @@ export class Forage {
         this.host.speakNow(brought.announce)
         this.host.burst('sparkle', 12)
         this.host.persist()
-        return
-      }
-    }
-
-    // Kit is the rarest thing out there and, when it happens, it is the whole
-    // story of the trip: the umbrella turns up on the day the pet wanted one.
-    // So it is tried before the find and comes home in place of it, supplies
-    // and all -- a trip that brought back a torch does not also need to
-    // mention the brambles. The odds live with the host, along with the roll:
-    // most days have no kit on them at all, and asking on those days must not
-    // cost the trip a die.
-    if (!mishap?.spoils) {
-      const item = this.host.takeKit({
-        season: ctx.season,
-        weather: ctx.weather,
-        night: ctx.night,
-        role: ground.role,
-        depth: this.legs,
-      })
-      if (item) {
-        this.foundKit = item
-        this.beats.push(
-          mishap ? `${mishap.line}, carrying ${item.what}` : `comes home with ${item.what}`,
-        )
-        this.host.speakNow(`${name} came back with ${item.what}`)
-        this.host.burst('sparkle', 16)
-        this.host.persist()
-        return
+        return false
       }
     }
 
@@ -429,7 +416,7 @@ export class Forage {
       this.beats.push(supply ? `${line}, but with ${supply}` : line)
       this.host.speakNow(supply ? `${name} brought back ${supply}` : `${name} came back with nothing`)
       this.host.persist()
-      return
+      return !!supply
     }
 
     this.found = curio
@@ -441,6 +428,34 @@ export class Forage {
     this.beats.push(supply ? `${line}, and ${supply}` : line)
     this.host.speakNow(`${name} came back with a ${what}`)
     this.host.burst('sparkle', 12)
+    this.host.persist()
+    return !!supply
+  }
+
+  /**
+   * Hands the trip in for what it was worth. Every trip counts toward
+   * something, and now and then one is the last of its kind that was needed --
+   * which is said here, where the player is already looking, rather than left
+   * to the ticker to mention while they are elsewhere.
+   */
+  private earn(supplies: boolean): void {
+    const ctx = this.ctx!
+    const earned = this.host.recordTrip({
+      season: ctx.season,
+      weather: ctx.weather,
+      night: ctx.night,
+      role: ctx.role,
+      legs: this.legs,
+      supplies,
+    })
+    if (earned.length === 0) return
+    // More than one can land at once -- a pushed trip through snow after dark
+    // is three kinds of trip -- and each is worth its own line.
+    const name = this.host.petName()
+    for (const item of earned) this.beats.push(`and now carries ${item.what}`)
+    this.foundKit = earned[0]!
+    this.host.speakNow(`${name} now carries ${earned[0]!.what}`)
+    this.host.burst('sparkle', 16)
     this.host.persist()
   }
 }

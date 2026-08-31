@@ -6,7 +6,7 @@ import { LARDER_CAP } from '../../src/game/larder'
 import { YARD_CAPACITY } from '../../src/game/yard'
 import { VERGE_SLOTS } from '../../src/data/biome'
 import { CURIOS, TRADE_COST } from '../../src/data/curios'
-import { KIT, type KitId } from '../../src/data/kit'
+import { KIT, kitById, type KitId } from '../../src/data/kit'
 import { draw } from '../screens'
 import { drawScreen } from '../../src/ui/draw'
 import { isNight, worldAt } from '../../src/game/world'
@@ -266,42 +266,78 @@ describe('a trip', () => {
     expect(h.app.forageFound).not.toBeUndefined()
   })
 
-  it('can bring back a piece of kit, which the family keeps', () => {
-    // The world starts these tests after dark, and the dark is what a torch is
-    // for -- so this is the trip that turns one up, on dice that always find.
-    const h = grownUp({ random: () => 0 })
-    h.select('forage')
-    h.tap('b')
-    runTrip(h, 'c')
-    expect(h.app.kitOwned).toEqual(['torch'])
-    expect(h.app.kitTally).toEqual({ owned: 1, of: KIT.length })
+  it('earns a piece of kit by making the trips it is earned by, and keeps it', () => {
+    // Three trips out in the dark, and the pet takes to carrying a torch. No
+    // dice anywhere in it: the same three trips always do it.
+    const torch = kitById('torch')!
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: true }) } })
+      .start()
+      .growTo('adult')
+    for (let trip = 1; trip <= torch.needs; trip++) {
+      expect(h.app.kitOwned, `before trip ${trip}`).not.toContain('torch')
+      h.pet.stats.energy = 100
+      h.pet.sick = false
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    expect(h.app.kitOwned).toContain('torch')
     expect(h.app.forageKit?.id).toBe('torch')
-    // Kit is the whole story of the trip it comes home on, so the board does
-    // not also gain a curio for it.
-    expect(h.app.curioTally.total).toBe(0)
   })
 
-  it('says what it found, and never finds the same thing twice', () => {
-    const h = grownUp({ random: () => 0 })
-    h.select('forage')
-    h.tap('b')
-    runTrip(h, 'c')
-    h.until('the news of it', () => h.app.tickerText.includes('FOUND A TORCH'))
+  it('counts a trip that came home with nothing, which is the point', () => {
+    // The worst days are the ones a player most wants kit for. A trip that
+    // found nothing was still a trip out in the dark.
+    const h = harness({
+      // Every roll at the top: no find, no supplies, nothing at all.
+      random: () => 0.99,
+      save: { ...emptySave(), worldOffset: offsetWith({ night: true }) },
+    })
+      .start()
+      .growTo('adult')
+    for (let trip = 0; trip < kitById('torch')!.needs; trip++) {
+      h.pet.stats.energy = 100
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    expect(h.app.curioTally.total).toBe(0)
+    expect(h.app.kitOwned).toContain('torch')
+  })
 
+  it('says what it earned, and stops counting once it has it', () => {
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: true }) } })
+      .start()
+      .growTo('adult')
+    for (let trip = 0; trip < kitById('torch')!.needs; trip++) {
+      h.pet.stats.energy = 100
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
+    }
+    h.until('the news of it', () => h.app.tickerText.includes('NOW CARRIES A TORCH'))
+
+    const before = h.app.kitProgress.torch
     h.pet.stats.energy = 100
     h.select('forage')
     h.tap('b')
     runTrip(h, 'c')
-    expect(h.app.kitOwned).toEqual(['torch'])
+    expect(h.app.kitOwned.filter((id) => id === 'torch')).toHaveLength(1)
+    expect(h.app.kitProgress.torch).toBe(before)
   })
 
-  it('saves the kit, so it outlives the tab', () => {
-    const h = grownUp({ random: () => 0 })
+  it('keeps the tally between trips, and saves it', () => {
+    const h = harness({ save: { ...emptySave(), worldOffset: offsetWith({ night: true }) } })
+      .start()
+      .growTo('adult')
+    h.pet.stats.energy = 100
     h.select('forage')
     h.tap('b')
     runTrip(h, 'c')
+    expect(h.app.kitProgress.torch).toBe(1)
+    expect(h.app.kitOwned).toEqual([])
     flushSave()
-    expect(h.stored()!.kit).toEqual(['torch'])
+    expect(h.stored()!.kitProgress.torch).toBe(1)
   })
 
   it('saves what it brought home', () => {
@@ -331,9 +367,13 @@ describe('what the trip changes', () => {
     const h = forageRepeatedly(grownUp({ random: () => 0.3 }), 24, 'c')
     const larder = h.app.larder
     expect(Object.keys(larder).length).toBeGreaterThan(0)
+    // The cap the family actually has: two dozen trips is enough to earn a
+    // basket, and a basket is three more of everything.
+    const cap = h.app.larderCap
+    expect(cap).toBeGreaterThanOrEqual(LARDER_CAP)
     for (const [id, count] of Object.entries(larder)) {
       expect(count, id).toBeGreaterThan(0)
-      expect(count, id).toBeLessThanOrEqual(LARDER_CAP)
+      expect(count, id).toBeLessThanOrEqual(cap)
     }
   })
 
@@ -571,20 +611,21 @@ describe('what the kit is worth', () => {
   })
 
   it('holds more in the larder for a family with a basket', () => {
-    const fill = (kit: KitId[]) => {
-      const h = harness({ save: { ...emptySave(), kit }, random: 4 }).start().growTo('adult')
-      for (let trip = 0; trip < 40; trip++) {
-        h.pet.stats.energy = 100
-        h.pet.sick = false
-        h.select('forage')
-        h.tap('b')
-        runTrip(h, 'c')
-      }
-      return Math.max(0, ...Object.values(h.app.larder))
+    expect(kitted([], {}).app.larderCap).toBe(LARDER_CAP)
+    expect(kitted(['basket'], {}).app.larderCap).toBeGreaterThan(LARDER_CAP)
+
+    // And the gathering actually uses the bigger number.
+    const h = harness({ save: { ...emptySave(), kit: ['basket'] }, random: 4 })
+      .start()
+      .growTo('adult')
+    for (let trip = 0; trip < 40; trip++) {
+      h.pet.stats.energy = 100
+      h.pet.sick = false
+      h.select('forage')
+      h.tap('b')
+      runTrip(h, 'c')
     }
-    const bare = fill([])
-    expect(bare).toBe(LARDER_CAP)
-    expect(fill(['basket'])).toBeGreaterThan(LARDER_CAP)
+    expect(Math.max(0, ...Object.values(h.app.larder))).toBeGreaterThan(LARDER_CAP)
   })
 
   it('tells a family with a pine cone when the sky is going to turn', () => {

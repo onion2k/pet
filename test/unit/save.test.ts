@@ -243,6 +243,18 @@ describe('migrations', () => {
     expect(load().kit).toEqual([])
   })
 
+  it('starts the kit tally empty at version 8, keeping what was already carried', () => {
+    store.data[KEY] = JSON.stringify({
+      ...emptySave(),
+      version: 8,
+      kit: ['torch'],
+      kitProgress: undefined,
+    })
+    const file = load()
+    expect(file.kit).toEqual(['torch'])
+    expect(file.kitProgress).toEqual({})
+  })
+
   it('preserves a lineage through every migration from the oldest format', () => {
     const pet = { ...newPet('KIRA', 10), discovered: ['egg', 'blob'] }
     store.data[KEY] = JSON.stringify({ pet, muted: false })
@@ -290,6 +302,23 @@ describe('repair', () => {
 
   it('keeps one of each piece of kit, however many times the file says it', () => {
     expect(damaged({ kit: ['torch', 'torch', 'basket'] }).kit).toEqual(['torch', 'basket'])
+  })
+
+  it('replaces a kit tally that is not an object', () => {
+    expect(damaged({ kitProgress: 'lots' }).kitProgress).toEqual({})
+    expect(damaged({ kitProgress: [1, 2] }).kitProgress).toEqual({})
+  })
+
+  it('drops tally entries this build has no item for', () => {
+    expect(damaged({ kitProgress: { torch: 2, jetpack: 5 } }).kitProgress).toEqual({ torch: 2 })
+  })
+
+  it('will not read a tally back below zero, or as a fraction of a trip', () => {
+    // Everything counted in a save goes through the same door: a finite
+    // number that has never been below zero.
+    expect(damaged({ kitProgress: { torch: -3 } }).kitProgress).toEqual({ torch: 0 })
+    expect(damaged({ kitProgress: { torch: 'two' } }).kitProgress).toEqual({ torch: 0 })
+    expect(damaged({ kitProgress: { torch: Infinity } }).kitProgress).toEqual({ torch: 0 })
   })
 
   it('replaces a yard that is not an object at all', () => {

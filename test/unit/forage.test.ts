@@ -3,7 +3,7 @@ import { Forage, type ForageHost } from '../../src/game/forage'
 import { groundById, type Ground } from '../../src/data/grounds'
 import { resetRandom, scripted, seeded, setRandom } from '../../src/engine/random'
 import type { Curio } from '../../src/data/curios'
-import { kitById, kitPowers, NO_KIT, type KitPowers } from '../../src/data/kit'
+import { kitById, kitPowers, NO_KIT, type KitPowers, type Trip } from '../../src/data/kit'
 import type { JourneyContext } from '../../src/data/journey'
 import type { Stats } from '../../src/game/types'
 
@@ -25,6 +25,8 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
     persists: 0,
     /** How deep each trip looked, which a torch can raise without walking. */
     depths: [] as number[],
+    /** Every trip handed in, for the tests about what a trip was worth. */
+    trips: [] as Trip[],
     broughtHome: 0,
     gathered: 0,
   }
@@ -48,7 +50,11 @@ function stubHost(overrides: Partial<ForageHost> = {}) {
     addCurio: (curio) => calls.curios.push(curio),
     // Nothing to find by default: kit is the rarest thing out there, and a
     // trip that keeps turning one up is not the trip most of these test.
-    takeKit: () => null,
+    // Every trip is counted, and by default none of them finishes anything.
+    recordTrip: (trip) => {
+      calls.trips.push(trip)
+      return []
+    },
     // No kit, unless a test is about having some.
     kit: () => NO_KIT,
     bringHome: () => {
@@ -593,11 +599,11 @@ describe('what it comes home with', () => {
     expect(stub.calls.spoken).toContain('PIP planted a bramble')
   })
 
-  it('says what kit it came home with, in place of a find', () => {
-    // Every roll at the top: no mishap, no yard find, and the luck check for a
-    // curio fails -- so the only thing this trip can be about is the kit.
-    setRandom(() => 0.99)
-    const stub = stubHost({ takeKit: () => TORCH })
+  it('says what the trip earned, alongside what it found rather than instead', () => {
+    // Kit is no longer a find that takes the trip over: a trip that finished
+    // off a torch still hands over whatever it came home with, and says both.
+    setRandom(() => 0)
+    const stub = stubHost({ recordTrip: () => [TORCH] })
     const forage = new Forage(stub.host)
     forage.begin(WALL)
     const seen: string[] = []
@@ -606,111 +612,73 @@ describe('what it comes home with', () => {
       forage.advance(1 / 60)
       for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
     }
-    expect(seen).toContain('comes home with a torch')
-    expect(stub.calls.spoken).toContain('PIP came back with a torch')
+    expect(seen).toContain('and now carries a torch')
+    expect(stub.calls.spoken).toContain('PIP now carries a torch')
     expect(forage.foundKit).toBe(TORCH)
-    // The kit is the whole story of the trip, so nothing was added to the board.
-    expect(stub.calls.curios).toEqual([])
+    // And the find it was already having still happened.
+    expect(stub.calls.curios).toHaveLength(1)
   })
 
-  it('says the mishap and the kit together, since one does not spoil the other', () => {
-    // Rolls at zero: a mishap that does not spoil the trip, and kit anyway.
+  it('gives a line to each of several things finished at once', () => {
+    // A pushed trip through snow after dark is three kinds of trip, and can
+    // be the last one needed for more than one of them.
     setRandom(() => 0)
-    const stub = stubHost({ bringHome: () => null, takeKit: () => TORCH })
+    const boots = kitById('boots')!
+    const stub = stubHost({ recordTrip: () => [TORCH, boots] })
     const forage = new Forage(stub.host)
-    forage.begin(HILL)
+    forage.begin(WALL)
     const seen: string[] = []
     for (let i = 0; i < 60 * 120 && forage.active; i++) {
       stub.setAway(forage.outOfSight)
       forage.advance(1 / 60)
-      if (forage.choosing) forage.pushOn()
       for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
     }
-    expect(seen.some((b) => b.includes('mud, carrying a torch'))).toBe(true)
+    expect(seen).toContain('and now carries a torch')
+    expect(seen).toContain('and now carries a pair of stout boots')
   })
 
-  it('spares the mishap an umbrella is for, rather than swapping it for another', () => {
-    // Every roll at zero: the mishap check passes and the first mishap wins,
-    // which is the mud. With an umbrella that simply did not happen -- and
-    // nothing else happened in its place.
-    setRandom(() => 0)
-    const powers: KitPowers = { ...NO_KIT, spares: ['mud'] }
-    const stub = stubHost({ kit: () => powers })
-    const forage = new Forage(stub.host)
-    forage.begin(HILL)
-    const seen: string[] = []
-    for (let i = 0; i < 60 * 120 && forage.active; i++) {
-      stub.setAway(forage.outOfSight)
-      forage.advance(1 / 60)
-      if (forage.choosing) forage.pushOn()
-      for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
-    }
-    for (const line of ['mud', 'footsore', 'and with nothing', 'caught out']) {
-      expect(seen.some((b) => b.includes(line)), line).toBe(false)
-    }
-    // And the trip was not made worse in some other way to make up for it.
-    expect(stub.calls.stats.some((d) => (d.hygiene ?? 0) < 0)).toBe(false)
-  })
-
-  it('settles the trip against the same kit the menu was read with', () => {
-    // The hill wants a clear day. On a wet one it is a poor prospect and the
-    // find usually fails; an umbrella takes the rain out of that reckoning, so
-    // the same dice come home with something.
-    const wet = { season: 'spring', weather: 'rain', night: false } as const
-    const trip = (kit: KitPowers) => {
-      setRandom(scripted([0.6]))
-      const stub = stubHost({
-        kit: () => kit,
-        journeyContext: (ground) => ({
-          role: ground.role,
-          place: ground.place,
-          season: wet.season,
-          weather: wet.weather,
-          night: false,
-          speciesId: 'blob',
-        }),
-      })
-      const forage = new Forage(stub.host)
-      forage.begin(HILL)
-      runToEnd(forage, stub)
-      return stub.calls.curios.length
-    }
-    expect(trip(NO_KIT)).toBe(0)
-    expect(trip(kitPowers(['umbrella'], wet))).toBe(1)
-  })
-
-  it('never looks for kit on a trip that was spoiled before it got anywhere', () => {
-    // A spoiling mishap takes the whole trip with it, kit included: the pet did
-    // not get where it was going, so there was nowhere to find anything. Run
-    // over seeds rather than a scripted trip, because how many dice a trip
-    // throws before it settles depends on the sentences it happened to pick.
-    let spoiled = 0
-    for (let seed = 0; seed < 40; seed++) {
+  it('hands in every trip, however badly it went', () => {
+    // A trip that came home with nothing was still a trip out in the rain, so
+    // it still counts toward the umbrella. Anything else would make the worst
+    // days -- the ones a player most wants kit for -- the ones that never
+    // earn any.
+    for (const seed of [0, 1, 2, 3, 4, 5]) {
       setRandom(seeded(seed))
-      let asked = 0
-      const stub = stubHost({
-        takeKit: () => {
-          asked++
-          return TORCH
-        },
-      })
+      const stub = stubHost()
       const forage = new Forage(stub.host)
       forage.begin(HILL)
-      const seen: string[] = []
       for (let i = 0; i < 60 * 120 && forage.active; i++) {
         stub.setAway(forage.outOfSight)
         forage.advance(1 / 60)
         if (forage.choosing) forage.pushOn()
-        for (const b of forage.beats) if (!seen.includes(b)) seen.push(b)
       }
-      const wasted = seen.some((b) => b.includes('and with nothing') || b.includes('caught out'))
-      if (!wasted) continue
-      spoiled++
-      expect(asked, `seed ${seed}`).toBe(0)
-      expect(forage.foundKit, `seed ${seed}`).toBeNull()
+      expect(stub.calls.trips, `seed ${seed}`).toHaveLength(1)
     }
-    // Or the assertion above never ran and this test proved nothing.
-    expect(spoiled).toBeGreaterThan(0)
+  })
+
+  it('hands in the trip the pet actually made', () => {
+    setRandom(() => 0.99)
+    const stub = stubHost({
+      journeyContext: (ground) => ({
+        role: ground.role,
+        place: ground.place,
+        season: 'winter',
+        weather: 'snow',
+        night: true,
+        speciesId: 'blob',
+      }),
+    })
+    const forage = new Forage(stub.host)
+    forage.begin(HILL)
+    runToEnd(forage, stub)
+    expect(stub.calls.trips[0]).toEqual({
+      season: 'winter',
+      weather: 'snow',
+      night: true,
+      role: 'far',
+      legs: 1,
+      supplies: false,
+    })
   })
 
   it('says the mishap and the yard find together on a bad deep trip', () => {

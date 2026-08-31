@@ -277,6 +277,7 @@ describe('saving', () => {
           home: 'woodland',
           larder: { berries: 2 },
           kit: ['torch', 'umbrella'],
+          kitProgress: { boots: 2 },
         },
       }).start()
 
@@ -296,8 +297,10 @@ describe('saving', () => {
       expect(h.app.discoveredIds).toEqual([])
       expect(h.app.curioCounts).toEqual({})
       expect(h.app.larder).toEqual({})
-      // The kit is the family's, like the curios, so it goes the same way.
+      // The kit is the family's, like the curios, so it goes the same way --
+      // and so does the work that had been put toward the rest of it.
       expect(h.app.kitOwned).toEqual([])
+      expect(h.app.kitProgress).toEqual({})
     })
 
     it('takes the house too, since the house belonged to the family', () => {

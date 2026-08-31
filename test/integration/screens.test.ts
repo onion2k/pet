@@ -4,7 +4,7 @@ import { textWidth } from '../../src/data/font'
 import type { DrawnText } from '../fake-hud'
 import { speciesOf } from '../../src/data/species'
 import { CURIOS } from '../../src/data/curios'
-import { KIT } from '../../src/data/kit'
+import { KIT, kitById } from '../../src/data/kit'
 import { DEFAULT_START, harness } from '../harness'
 import { emptySave } from '../../src/game/save'
 import { isNight } from '../../src/game/world'
@@ -257,6 +257,30 @@ describe('what a screen is for', () => {
     }
   })
 
+  it('the collection screen says what would earn a piece of kit, and how near', () => {
+    // The unearned half of the board is a list of things to go and do, so a
+    // silhouette has to say what to do and how much of it is left.
+    const h = harness({ save: { ...emptySave(), kitProgress: { torch: 2 } } }).start()
+    h.select('status')
+    h.tap('a')
+    const torch = KIT.findIndex((item) => item.id === 'torch')
+    for (let i = 0; i < CURIOS.length + torch; i++) h.tap('c')
+    const said = draw(h).said()
+    expect(said).toContain('TORCH')
+    expect(said).toContain(`${kitById('torch')!.hint} 2/${kitById('torch')!.needs}`)
+  })
+
+  it('the collection screen says what a piece of kit is for once it is earned', () => {
+    const h = harness({ save: { ...emptySave(), kit: ['torch'] } }).start()
+    h.select('status')
+    h.tap('a')
+    const torch = KIT.findIndex((item) => item.id === 'torch')
+    for (let i = 0; i < CURIOS.length + torch; i++) h.tap('c')
+    const said = draw(h).said()
+    expect(said).toContain(kitById('torch')!.note.toUpperCase())
+    expect(said).not.toContain(kitById('torch')!.hint)
+  })
+
   it('the collection screen says what the cursor is on, of either kind', () => {
     const h = openScreen('curios')
     expect(draw(h).said()).toContain(CURIOS[0]!.name.toUpperCase())
@@ -264,7 +288,7 @@ describe('what a screen is for', () => {
     const said = draw(h).said()
     expect(said).toContain(KIT[0]!.name.toUpperCase())
     // And that it is not a thing to be traded, which is what B does elsewhere.
-    expect(said).toContain('THE PET USES THESE')
+    expect(said).toContain('EARNED BY GOING OUT')
   })
 
   it('the main screen keeps the pet in view rather than a menu', () => {

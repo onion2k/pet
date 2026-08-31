@@ -87,7 +87,9 @@ and visitors are read out of the same data the game plays from.
 What it deliberately leaves out is the dice: which curio wants which weather,
 how far out the rare things live, what the odds are of coming home muddy. Those
 are the game's to reveal, and a booklet that printed them would hand the player
-the answers to the only questions worth having.
+the answers to the only questions worth having. The kit is the exception, and
+prints what earns each piece — because there are no dice in it to spoil, and a
+list of things to go and do is no use to anybody kept secret.
 
 ## The long game
 
@@ -126,18 +128,25 @@ Care keeps a pet well; the lineage is why you keep coming back.
 - **The kit.** The other half of the board, and the half the pet *uses*. Eight
   things — an umbrella, a bobble hat, a snowboard, a torch, stout boots,
   waders, a basket and a pine cone — each tied to a condition the world already
-  produces, and each turning up only on the day it is for: the umbrella in the
-  rain, the snowboard in snow, the torch on a trip that set out after dark. The
-  world hands you the tool at about the moment you first wanted one. Kit belongs
-  to the family rather than to the pet carrying it, so a torch fetched by one
-  is still in the porch for the next, and NEW PET takes it the way it takes
-  everything else.
+  produces, and none of them found. **Every one is earned by doing the job it
+  then helps with:** go out in the rain three times and the pet takes to
+  carrying an umbrella; push past the first leg often enough and it puts boots
+  on. There are no dice anywhere in it, and the board says how many more trips
+  each one wants — so the half you have not earned is a list of things to go
+  and do rather than a wall to wait behind. Kit belongs to the family rather
+  than to the pet carrying it, so a torch one pet walked out three dark nights
+  for is still in the porch for the next, and NEW PET takes it, tally and all.
 
   It is not a currency and cannot be traded: a second umbrella is worth nothing,
   so there is nothing to spend. The rule the whole list obeys is that kit does
   not make a good day better — it makes a bad day playable. Which is why simply
   owning a thing is enough to have it, and why a full kit does not so much make
   every day good as make every day legible.
+
+  A trip counts toward everything it was, and every trip counts. One pushed
+  through snow after dark is three kinds of trip at once, and a trip that came
+  home with nothing was still a trip out in the rain — which matters, because
+  the worst days are exactly the ones a player most wants kit for.
 
   Three of them read the day so far. An **umbrella** takes wet weather out of
   the reckoning, so the long hill is worth a try in the rain rather than not

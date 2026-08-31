@@ -43,17 +43,17 @@ import {
   type CurioSet,
 } from '../data/curios'
 import {
+  creditTrip,
   KIT,
-  KIT_CHANCE,
   KIT_COUNT,
-  kitPool,
   kitPowers,
-  pickKit,
+  progressOf,
   type Day,
-  type KitDay,
   type KitId,
   type KitItem,
   type KitPowers,
+  type KitProgress,
+  type Trip,
 } from '../data/kit'
 import { textWidth } from '../data/font'
 import { SPECIES_COUNT } from '../data/species'
@@ -460,29 +460,32 @@ export class App {
     // at least one leg, so there is always something it could have picked up.
     const supply = findSupply(ground.role, legs, random())!
     const held = this.save.larder[supply.id] ?? 0
-    if (held >= LARDER_CAP + this.kitPowers.larderBonus) return null
+    if (held >= this.larderCap) return null
     this.save.larder[supply.id] = held + 1
     return supply.what
   }
 
   /**
-   * What the trip turned up in the way of kit, if anything.
+   * Counts a trip toward everything it was a trip for, and hands back whatever
+   * it finished off.
    *
-   * The roll lives here rather than in the trip because ownership does: kit is
-   * the family's, like the curios and the album, so a torch found by one pet is
-   * still in the porch when the next one is grown enough to want it.
+   * No dice at all. A player who wants an umbrella goes out in the rain until
+   * they have one, and the board tells them how many more times -- which makes
+   * the unearned half of it a list of things to go and do rather than a wall
+   * to wait behind.
+   *
+   * The tally belongs to the family, like the curios and the album, so a torch
+   * one pet walked out three dark nights for is still in the porch when the
+   * next one is grown enough to want it.
    */
-  private takeKit(day: KitDay): KitItem | null {
-    // Asked on every trip, and most trips have nothing out there for them, so
-    // the pool is checked before any dice are thrown: a die spent on a day
-    // with no kit on it would shift every other roll the trip makes.
-    const pool = kitPool(this.save.kit, day)
-    if (pool.length === 0) return null
-    if (random() >= KIT_CHANCE) return null
-    const item = pickKit(pool, random())
-    this.save.kit.push(item.id)
-    this.pushTicker(`${this.living.name} found ${item.what}`)
-    return item
+  private recordTrip(trip: Trip): KitItem[] {
+    const { earned, progress } = creditTrip(this.save.kit, this.save.kitProgress, trip)
+    this.save.kitProgress = progress
+    for (const item of earned) {
+      this.save.kit.push(item.id)
+      this.pushTicker(`${this.living.name} now carries ${item.what}`)
+    }
+    return earned
   }
 
   /**
@@ -513,6 +516,15 @@ export class App {
   /** What is in the larder, for the feed menu and the status screen. */
   get larder(): Record<string, number> {
     return this.save.larder
+  }
+
+  /**
+   * How much of any one thing the family can keep. A basket is three more of
+   * everything, and this is the one place that says so -- the gathering, the
+   * screens and the tests all ask here rather than each adding it up.
+   */
+  get larderCap(): number {
+    return LARDER_CAP + this.kitPowers.larderBonus
   }
 
   /**
@@ -950,7 +962,7 @@ export class App {
       this.save.curios[curio.id] = (this.save.curios[curio.id] ?? 0) + 1
     },
     bringHome: (legs) => this.bringHome(legs),
-    takeKit: (day) => this.takeKit(day),
+    recordTrip: (trip) => this.recordTrip(trip),
     kit: () => this.kitPowers,
     gather: (ground, legs) => this.gather(ground, legs),
     applyStats: (delta) => this.applyStats(delta),
@@ -1142,6 +1154,16 @@ export class App {
 
   get kitTally(): { owned: number; of: number } {
     return { owned: this.save.kit.length, of: KIT_COUNT }
+  }
+
+  /** How near the family is to each thing it has yet to earn. */
+  get kitProgress(): KitProgress {
+    return this.save.kitProgress
+  }
+
+  /** How many qualifying trips this one still wants, for the board to say so. */
+  kitDone(item: KitItem): number {
+    return progressOf(this.save.kitProgress, item)
   }
 
   /** Kit the trip came home with, for the screen that tells it. */

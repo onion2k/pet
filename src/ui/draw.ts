@@ -545,6 +545,10 @@ function drawCurios(hud: Hud, app: App): void {
   const slot = app.boardSlot
   const found = slot.kind === 'curio' ? slot.held > 0 : slot.owned
   const name = slot.kind === 'curio' ? slot.curio.name : slot.item.name
+  // An unearned thing says what would earn it and how far off that is, which
+  // turns this half of the board from a wall into a list of things to go and
+  // do. "NOT FOUND" was honest about a thing that was found; it would be a
+  // dead end for a thing that is worked toward.
   const under =
     slot.kind === 'curio'
       ? slot.held > 0
@@ -552,7 +556,7 @@ function drawCurios(hud: Hud, app: App): void {
         : 'NOT FOUND'
       : slot.owned
         ? slot.item.note
-        : 'NOT FOUND'
+        : `${slot.item.hint} ${app.kitDone(slot.item)}/${slot.item.needs}`
   hud.textCentered(hud.width / 2, 82, name.toUpperCase(), found ? INK : DIM)
   hud.textCentered(hud.width / 2, 92, under.toUpperCase(), DIM)
 
@@ -570,10 +574,11 @@ function drawCurios(hud: Hud, app: App): void {
   const want = app.tradeFor
   const footer = hud.height - 26
   if (slot.kind === 'kit') {
-    // Kit has no spares and so nothing to trade. Saying what it does have --
-    // that it is the pet's to use rather than the board's to fill -- is worth
-    // more than a prompt for a button that would only refuse.
-    hud.textCentered(hud.width / 2, footer, 'THE PET USES THESE', DIM)
+    // Kit has no spares and so nothing to trade. The one line there is room
+    // for says where it comes from instead, since that is the thing a player
+    // looking at a row of silhouettes most needs to know -- what each one is
+    // *for* is already on the line above it.
+    hud.textCentered(hud.width / 2, footer, 'EARNED BY GOING OUT', DIM)
   } else if (!want) hud.textCentered(hud.width / 2, footer, 'THE BOARD IS FULL', GOOD)
   else if (app.canTrade) {
     const line = `B TRADE ${TRADE_COST} FOR ${want.name.toUpperCase()}`

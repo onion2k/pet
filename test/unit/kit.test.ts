@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { CURIOS } from '../../src/data/curios'
 import { GROUNDS, type GroundRole } from '../../src/data/grounds'
 import {
+  creditTrip,
   KIT,
   KIT_COUNT,
   kitById,
-  kitPool,
   kitPowers,
   isKitId,
   NO_KIT,
-  pickKit,
+  progressOf,
   type Day,
-  type KitDay,
+  type KitId,
+  type Trip,
 } from '../../src/data/kit'
 import { SEASONS, type WeatherId } from '../../src/data/seasons'
 import { SLOTS_PER_ROW } from '../../src/ui/draw'
@@ -27,14 +28,18 @@ const SEASON_IDS = SEASONS.map((s) => s.id)
 const WEATHERS: WeatherId[] = ['clear', 'rain', 'snow', 'mist']
 const ROLES: GroundRole[] = ['near', 'wet', 'sheltered', 'far']
 
-/** Every day the world can put in front of a trip, and every trip it can be. */
-function everyDay(): KitDay[] {
-  const days: KitDay[] = []
+/** Every trip the world can produce, which is what the kit is earned by. */
+function everyDay(): Trip[] {
+  const days: Trip[] = []
   for (const season of SEASON_IDS) {
     for (const weather of WEATHERS) {
       for (const night of [false, true]) {
         for (const role of ROLES) {
-          for (const depth of [1, 2, 3]) days.push({ season, weather, night, role, depth })
+          for (const legs of [1, 2, 3]) {
+            for (const supplies of [false, true]) {
+              days.push({ season, weather, night, role, legs, supplies })
+            }
+          }
         }
       }
     }
@@ -86,10 +91,13 @@ describe('the kit list', () => {
     expect(CURIOS.length).toBeLessThanOrEqual(SLOTS_PER_ROW)
   })
 
-  it('only asks for a ground role that somewhere actually has', () => {
+  it('can be earned somewhere the family could actually go', () => {
+    // A rule that wanted a kind of ground no biome has would be a slot on the
+    // board that nothing could ever fill.
     const roles = new Set(GROUNDS.map((g) => g.role))
-    for (const item of KIT) {
-      if (item.role) expect(roles.has(item.role), item.id).toBe(true)
+    for (const role of ROLES) {
+      if (!roles.has(role)) continue
+      expect(everyDay().some((trip) => trip.role === role)).toBe(true)
     }
   })
 
@@ -102,51 +110,152 @@ describe('the kit list', () => {
   })
 })
 
-describe('what a day turns up', () => {
-  const days = everyDay()
+describe('what earns it', () => {
+  const trips = everyDay()
 
-  it('can turn up every piece of kit on some day the world produces', () => {
+  it('gives every piece something to be earned by, and something to say about it', () => {
     for (const item of KIT) {
-      const reachable = days.some((day) => kitPool([], day).includes(item))
-      expect(reachable, item.id).toBe(true)
+      expect(item.needs, item.id).toBeGreaterThan(0)
+      expect(item.hint.length, item.id).toBeGreaterThan(0)
+      // A noun phrase, because the board prints the tally after it.
+      expect(item.hint, item.id).toBe(item.hint.toUpperCase())
     }
   })
 
-  it('cannot turn up any piece of kit on every day, or the day would not matter', () => {
+  it('can be earned by some trip the world actually produces', () => {
     for (const item of KIT) {
-      const always = days.every((day) => kitPool([], day).includes(item))
-      expect(always, item.id).toBe(false)
+      expect(trips.some((trip) => item.counts(trip)), item.id).toBe(true)
     }
   })
 
-  it('never offers something the family already owns', () => {
-    const owned = KIT.map((k) => k.id)
-    for (const day of days) expect(kitPool(owned, day)).toEqual([])
+  it('asks for the job the thing then helps with', () => {
+    const wet: Trip = {
+      season: 'spring',
+      weather: 'rain',
+      night: false,
+      role: 'near',
+      legs: 1,
+      supplies: false,
+    }
+    const dry: Trip = { ...wet, weather: 'clear' }
+    expect(kitById('umbrella')!.counts(wet)).toBe(true)
+    expect(kitById('umbrella')!.counts(dry)).toBe(false)
+    expect(kitById('torch')!.counts({ ...dry, night: true })).toBe(true)
+    expect(kitById('torch')!.counts(dry)).toBe(false)
+    expect(kitById('hat')!.counts({ ...dry, season: 'winter' })).toBe(true)
+    expect(kitById('hat')!.counts(dry)).toBe(false)
+    expect(kitById('snowboard')!.counts({ ...dry, season: 'winter', weather: 'snow' })).toBe(true)
+    expect(kitById('waders')!.counts({ ...dry, role: 'wet' })).toBe(true)
+    expect(kitById('waders')!.counts(dry)).toBe(false)
+    expect(kitById('boots')!.counts({ ...dry, legs: 2 })).toBe(true)
+    expect(kitById('boots')!.counts(dry)).toBe(false)
+    expect(kitById('basket')!.counts({ ...dry, supplies: true })).toBe(true)
+    expect(kitById('basket')!.counts(dry)).toBe(false)
   })
 
-  it('holds the wet-weather kit back for wet weather', () => {
-    const dry: KitDay = { season: 'spring', weather: 'clear', night: false, role: 'near', depth: 1 }
-    const wet: KitDay = { ...dry, weather: 'rain' }
-    expect(kitPool([], dry).map((k) => k.id)).not.toContain('umbrella')
-    expect(kitPool([], wet).map((k) => k.id)).toContain('umbrella')
+  it('counts every trip toward the one thing any trip is', () => {
+    // The cone is the long haul: it is not earned by a kind of trip but by
+    // having been out in the weather enough to know it.
+    const cone = kitById('pinecone')!
+    for (const trip of trips) expect(cone.counts(trip)).toBe(true)
+    expect(cone.needs).toBeGreaterThan(10)
+  })
+})
+
+describe('crediting a trip', () => {
+  const wet: Trip = {
+    season: 'spring',
+    weather: 'rain',
+    night: false,
+    role: 'near',
+    legs: 1,
+    supplies: false,
+  }
+  const dry: Trip = { ...wet, weather: 'clear' }
+
+  it('counts toward everything the trip was, and nothing it was not', () => {
+    const { progress } = creditTrip([], {}, wet)
+    expect(progress.umbrella).toBe(1)
+    expect(progress.pinecone).toBe(1)
+    expect(progress.torch).toBeUndefined()
+    expect(progress.snowboard).toBeUndefined()
   })
 
-  it('keeps the torch for a trip that set out after dark', () => {
-    const day: KitDay = { season: 'spring', weather: 'clear', night: false, role: 'near', depth: 1 }
-    expect(kitPool([], day).map((k) => k.id)).not.toContain('torch')
-    expect(kitPool([], { ...day, night: true }).map((k) => k.id)).toContain('torch')
+  it('leaves the tally it was given alone', () => {
+    // The save hands its own object in, and a rule that edited it in place
+    // would have changed the family before anything decided to keep it.
+    const before = { umbrella: 1 }
+    creditTrip([], before, wet)
+    expect(before).toEqual({ umbrella: 1 })
   })
 
-  it('keeps the far things out past the first leg', () => {
-    const near: KitDay = { season: 'spring', weather: 'clear', night: false, role: 'far', depth: 1 }
-    expect(kitPool([], near).map((k) => k.id)).not.toContain('boots')
-    expect(kitPool([], { ...near, depth: 2 }).map((k) => k.id)).toContain('boots')
+  it('earns nothing until the last trip of the right kind', () => {
+    const umbrella = kitById('umbrella')!
+    let progress = {}
+    for (let trip = 1; trip < umbrella.needs; trip++) {
+      const step = creditTrip([], progress, wet)
+      expect(step.earned, `after ${trip}`).toEqual([])
+      progress = step.progress
+    }
+    expect(creditTrip([], progress, wet).earned).toContain(umbrella)
   })
 
-  it('keeps the waders to the water', () => {
-    const day: KitDay = { season: 'summer', weather: 'clear', night: false, role: 'far', depth: 1 }
-    expect(kitPool([], day).map((k) => k.id)).not.toContain('waders')
-    expect(kitPool([], { ...day, role: 'wet' }).map((k) => k.id)).toContain('waders')
+  it('can finish more than one thing at once', () => {
+    // A pushed trip through snow after dark is several kinds of trip.
+    const everything: Trip = {
+      season: 'winter',
+      weather: 'snow',
+      night: true,
+      role: 'wet',
+      legs: 3,
+      supplies: true,
+    }
+    let progress = {}
+    for (let trip = 0; trip < 4; trip++) progress = creditTrip([], progress, everything).progress
+    const earned = creditTrip([], progress, everything).earned.map((k) => k.id)
+    expect(earned.length).toBeGreaterThan(1)
+  })
+
+  it('stops counting a thing the family already has', () => {
+    const owned: KitId[] = ['umbrella']
+    const { earned, progress } = creditTrip(owned, { umbrella: 99 }, wet)
+    expect(earned).toEqual([])
+    expect(progress.umbrella).toBe(99)
+  })
+
+  it('earns everything in the end, given enough of the right trips', () => {
+    let owned: KitId[] = []
+    let progress = {}
+    const day = (i: number): Trip => ({
+      season: i % 2 ? 'winter' : 'spring',
+      weather: i % 2 ? 'snow' : 'rain',
+      night: i % 3 === 0,
+      role: i % 4 === 0 ? 'wet' : 'near',
+      legs: (i % 3) + 1,
+      supplies: i % 2 === 0,
+    })
+    for (let i = 0; i < 200 && owned.length < KIT.length; i++) {
+      const step = creditTrip(owned, progress, day(i))
+      progress = step.progress
+      owned = [...owned, ...step.earned.map((k) => k.id)]
+    }
+    expect(owned.sort()).toEqual(KIT.map((k) => k.id).sort())
+  })
+
+  it('reports how near a thing is, and never past the post', () => {
+    const umbrella = kitById('umbrella')!
+    expect(progressOf({}, umbrella)).toBe(0)
+    expect(progressOf({ umbrella: 1 }, umbrella)).toBe(1)
+    expect(progressOf({ umbrella: 99 }, umbrella)).toBe(umbrella.needs)
+  })
+
+  it('says nothing counted on a trip that was none of the kinds', () => {
+    const cone = kitById('pinecone')!
+    const { progress } = creditTrip(['pinecone'], {}, dry)
+    // Only the cone counts every trip, and it is owned, so nothing moved but
+    // the things this trip genuinely was.
+    expect(progress.pinecone).toBeUndefined()
+    expect(cone.counts(dry)).toBe(true)
   })
 })
 
@@ -266,48 +375,5 @@ describe('what the kit is worth today', () => {
       )
       expect(speaks, item.id).toBe(true)
     }
-  })
-})
-
-describe('the pick', () => {
-  const dark: KitDay = { season: 'winter', weather: 'snow', night: true, role: 'far', depth: 3 }
-
-  it('only ever picks something the day suits, whatever the roll', () => {
-    for (const day of everyDay()) {
-      const pool = kitPool([], day)
-      if (pool.length === 0) continue
-      for (let roll = 0; roll < 1; roll += 0.05) {
-        expect(pool, `${day.weather} ${roll}`).toContain(pickKit(pool, roll))
-      }
-    }
-  })
-
-  it('reaches every item in the pool as the roll walks across it', () => {
-    const pool = kitPool([], dark)
-    expect(pool.length).toBeGreaterThan(1)
-    const reached = new Set<string>()
-    for (let roll = 0; roll < 1; roll += 0.001) reached.add(pickKit(pool, roll).id)
-    expect(reached.size).toBe(pool.length)
-  })
-
-  it('stays inside the pool at the very edge of the roll', () => {
-    // A roll of exactly 1, or one nudged past it by floating point, must not
-    // walk off the end of the pool and come back undefined.
-    const pool = kitPool([], dark)
-    expect(pickKit(pool, 1)).toBe(pool.at(-1))
-    expect(pickKit(pool, 1.0000001)).toBe(pool.at(-1))
-  })
-
-  it('never offers the same thing twice, as the family collects it', () => {
-    const owned: string[] = []
-    for (let i = 0; i < 40; i++) {
-      const pool = kitPool(owned as never, dark)
-      if (pool.length === 0) break
-      const item = pickKit(pool, (i % 7) / 7)
-      expect(owned).not.toContain(item.id)
-      owned.push(item.id)
-    }
-    expect(new Set(owned).size).toBe(owned.length)
-    expect(owned.length).toBeGreaterThan(1)
   })
 })

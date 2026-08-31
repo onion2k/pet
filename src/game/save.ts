@@ -4,12 +4,12 @@ import { TEMPERAMENTS, type TemperamentId } from './temperament'
 import { HEALTH_FLOOR } from './tuning'
 import { now as clockNow } from '../engine/clock'
 import { BIOMES, knownBiome, type BiomeId } from '../data/biome'
-import { isKitId } from '../data/kit'
+import { isKitId, type KitProgress } from '../data/kit'
 import type { PlayAxis } from '../data/yardgames'
 import { emptyYard, type Planting } from './yard'
 
 const KEY = 'petz9000.save'
-export const SAVE_VERSION = 8
+export const SAVE_VERSION = 9
 
 /**
  * The slice of `localStorage` the save needs, behind a seam. A test supplies a
@@ -142,6 +142,10 @@ const MIGRATIONS: Record<number, (raw: any) => any> = {
   // empty list means -- and it is the family's rather than the pet's, so it
   // sits beside the curios and outlives whoever carried it home.
   7: (raw) => ({ ...raw, kit: [] }),
+  // 8 -> 9 counts what the family's trips have been worth, since kit is earned
+  // by making them rather than found. Anyone already carrying something keeps
+  // it; everyone starts from nothing on whatever is left.
+  8: (raw) => ({ ...raw, kitProgress: {} }),
 }
 
 /** A pet that has never been played with out in the yard. */
@@ -183,6 +187,7 @@ export function emptySave(): SaveFile {
     yard: emptyYard(),
     larder: {},
     kit: [],
+    kitProgress: {},
   }
 }
 
@@ -354,7 +359,22 @@ function repair(data: Record<string, unknown>): SaveFile {
     // species album is: kit from a branch, or from a build since rolled back,
     // would otherwise sit on the board as a slot nothing can draw.
     kit: [...new Set(arr<unknown>(data.kit, []).filter(isKitId))],
+    kitProgress: kitProgress(data.kitProgress),
   }
+}
+
+/**
+ * The tally toward each unearned thing, keeping only what this build has an
+ * item for and only what could have been counted -- a finite tally that has
+ * never been below zero, as everything else counted in here.
+ */
+function kitProgress(v: unknown): KitProgress {
+  if (!isRecord(v)) return {}
+  const out: KitProgress = {}
+  for (const [id, done] of Object.entries(v)) {
+    if (isKitId(id)) out[id] = count(done)
+  }
+  return out
 }
 
 export function load(): SaveFile {
