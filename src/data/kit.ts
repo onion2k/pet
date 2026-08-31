@@ -30,7 +30,7 @@ export type KitId =
   | 'boots'
   | 'waders'
   | 'basket'
-  | 'spyglass'
+  | 'pinecone'
 
 /**
  * What can go wrong on a trip, named so that kit can spare one. The list
@@ -198,22 +198,25 @@ export const KIT: KitItem[] = [
     ),
   },
   {
-    id: 'spyglass',
-    name: 'Spyglass',
-    what: 'a spyglass',
-    note: 'For seeing what is coming.',
-    role: 'far',
+    id: 'pinecone',
+    name: 'Pine cone',
+    what: 'a pine cone',
+    // The one note here that has to teach rather than label: a cone shutting
+    // before the rain is folk knowledge, and a player who has not met it would
+    // otherwise be holding a fir cone and wondering what it was for.
+    note: 'It closes before rain.',
+    role: 'sheltered',
     depth: 3,
-    colour: '#c9a227',
+    colour: '#96562e',
     glyph: art(
-      '........',
-      '.....###',
-      '..#.####',
-      '###.####',
-      '###.####',
-      '..#.####',
-      '.....###',
-      '........',
+      '..####..',
+      '.######.',
+      '##.##.##',
+      '.######.',
+      '.##..##.',
+      '..####..',
+      '..#..#..',
+      '...##...',
     ),
   },
 ]

@@ -242,9 +242,9 @@ describe('what the kit is worth today', () => {
   })
 
   it('says nothing about the two that have not been taught to speak yet', () => {
-    // The basket and the spyglass are found and owned but do not read yet.
+    // The basket and the pine cone are found and owned but do not read yet.
     // This is the line that will have to change when they do.
-    const quiet: KitId[] = ['basket', 'spyglass']
+    const quiet: KitId[] = ['basket', 'pinecone']
     for (const season of SEASON_IDS) {
       for (const weather of WEATHERS) {
         for (const night of [false, true]) {
