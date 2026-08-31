@@ -25,6 +25,7 @@ import { Hud } from './render/hud'
 import { Particles } from './render/particles'
 import { PetView } from './render/pet'
 import { drawScreen } from './ui/draw'
+import { registerServiceWorker } from './pwa'
 
 /** Native resolution of the pet's screen. Everything above it is upscaling.
  *  Twelve rows taller than the classic 192x160, to house the news ticker. */
@@ -569,6 +570,8 @@ function frame(now: number): void {
 }
 
 requestAnimationFrame(frame)
+
+registerServiceWorker()
 
 // The tab going away is the player going away: the app measures the absence
 // from here rather than from the last frame it happened to get, since a hidden

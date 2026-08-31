@@ -1088,6 +1088,7 @@ so the worst case is a lost setting rather than a lost pet.
 ## Layout
 
 ```
+public/     manifest, service worker, generated icons -- copied to dist as-is
 src/
   data/       voxel models, species graph, foods, pixel font, menu icons
   game/       simulation, save/migration, actions, branching metrics, minigames
@@ -1099,7 +1100,33 @@ test/
   harness.ts  the game driven by button presses, with no renderer
   unit/       one module at a time
   integration/ whole flows: a life, a day's care, a forage, getting around
+tools/
+  make-icons.mjs  draws the app icons, the way everything else here is drawn
 ```
 
 In dev builds `window.__pet` exposes `{ app, hud, shell, step, advance }` so the
 game can be driven frame by frame from the console.
+
+## Installing it
+
+The site is a PWA: `public/manifest.webmanifest` names it and points at the
+icons, and `public/sw.js` keeps a copy of the two pages and their assets so the
+pet opens without a network. Together they are what makes a browser offer to
+install it; once installed it runs full-screen with no chrome, which is what
+a thing pretending to be a handheld wants.
+
+The worker is registered only in production builds (`src/pwa.ts`) -- in dev it
+would sit in front of Vite's module graph and serve you yesterday's code. It
+serves pages network-first, so a deploy is picked up on the next launch, and
+assets cache-first, since the build content-hashes their names. **Bump `CACHE`
+in `public/sw.js` when you ship**; older caches are dropped on activation.
+
+The icons are not drawn by hand either:
+
+```bash
+node tools/make-icons.mjs
+```
+
+writes `public/icons/` from a 32x32 grid in the script -- the shell, its screen
+and a pet in it -- at the sizes the manifest, iOS and maskable masks ask for.
+The PNGs are committed, so this only needs rerunning when the picture changes.

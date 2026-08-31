@@ -1,5 +1,7 @@
 import './style.css'
 
+import { registerServiceWorker } from '../pwa'
+
 import { CURIOS, CURIO_COUNT, CURIO_SETS, TRADE_COST } from '../data/curios'
 import { FOODS } from '../data/foods'
 import { GROUNDS } from '../data/grounds'
@@ -762,3 +764,6 @@ book.append(strip)
 const iconStrip = html('<div style="display:flex;gap:10px;justify-content:center;margin-top:12px"></div>')
 for (const id of ICON_ORDER) iconStrip.append(artTile(iconRows(id), '#6a5f83', 3))
 book.append(iconStrip)
+
+// Landing here first should still install the offline copy of both pages.
+registerServiceWorker()
