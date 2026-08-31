@@ -62,9 +62,16 @@ const plasticFrag = /* glsl */ `
     return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
   }
 
-  /** A lattice of dots on whichever plane it is handed. */
+  /** A scatter of dots on whichever plane it is handed. */
   float dotsAt(vec2 p) {
-    return 1.0 - smoothstep(0.24, 0.32, length(fract(p) - 0.5));
+    // Every other row shifted half a step, so the dots sit in a stagger the way
+    // a brick course does rather than lining up into a grid.
+    vec2 q = vec2(p.x + mod(floor(p.y), 2.0) * 0.5, p.y);
+    vec2 cell = floor(q);
+    // And no two neighbours quite the same size, so it reads as something
+    // stirred into the plastic rather than printed on it.
+    float radius = mix(0.15, 0.34, hash(vec3(cell, 0.0)));
+    return 1.0 - smoothstep(radius - 0.05, radius + 0.05, length(fract(q) - 0.5));
   }
 
   /**
@@ -99,9 +106,10 @@ const plasticFrag = /* glsl */ `
       return dotsAt(p.yz * SCALE) * w.x + dotsAt(p.xz * SCALE) * w.y + dotsAt(p.xy * SCALE) * w.z;
     }
 
-    // Stripes, leaning a little off the horizontal and carrying right round the
-    // body, since nothing here depends on which way the case is facing.
-    return smoothstep(-0.30, 0.30, sin(p.y * 13.0 + p.x * 3.2));
+    // Broad stripes at forty-five degrees to the screen -- x and y weighted the
+    // same is what puts them on the diagonal. Nothing here reads z, so they
+    // carry round the sides and across the back without a seam.
+    return smoothstep(-0.30, 0.30, sin((p.x + p.y) * 4.5));
   }
 
   void main() {
