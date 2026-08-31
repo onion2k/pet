@@ -1044,6 +1044,24 @@ types without reading them, so a type error would ship in silence.
 That trade is only worth what `npm run verify` is worth, which is the whole of
 the gate in one command: typecheck, suite, and the 100% threshold below.
 
+**The gate is run for you, on the way out.** `.githooks/pre-push` runs
+`npm run verify` before anything leaves the machine, and refuses the push if it
+fails. A push is the last moment the check is still cheap to act on: after it,
+the thing that finds out is somebody else's clone.
+
+The hook is committed rather than left in `.git/hooks`, where it would live in
+one clone and nowhere else. `npm install` points git at it -- that is the whole
+of the `prepare` script -- so a fresh checkout is covered by the install it
+needs anyway. To wire it up by hand, or to check it is on:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+It skips a push that only deletes branches, since there is no code in one.
+`git push --no-verify` skips it altogether, which is the right move for a
+work-in-progress branch nobody is deploying and the wrong one for `main`.
+
 The typecheck covers `test` as well as `src`. It did not always: adding a
 required field to `Metrics` should have been a compile error in the three test
 files that build one by hand, and instead it was fourteen runtime failures with
@@ -1140,6 +1158,8 @@ test/
   property/   the soak: random presses against invariants, shrunk when they fail
 tools/
   make-icons.mjs  draws the app icons, the way everything else here is drawn
+.githooks/
+  pre-push        runs the gate before anything leaves the machine
 ```
 
 In dev builds `window.__pet` exposes `{ app, hud, shell, step, advance }` so the

@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "verify": "tsc --noEmit && vitest run --coverage"
+    "verify": "tsc --noEmit && vitest run --coverage",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "ogl": "^1.0.11"
