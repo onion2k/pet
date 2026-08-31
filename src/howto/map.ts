@@ -1,4 +1,4 @@
-import { GROUNDS } from '../data/grounds'
+import { MEADOW_GROUNDS, type GroundRole } from '../data/grounds'
 
 /**
  * A map of the meadow, drawn the way a booklet's endpapers would draw one.
@@ -13,12 +13,16 @@ import { GROUNDS } from '../data/grounds'
 const INK = '#3f3357'
 
 /** Where each ground's pin card sits. Laid out by how far the walk is, since
- *  distance is what the player is choosing between when they pick one. */
-const PINS: Record<string, [number, number]> = {
-  wall: [168, 380],
-  hollow: [380, 306],
-  creek: [742, 336],
-  hill: [618, 178],
+ *  distance is what the player is choosing between when they pick one.
+ *
+ *  Keyed by role rather than by id: every biome supplies the same four, so a
+ *  role always has a pin, where an id only has one if it happens to be the
+ *  meadow's. */
+const PINS: Record<GroundRole, [number, number]> = {
+  near: [168, 380],
+  sheltered: [380, 306],
+  wet: [742, 336],
+  far: [618, 178],
 }
 
 const tuft = (x: number, y: number, colour = '#7ecf58') =>
@@ -64,17 +68,19 @@ const trail = (path: string) =>
    <path d="${path}" fill="none" stroke="#b99b63" stroke-width="9" stroke-linecap="round" stroke-dasharray="2 20"/>`
 
 export function meadowMap(): string {
-  const tints: Record<string, string> = {
-    wall: '#c9c2b4',
-    hollow: '#e2a04f',
-    creek: '#7fd6ff',
-    hill: '#a4d977',
+  const tints: Record<GroundRole, string> = {
+    near: '#c9c2b4',
+    sheltered: '#e2a04f',
+    wet: '#7fd6ff',
+    far: '#a4d977',
   }
 
-  const pins = GROUNDS.map((g) => {
-    const [x, y] = PINS[g.id]!
+  // The drawing is the meadow -- its wall, its hollow, its creek -- so it is
+  // pinned with the meadow's four rather than with every ground in the world.
+  const pins = MEADOW_GROUNDS.map((g) => {
+    const [x, y] = PINS[g.role]
     const who = g.from === 'child' ? 'CHILD OR ADULT' : 'ADULT ONLY'
-    return pin(x, y, g.name.toUpperCase(), `${who}  ·  ${g.energy} ENERGY`, tints[g.id]!)
+    return pin(x, y, g.name.toUpperCase(), `${who}  ·  ${g.energy} ENERGY`, tints[g.role])
   }).join('')
 
   return `
@@ -170,9 +176,9 @@ export function meadowMap(): string {
 </svg>`
 }
 
-/** Groups the grounds with a line about each, for the key beside the map. */
+/** Groups the map's grounds with a line about each, for the key beside it. */
 export const mapKey = () =>
-  GROUNDS.map((g) => ({
+  MEADOW_GROUNDS.map((g) => ({
     name: g.name,
     note: g.note,
     who: g.from === 'child' ? 'A child can go here, and so can an adult.' : 'An adult only.',
