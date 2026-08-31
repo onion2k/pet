@@ -110,13 +110,13 @@ export interface BuildOptions {
 
 /** The per-vertex arrays a voxel volume expands to, before they become a mesh. */
 export interface VoxelArrays {
-  position: number[]
-  normal: number[]
-  color: number[]
-  ao: number[]
-  part: number[]
-  emissive: number[]
-  material: number[]
+  position: Float32Array
+  normal: Float32Array
+  color: Float32Array
+  ao: Float32Array
+  part: Float32Array
+  emissive: Float32Array
+  material: Float32Array
   faces: number
 }
 
@@ -130,64 +130,106 @@ export function buildVoxels(
   return { geometry: geometryFrom(gl, arrays), faces: arrays.faces }
 }
 
+/** The six bases, worked out once. There are only six, and a patch of terrain
+ *  asks for tens of thousands of faces. */
+const BASIS: [number[], number[]][] = FACES.map((n) => basis(n))
+
+/** The two ways a quad splits into triangles. */
+const SPLIT_A = [0, 1, 2, 0, 2, 3]
+const SPLIT_B = [1, 2, 3, 1, 3, 0]
+
 /** The same expansion, stopping short of the mesh so extra vertices can be added. */
 export function voxelArrays(
   source: VoxelSource,
   { scale, origin }: BuildOptions,
 ): VoxelArrays {
-  const position: number[] = []
-  const normal: number[] = []
-  const color: number[] = []
-  const ao: number[] = []
-  const part: number[] = []
-  const emissive: number[] = []
-  const material: number[] = []
-  let faces = 0
+  const { w, h, d } = source
 
-  for (let y = 0; y < source.h; y++) {
-    for (let z = 0; z < source.d; z++) {
-      for (let x = 0; x < source.w; x++) {
+  // Counted first, then filled. The alternative -- growing seven plain arrays a
+  // number at a time and copying them out at the end -- spends more on the
+  // copying and the garbage than the whole rest of the mesher does.
+  let faces = 0
+  for (let y = 0; y < h; y++)
+    for (let z = 0; z < d; z++)
+      for (let x = 0; x < w; x++) {
         const voxel = source.at(x, y, z)
         if (!voxel) continue
+        for (let f = 0; f < 6; f++) {
+          const n = FACES[f]!
+          const neighbour = source.at(x + n[0], y + n[1], z + n[2])
+          if (neighbour && neighbour.part === voxel.part) continue
+          faces++
+        }
+      }
 
-        for (const n of FACES) {
+  const verts = faces * 6
+  const position = new Float32Array(verts * 3)
+  const normal = new Float32Array(verts * 3)
+  const color = new Float32Array(verts * 3)
+  const ao = new Float32Array(verts)
+  const part = new Float32Array(verts)
+  const emissive = new Float32Array(verts)
+  const material = new Float32Array(verts)
+
+  // One quad's four corners, reused by every face rather than allocated afresh.
+  const vx = [0, 0, 0, 0]
+  const vy = [0, 0, 0, 0]
+  const vz = [0, 0, 0, 0]
+  const shades = [0, 0, 0, 0]
+  const half = scale / 2
+  /** Write cursors into the three-wide arrays and the one-wide ones. */
+  let wide = 0
+  let narrow = 0
+
+  for (let y = 0; y < h; y++) {
+    for (let z = 0; z < d; z++) {
+      for (let x = 0; x < w; x++) {
+        const voxel = source.at(x, y, z)
+        if (!voxel) continue
+        const cx = origin[0] + (x + 0.5) * scale
+        const cy = origin[1] + (y + 0.5) * scale
+        const cz = origin[2] + (z + 0.5) * scale
+        const col = voxel.color
+        const vPart = voxel.part
+        const vEm = voxel.emissive
+        const vMat = voxel.material ?? 0
+
+        for (let f = 0; f < 6; f++) {
+          const n = FACES[f]!
           const neighbour = source.at(x + n[0], y + n[1], z + n[2])
           // A face between two different parts must be kept: parts move
           // independently in the pet shader, and a culled interface becomes a
           // see-through hole the moment a limb swings away from the body.
-          if (neighbour && neighbour.part === voxel.part) continue
-          faces++
-          const [u, v] = basis(n)
-          const cx = origin[0] + (x + 0.5) * scale
-          const cy = origin[1] + (y + 0.5) * scale
-          const cz = origin[2] + (z + 0.5) * scale
-          const half = scale / 2
-
-          const verts: number[][] = []
-          const shades: number[] = []
-          for (const [du, dv] of CORNERS) {
-            verts.push([
-              cx + (n[0] + du * u[0]! + dv * v[0]!) * half,
-              cy + (n[1] + du * u[1]! + dv * v[1]!) * half,
-              cz + (n[2] + du * u[2]! + dv * v[2]!) * half,
-            ])
-            shades.push(cornerAo(source, x, y, z, n, u, v, du, dv))
+          if (neighbour && neighbour.part === vPart) continue
+          const [u, v] = BASIS[f]!
+          for (let c = 0; c < 4; c++) {
+            const du = CORNERS[c]![0]
+            const dv = CORNERS[c]![1]
+            vx[c] = cx + (n[0] + du * u[0]! + dv * v[0]!) * half
+            vy[c] = cy + (n[1] + du * u[1]! + dv * v[1]!) * half
+            vz[c] = cz + (n[2] + du * u[2]! + dv * v[2]!) * half
+            shades[c] = cornerAo(source, x, y, z, n, u, v, du, dv)
           }
-
           // Flip the split so the AO gradient never creases across the quad.
-          const order =
-            shades[0]! + shades[2]! > shades[1]! + shades[3]!
-              ? [0, 1, 2, 0, 2, 3]
-              : [1, 2, 3, 1, 3, 0]
-
-          for (const i of order) {
-            position.push(verts[i]![0]!, verts[i]![1]!, verts[i]![2]!)
-            normal.push(n[0], n[1], n[2])
-            color.push(voxel.color[0], voxel.color[1], voxel.color[2])
-            ao.push(shades[i]!)
-            part.push(voxel.part)
-            emissive.push(voxel.emissive)
-            material.push(voxel.material ?? 0)
+          const split =
+            shades[0]! + shades[2]! > shades[1]! + shades[3]! ? SPLIT_A : SPLIT_B
+          for (let k = 0; k < 6; k++) {
+            const i = split[k]!
+            position[wide] = vx[i]!
+            position[wide + 1] = vy[i]!
+            position[wide + 2] = vz[i]!
+            normal[wide] = n[0]
+            normal[wide + 1] = n[1]
+            normal[wide + 2] = n[2]
+            color[wide] = col[0]
+            color[wide + 1] = col[1]
+            color[wide + 2] = col[2]
+            wide += 3
+            ao[narrow] = shades[i]!
+            part[narrow] = vPart
+            emissive[narrow] = vEm
+            material[narrow] = vMat
+            narrow++
           }
         }
       }
@@ -197,16 +239,24 @@ export function voxelArrays(
   return { position, normal, color, ao, part, emissive, material, faces }
 }
 
+/** Two arrays end to end. */
+const join = (a: Float32Array, b: Float32Array): Float32Array => {
+  const out = new Float32Array(a.length + b.length)
+  out.set(a)
+  out.set(b, a.length)
+  return out
+}
+
 /** Two sets of vertex arrays as one mesh's worth. */
 export function mergeArrays(a: VoxelArrays, b: VoxelArrays): VoxelArrays {
   return {
-    position: a.position.concat(b.position),
-    normal: a.normal.concat(b.normal),
-    color: a.color.concat(b.color),
-    ao: a.ao.concat(b.ao),
-    part: a.part.concat(b.part),
-    emissive: a.emissive.concat(b.emissive),
-    material: a.material.concat(b.material),
+    position: join(a.position, b.position),
+    normal: join(a.normal, b.normal),
+    color: join(a.color, b.color),
+    ao: join(a.ao, b.ao),
+    part: join(a.part, b.part),
+    emissive: join(a.emissive, b.emissive),
+    material: join(a.material, b.material),
     faces: a.faces + b.faces,
   }
 }
@@ -214,13 +264,13 @@ export function mergeArrays(a: VoxelArrays, b: VoxelArrays): VoxelArrays {
 /** Turns expanded arrays into a mesh. */
 export function geometryFrom(gl: OGLRenderingContext, arrays: VoxelArrays): Geometry {
   return new Geometry(gl, {
-    position: { size: 3, data: new Float32Array(arrays.position) },
-    normal: { size: 3, data: new Float32Array(arrays.normal) },
-    color: { size: 3, data: new Float32Array(arrays.color) },
-    ao: { size: 1, data: new Float32Array(arrays.ao) },
-    part: { size: 1, data: new Float32Array(arrays.part) },
-    emissive: { size: 1, data: new Float32Array(arrays.emissive) },
-    material: { size: 1, data: new Float32Array(arrays.material) },
+    position: { size: 3, data: arrays.position },
+    normal: { size: 3, data: arrays.normal },
+    color: { size: 3, data: arrays.color },
+    ao: { size: 1, data: arrays.ao },
+    part: { size: 1, data: arrays.part },
+    emissive: { size: 1, data: arrays.emissive },
+    material: { size: 1, data: arrays.material },
   })
 }
 

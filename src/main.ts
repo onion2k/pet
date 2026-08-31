@@ -586,7 +586,18 @@ function step(dt: number): void {
   renderer.render({ scene: stage.scene, camera: stage.camera })
 }
 
+/** Frames drawn since the loop started. Only the first two are of any interest. */
+let frames = 0
+
 function frame(now: number): void {
+  // The device goes up before the ground does. Meshing the patch is the longest
+  // single piece of work in a cold start, and nothing is on screen at all until
+  // a frame has been presented -- so the first frame is drawn with the ground
+  // still unraised, and the patch is built at the head of the second. There is
+  // nothing to see behind the boot splash, which covers the screen whole for its
+  // first second and a half.
+  if (frames++ === 1) terrain.raise()
+
   // Clamp dt so a backgrounded tab resumes smoothly; offline time is handled
   // separately by the simulation's chunked catch-up.
   step(Math.min((now - last) / 1000, 0.1))
@@ -641,6 +652,9 @@ if (import.meta.env.DEV) {
       screenCamera,
       step,
       advance: (frames: number, dt = 1 / 60) => {
+        // The loop raises the ground on its second frame; a harness that drives
+        // step directly never gets there, and would advance over bare sky.
+        terrain.raise()
         for (let i = 0; i < frames; i++) step(dt)
       },
     },

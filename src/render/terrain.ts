@@ -633,6 +633,12 @@ export interface Terrain {
   shape: TerrainShape
   /** Number of scenery pieces on the patch. */
   props: number
+  /**
+   * Meshes the patch that has been planned. Separate from planning because
+   * meshing is the longest single piece of work in a cold start, and the shape
+   * -- which is all the pet and the yard need to know -- is cheap.
+   */
+  raise(): void
   /** Rebuilds the patch for a different seed or biome. */
   rebuild(seed: string, biome: Biome): void
   setSick(amount: number): void
@@ -686,11 +692,29 @@ export function createTerrain(
 
   let mesh: Mesh | null = null
   let shape = terrainShape(seed, biome)
+  let plannedSeed = seed
+  let plannedBiome = biome
+  /** Whether the mesh matches the plan. */
+  let standing = false
   let faces = 0
   let props = 0
 
-  const build = (nextSeed: string, nextBiome: Biome) => {
+  /** The lie of the land: heights, where the shelter stands, where the lanterns
+   *  go. Cheap, and it is what everything outside this module reads. */
+  const plan = (nextSeed: string, nextBiome: Biome) => {
+    plannedSeed = nextSeed
+    plannedBiome = nextBiome
+    standing = false
     shape = terrainShape(nextSeed, nextBiome)
+  }
+
+  /** Meshes the planned patch. Everything expensive about the ground is here,
+   *  so a patch already standing is left alone. */
+  const raise = () => {
+    if (standing) return
+    standing = true
+    const nextSeed = plannedSeed
+    const nextBiome = plannedBiome
     const s = seedFrom(nextSeed)
     const cache = new Map<string, Voxel>()
     // Terrain stores a material index; the colour comes from the season palette
@@ -713,7 +737,10 @@ export function createTerrain(
     const scenery = scatterProps(shape, nextBiome, s, cache)
     const propKey = (x: number, y: number, z: number) => (y * TERRAIN_ROWS + z) * TERRAIN_COLS + x
 
-    const source: VoxelSource = {
+    // What is where, answered one cell at a time. Every answer is a height
+    // lookup, a hash and a map probe, and the mesher asks about twenty times per
+    // solid voxel -- so it is read through once, below, rather than repeatedly.
+    const field: VoxelSource = {
       w: TERRAIN_COLS,
       h: Math.max(maxHeight, scenery.top + 1),
       d: TERRAIN_ROWS,
@@ -751,6 +778,29 @@ export function createTerrain(
       },
     }
 
+    // The patch, read out once into a flat grid. The mesher walks it many times
+    // over -- once to cull each face, and twelve more to shade each corner --
+    // and against the grid every one of those is an array index.
+    const { w: gw, h: gh, d: gd } = field
+    const cells: (Voxel | null)[] = new Array(gw * gh * gd)
+    for (let y = 0; y < gh; y++)
+      for (let z = 0; z < gd; z++)
+        for (let x = 0; x < gw; x++) cells[(y * gd + z) * gw + x] = field.at(x, y, z)
+
+    // Below the patch is solid, as it was before, so the underside is culled.
+    const bedrock = voxel(MATERIAL_INDEX.rock)
+    const source: VoxelSource = {
+      w: gw,
+      h: gh,
+      d: gd,
+      at(x, y, z) {
+        if (x < 0 || z < 0 || x >= gw || z >= gd) return null
+        if (y < 0) return bedrock
+        if (y >= gh) return null
+        return cells[(y * gd + z) * gw + x]!
+      },
+    }
+
     const origin: [number, number, number] = [
       (-TERRAIN_COLS / 2) * TERRAIN_VOXEL,
       0,
@@ -770,8 +820,6 @@ export function createTerrain(
     }
   }
 
-  build(seed, biome)
-
   return {
     root,
     get shape() {
@@ -783,7 +831,11 @@ export function createTerrain(
     get props() {
       return props
     },
-    rebuild: build,
+    raise,
+    rebuild: (nextSeed, nextBiome) => {
+      plan(nextSeed, nextBiome)
+      raise()
+    },
     setSick(amount) {
       program.uniforms.uSick.value = amount
     },
