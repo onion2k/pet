@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Runs the gate before anything leaves the machine.
+#
+# The suite came out of `npm run build` so that deploys would stop paying for a
+# check already made locally -- which only works if it is actually made locally.
+# This is that check, at the last moment it can still be cheap to act on: a push
+# is the point after which someone else's clone is the one that finds out.
+#
+# Skipped for a push that only deletes branches, since there is no code in it.
+# `git push --no-verify` skips it altogether, which is the right move for a
+# work-in-progress branch nobody is deploying and the wrong one for main.
+
+deleting_only=1
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_sha" in
+    # An all-zero local sha is a ref being deleted rather than pushed.
+    *[!0]*) deleting_only=0 ;;
+  esac
+done
+
+if [ "$deleting_only" = 1 ]; then
+  exit 0
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "pre-push: npm is not on this PATH, so the suite cannot be run." >&2
+  echo "          Fix the PATH, or push with --no-verify and run it by hand." >&2
+  exit 1
+fi
+
+echo "pre-push: npm run verify"
+if ! npm run --silent verify; then
+  echo >&2
+  echo "pre-push: the gate failed, so nothing was pushed." >&2
+  echo "          Fix it, or push with --no-verify if you meant to." >&2
+  exit 1
+fi
