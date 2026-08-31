@@ -155,6 +155,29 @@ export class Forage {
     this.ctx = this.host.journeyContext(ground)
   }
 
+  /**
+   * Drops the trip on the floor, wherever it had got to.
+   *
+   * Everything a trip does from here on is done to a pet: it comes home tired,
+   * it says what it found, it puts something in the larder. When the pet that
+   * went on it is gone -- a retirement dismissed while it was still out over
+   * the hill, or the whole lineage started over -- there is nobody for any of
+   * that to happen to, and the walk home was reading its stats to work out how
+   * the walk went. So this ends the trip without telling it: the host is not
+   * touched at all, and what the pet was carrying goes with the pet.
+   */
+  abandon(): void {
+    this.phase = 'idle'
+    this.dim = 0
+    this.beats = []
+    this.found = null
+    this.legs = 1
+    this.stage = 'out'
+    this.timer = 0
+    this.ctx = null
+    this.ground = null
+  }
+
   /** Sends it on for one more leg. Ignored unless the trip is actually asking. */
   pushOn(): boolean {
     if (!this.choosing) return false

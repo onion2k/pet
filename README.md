@@ -1076,6 +1076,35 @@ and DOM wiring, and a faked GL context would prove nothing about a shader while
 making the number a lie. The pure helpers that live among them are tested
 directly. Browser end-to-end tests are deliberately not here yet.
 
+**The soak** (`test/property/soak.test.ts`) covers the runs nobody would think
+to write down. `fast-check` generates sequences of presses, holds, absences and
+icon selections, and after every one it asks the same short list of questions:
+stats inside their bounds, no number gone to NaN, a stage that never walks
+backwards within a life, a menu cursor still inside its list, a way back to the
+main screen from wherever the run ended, and a save file that reads back the
+same twice. When one fails, fast-check shrinks the run to the few presses that
+actually matter and prints a seed to reproduce it — which is the point, because
+a failure forty presses deep is not a bug report until it is three presses deep.
+A second property does the same to the save file itself, generating right-shaped
+saves full of wrong values and asking only that the game boots into something
+playable.
+
+The dice are pinned like every other die in this suite. Left to itself
+fast-check seeds from the wall clock, which would mean a failure nobody else
+could reproduce and a coverage number that moved on every run -- so the seed is
+a constant, and a different sweep is a different seed said out loud. The cost of
+that is real: a pinned seed explores the same runs every time, and the third bug
+the soak found was one the default seed does not reach at any depth. So both
+knobs matter, and the sweep worth doing before a release turns them together:
+
+```bash
+SOAK_RUNS=8000 SOAK_SEED=$RANDOM npm test   # about twelve seconds
+```
+
+The default hundred runs take about a tenth of a second and go in the suite.
+What a sweep finds belongs in `unit/` or `integration/` afterwards, as a test
+with a name: the soak is for discovering the case, not for documenting it.
+
 Getting to 100% turned up two real bugs and a pile of defensive code that could
 not fire. The care streak compared elapsed milliseconds against local midnight,
 so anyone who played after about noon read as two days since yesterday and lost
@@ -1100,6 +1129,7 @@ test/
   harness.ts  the game driven by button presses, with no renderer
   unit/       one module at a time
   integration/ whole flows: a life, a day's care, a forage, getting around
+  property/   the soak: random presses against invariants, shrunk when they fail
 tools/
   make-icons.mjs  draws the app icons, the way everything else here is drawn
 ```

@@ -1,4 +1,8 @@
-import type { PetState, SaveFile } from './types'
+import type { PetState, SaveFile, Stats } from './types'
+import { SPECIES } from '../data/species'
+import { TEMPERAMENTS, type TemperamentId } from './temperament'
+import { HEALTH_FLOOR } from './tuning'
+import { now as clockNow } from '../engine/clock'
 import { BIOMES, knownBiome, type BiomeId } from '../data/biome'
 import type { PlayAxis } from '../data/yardgames'
 import { emptyYard, type Planting } from './yard'
@@ -188,6 +192,11 @@ const arr = <T>(v: unknown, fallback: T[]): T[] => (Array.isArray(v) ? (v as T[]
 const rec = <T>(v: unknown, fallback: Record<string, T>): Record<string, T> =>
   isRecord(v) ? (v as Record<string, T>) : fallback
 
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v)
+
+/** A tally: a finite number that has never been below zero. */
+const count = (v: unknown): number => Math.max(0, num(v, 0))
+
 /** The plantings at one place, dropping anything that is not a list of them. */
 const gardens = (v: unknown): Partial<Record<BiomeId, Planting[]>> => {
   if (!isRecord(v)) return {}
@@ -198,6 +207,106 @@ const gardens = (v: unknown): Partial<Record<BiomeId, Planting[]>> => {
   }
   return out
 }
+
+/**
+ * A pet, field by field.
+ *
+ * This is the one the rest of the file exists for. Every other field in a save
+ * is a setting, and a setting that comes back wrong costs the player a colour
+ * or a streak; the pet is the game. It was also, for a while, the one field
+ * `repair` did not touch -- it went through as a cast, on the reasoning that a
+ * file at the current version must have been written by the current code. A
+ * save with a `pet` of `{}` in it disproved that in about a second: the first
+ * frame walked `pet.discovered` and threw before anything reached the screen.
+ *
+ * So: nothing here is trusted, and nothing here can fail. What cannot be read
+ * falls back to what a newly laid egg would have had, which is a pet that has
+ * lost some of its history rather than a pet that cannot be opened.
+ */
+function repairPet(v: unknown): PetState | null {
+  if (!isRecord(v)) return null
+
+  const stats = isRecord(v.stats) ? v.stats : {}
+  const care = isRecord(v.care) ? v.care : {}
+  const diet = isRecord(v.diet) ? v.diet : {}
+  const play = isRecord(v.play) ? v.play : {}
+  const byAxis = isRecord(play.byAxis) ? play.byAxis : {}
+  const sleep = isRecord(v.sleep) ? v.sleep : {}
+
+  // The species names the form, and the form knows which stage it belongs to,
+  // so the stage is read off it rather than trusted separately: a save cannot
+  // then claim to be a child and draw itself as an adult. A form this build
+  // has never heard of -- a save from a branch, or one rolled back past a
+  // species being added -- starts over as an egg, because a pet we cannot draw
+  // is not one we can put on the screen.
+  const species = SPECIES.get(str(v.speciesId, '')) ?? SPECIES.get('egg')!
+  const born = num(v.bornAt, clockNow())
+
+  const discovered = arr<unknown>(v.discovered, [])
+    .filter((id): id is string => typeof id === 'string')
+    .filter((id) => SPECIES.has(id))
+  if (!discovered.includes(species.id)) discovered.push(species.id)
+
+  return {
+    id: str(v.id, '') || nextId(),
+    name: str(v.name, 'PET'),
+    speciesId: species.id,
+    stage: species.stage,
+    temperament: temperament(v.temperament),
+    bornAt: born,
+    lastTick: num(v.lastTick, born),
+    ageMs: count(v.ageMs),
+    stats: repairStats(stats),
+    asleep: bool(v.asleep, false),
+    sick: bool(v.sick, false),
+    warm: typeof v.warm === 'boolean' ? v.warm : undefined,
+    care: {
+      neglectSeconds: count(care.neglectSeconds),
+      thrivingSeconds: count(care.thrivingSeconds),
+      sicknessCount: count(care.sicknessCount),
+    },
+    diet: {
+      sweet: count(diet.sweet),
+      protein: count(diet.protein),
+      veg: count(diet.veg),
+      junk: count(diet.junk),
+      meals: count(diet.meals),
+    },
+    play: {
+      gamesPlayed: count(play.gamesPlayed),
+      gamesWon: count(play.gamesWon),
+      bestStreak: count(play.bestStreak),
+      byAxis: {
+        chase: count(byAxis.chase),
+        romp: count(byAxis.romp),
+        quiet: count(byAxis.quiet),
+      },
+    },
+    sleep: {
+      onTimeSleeps: count(sleep.onTimeSleeps),
+      lateSleeps: count(sleep.lateSleeps),
+      overtiredSeconds: count(sleep.overtiredSeconds),
+    },
+    // Deduplicated: the collection screen counts what is in here.
+    discovered: [...new Set(discovered)],
+  }
+}
+
+/** The five stats, inside the bounds the simulation would have kept them in. */
+function repairStats(v: Record<string, unknown>): Stats {
+  return {
+    hunger: clamp(num(v.hunger, 70), 0, 100),
+    happiness: clamp(num(v.happiness, 70), 0, 100),
+    energy: clamp(num(v.energy, 90), 0, 100),
+    hygiene: clamp(num(v.hygiene, 90), 0, 100),
+    // The floor is the simulation's, not zero: this game has no death in it.
+    health: clamp(num(v.health, 100), HEALTH_FLOOR, 100),
+  }
+}
+
+/** A temperament this build still has a name and a blurb for, or none. */
+const temperament = (v: unknown): TemperamentId | undefined =>
+  typeof v === 'string' && v in TEMPERAMENTS ? (v as TemperamentId) : undefined
 
 /**
  * Fills in anything a hand-edited or half-written save is missing.
@@ -217,7 +326,7 @@ function repair(data: Record<string, unknown>): SaveFile {
   const yard = isRecord(data.yard) ? data.yard : {}
   return {
     version: SAVE_VERSION,
-    pet: isRecord(data.pet) ? (data.pet as unknown as PetState) : null,
+    pet: repairPet(data.pet),
     muted: bool(data.muted, base.muted),
     worldOffset: num(data.worldOffset, base.worldOffset),
     discovered: arr(data.discovered, base.discovered),

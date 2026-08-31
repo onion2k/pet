@@ -1036,6 +1036,9 @@ export class App {
   /** Wipes the save and returns to the naming screen. */
   restart(): void {
     wipe()
+    // Same reason as retiring: NEW PET is a button on the page, and nothing
+    // stops it being pressed while the pet is away.
+    this.forage.abandon()
     this.pet = null
     this.save.pet = null
     this.mode = 'name'
@@ -1249,6 +1252,10 @@ export class App {
   /** Dismisses the ceremony and clears the way for the next egg. */
   private finishRetirement(): void {
     this.retiring = null
+    // An adult can be seen off while it is still out over the hill: the status
+    // screen is reachable from the yard, and the yard is where the trip left
+    // from. The walk home belongs to the pet that went on it.
+    this.forage.abandon()
     this.pet = null
     this.save.pet = null
     this.mode = 'name'
@@ -1572,6 +1579,15 @@ export class App {
     if (wasAsleep && !pet.asleep && !this.skipping) {
       this.say(`${pet.name} wakes up`, 'confirm')
       this.sayAsPet(voice.morning(pet.speciesId))
+    }
+
+    // The play menu is as long as the yard is full, and the yard empties on
+    // its own -- a visitor's hour ends whether or not anyone is looking at the
+    // menu it put a row on. Clamping only on the way in left the highlight
+    // sitting past the end of a list that had shrunk underneath it, so the row
+    // a player thought they were choosing was not the one B would start.
+    if (this.mode === 'games') {
+      this.gameIndex = Math.min(this.gameIndex, this.playMenu.length - 1)
     }
 
     if (this.mode === 'playing' && this.session) {

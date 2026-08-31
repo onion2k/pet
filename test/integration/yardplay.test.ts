@@ -92,6 +92,21 @@ describe('the play menu', () => {
     expect(h.app.gameIndex).toBeLessThanOrEqual(wasAt)
     expect(() => h.tap('b')).not.toThrow()
   })
+
+  it('brings the highlight back inside a menu that shrank while it was open', () => {
+    // The other way round from the test above. There the player was away
+    // between one menu and the next; here they are sitting on the menu when the
+    // visitor's hour ends underneath it, which is not something they did and so
+    // not something a press can be waited for to put right. Left alone the
+    // highlight sat past the end of the list and B started a different row.
+    const h = withBall()
+    h.select('play')
+    while (h.app.gameIndex < h.app.playMenu.length - 1) h.tap('c')
+    h.app.debugWorldOffset = offsetWith(false) - h.app.worldOffset
+    h.frame()
+    expect(h.app.gameIndex).toBeLessThan(h.app.playMenu.length)
+    expect(h.app.mode).toBe('games')
+  })
 })
 
 describe('playing fetch', () => {

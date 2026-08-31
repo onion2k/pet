@@ -329,6 +329,62 @@ describe('what the trip changes', () => {
   })
 })
 
+describe('a pet that goes away mid-trip', () => {
+  /**
+   * A trip outlives the screen it was started from -- that is the point of it,
+   * so an evolution part way through does not strand the pet over the hill. It
+   * turned out to outlive the pet as well. Every beat of the journey reads the
+   * pet to work out how the walk is going, so once the ceremony was dismissed
+   * the next frame threw, which is the frame that draws the naming screen for
+   * the egg that was meant to follow.
+   *
+   * Both tests below wait for the journey proper before taking the pet away. A
+   * trip still walking out is safe by accident: it is waiting to be told the
+   * pet is over the hill, nobody is left to tell it, and it stalls where it
+   * stands. The one that breaks is the one already underway.
+   */
+  const underway = (h: Harness): boolean => h.app.forageBeats.length > 0
+
+  it('survives being retired while it is still out', () => {
+    // The status screen is reachable from the yard, and the trip carries on
+    // behind it: the pet is over the hill while the player reads its record.
+    const h = grownUp()
+    sendTo(h, MEADOW_GROUNDS[0]!.id)
+    h.select('status')
+    h.until('the trip to be underway', () => underway(h), 30)
+    h.holdRetire()
+    h.tap('b')
+    expect(h.app.pet).toBeNull()
+    expect(() => h.advance(10)).not.toThrow()
+  })
+
+  it('survives the whole lineage being started over while it is still out', () => {
+    // NEW PET is a button on the page rather than one on the shell, so unlike
+    // everything else it can be pressed while the trip screen is up.
+    const h = grownUp()
+    sendTo(h, MEADOW_GROUNDS[0]!.id)
+    h.until('the trip to be underway', () => underway(h), 30)
+    expect(h.app.mode).toBe('forage')
+    h.app.restart()
+    expect(h.app.pet).toBeNull()
+    expect(() => h.advance(10)).not.toThrow()
+  })
+
+  it('leaves nothing of the trip behind for the next pet', () => {
+    // What it was carrying goes with it. A beat left on the screen, or a curio
+    // left in hand, would be the last pet's trip handed to the next one.
+    const h = grownUp()
+    sendTo(h, MEADOW_GROUNDS[0]!.id)
+    h.until('the trip to be underway', () => underway(h), 30)
+    h.app.restart()
+    h.advance(1)
+    expect(h.app.forageBeats).toEqual([])
+    expect(h.app.forageFound).toBeNull()
+    expect(h.app.visual.foraging).toBe(false)
+    expect(h.app.forageDim).toBe(0)
+  })
+})
+
 describe('the collection board', () => {
   const withCurios = (curios: Record<string, number>) =>
     harness({ save: { ...emptySave(), curios } }).start()

@@ -19,6 +19,8 @@ import {
   emptyPlayAxes,
 } from '../../src/game/save'
 import type { SaveFile } from '../../src/game/types'
+import { resetClock, setClock } from '../../src/engine/clock'
+import { emptyPlayAxes as axes } from '../../src/game/save'
 
 /**
  * The save file is the one part of the game a player can actually lose. A
@@ -42,6 +44,7 @@ afterEach(() => {
   cancelPendingSave()
   resetStorage()
   resetIdSource()
+  resetClock()
 })
 
 describe('newPet', () => {
@@ -355,6 +358,163 @@ describe('repair', () => {
 
   it('normalises the version even when the stored one was older', () => {
     expect(damaged({}).version).toBe(SAVE_VERSION)
+  })
+})
+
+describe('repairing the pet', () => {
+  /**
+   * The pet is the one field `repair` used to wave through, on the reasoning
+   * that a file at the current version was written by the current code. It is
+   * also the only field whose loss is a lost pet rather than a lost setting, so
+   * it is the one that gets read back a piece at a time.
+   */
+  const NOW = Date.UTC(2024, 5, 3, 12, 0, 0)
+
+  beforeEach(() => setClock(() => NOW))
+
+  const withPet = (pet: unknown) => {
+    store.data[KEY] = JSON.stringify({ version: SAVE_VERSION, pet })
+    return load().pet!
+  }
+
+  it('builds a whole pet out of an empty object', () => {
+    // The case that used to throw on the first frame: `{}` has no `discovered`,
+    // and the boot walks it before anything reaches the screen.
+    const pet = withPet({})
+    expect(pet).toEqual({
+      id: 'id-1',
+      name: 'PET',
+      speciesId: 'egg',
+      stage: 'egg',
+      temperament: undefined,
+      bornAt: NOW,
+      lastTick: NOW,
+      ageMs: 0,
+      stats: { hunger: 70, happiness: 70, energy: 90, hygiene: 90, health: 100 },
+      asleep: false,
+      sick: false,
+      warm: undefined,
+      care: { neglectSeconds: 0, thrivingSeconds: 0, sicknessCount: 0 },
+      diet: { sweet: 0, protein: 0, veg: 0, junk: 0, meals: 0 },
+      play: { gamesPlayed: 0, gamesWon: 0, bestStreak: 0, byAxis: axes() },
+      sleep: { onTimeSleeps: 0, lateSleeps: 0, overtiredSeconds: 0 },
+      discovered: ['egg'],
+    })
+  })
+
+  it('keeps an intact pet exactly as it was', () => {
+    const pet = {
+      id: 'abc',
+      name: 'ZED',
+      speciesId: 'pudge',
+      stage: 'child',
+      temperament: 'lively',
+      bornAt: 100,
+      lastTick: 200,
+      ageMs: 300,
+      stats: { hunger: 1, happiness: 2, energy: 3, hygiene: 4, health: 50 },
+      asleep: true,
+      sick: true,
+      warm: true,
+      care: { neglectSeconds: 1, thrivingSeconds: 2, sicknessCount: 3 },
+      diet: { sweet: 1, protein: 2, veg: 3, junk: 4, meals: 5 },
+      play: { gamesPlayed: 1, gamesWon: 2, bestStreak: 3, byAxis: { chase: 4, romp: 5, quiet: 6 } },
+      sleep: { onTimeSleeps: 1, lateSleeps: 2, overtiredSeconds: 3 },
+      discovered: ['egg', 'blob', 'pudge'],
+    }
+    expect(withPet(pet)).toEqual(pet)
+  })
+
+  it('replaces every field that came back the wrong type', () => {
+    const pet = withPet({
+      id: 9,
+      name: null,
+      bornAt: 'soon',
+      lastTick: 'later',
+      ageMs: 'ages',
+      stats: 'fine',
+      asleep: 'yes',
+      sick: 1,
+      warm: 'toasty',
+      care: 3,
+      diet: [],
+      play: null,
+      sleep: 'well',
+      discovered: 'egg',
+    })
+    expect(pet.id).toBe('id-1')
+    expect(pet.name).toBe('PET')
+    expect(pet.bornAt).toBe(NOW)
+    expect(pet.lastTick).toBe(NOW)
+    expect(pet.ageMs).toBe(0)
+    expect(pet.stats).toEqual({ hunger: 70, happiness: 70, energy: 90, hygiene: 90, health: 100 })
+    expect(pet.asleep).toBe(false)
+    expect(pet.sick).toBe(false)
+    expect(pet.warm).toBeUndefined()
+    expect(pet.care).toEqual({ neglectSeconds: 0, thrivingSeconds: 0, sicknessCount: 0 })
+    expect(pet.play.byAxis).toEqual(axes())
+    expect(pet.discovered).toEqual(['egg'])
+  })
+
+  it('falls the last tick back to the moment the pet was born', () => {
+    expect(withPet({ bornAt: 500 }).lastTick).toBe(500)
+  })
+
+  it('brings stats back inside their bounds rather than trusting them', () => {
+    // A stat outside 0..100 is one the simulation would never have written, and
+    // one the bars on the screen cannot draw.
+    const high = withPet({ stats: { hunger: 900, happiness: 101, energy: 100, hygiene: 55, health: 900 } })
+    expect(high.stats).toEqual({ hunger: 100, happiness: 100, energy: 100, hygiene: 55, health: 100 })
+
+    const low = withPet({ stats: { hunger: -5, happiness: -1, energy: 0, hygiene: 12, health: -900 } })
+    // Health has the simulation's floor rather than zero: there is no death here.
+    expect(low.stats).toEqual({ hunger: 0, happiness: 0, energy: 0, hygiene: 12, health: 8 })
+  })
+
+  it('floors a tally that came back negative', () => {
+    const pet = withPet({ ageMs: -5, care: { neglectSeconds: -1 }, play: { byAxis: { chase: -2 } } })
+    expect(pet.ageMs).toBe(0)
+    expect(pet.care.neglectSeconds).toBe(0)
+    expect(pet.play.byAxis.chase).toBe(0)
+  })
+
+  it('starts a pet over as an egg when its form is one this build cannot draw', () => {
+    // A save from a branch, or from before a species was renamed. Every screen
+    // reads the form; a name nothing answers to is a crash on the first frame.
+    expect(withPet({ speciesId: 'chimera', stage: 'adult' }).speciesId).toBe('egg')
+    expect(withPet({ speciesId: 'chimera', stage: 'adult' }).stage).toBe('egg')
+    expect(withPet({ speciesId: 42 }).speciesId).toBe('egg')
+  })
+
+  it('reads the stage off the form rather than believing both', () => {
+    // Two fields that can disagree are two fields that eventually will: a save
+    // claiming to be a child while wearing an adult's form drew one and scored
+    // the other.
+    expect(withPet({ speciesId: 'blob', stage: 'adult' }).stage).toBe('baby')
+    expect(withPet({ speciesId: 'mochi', stage: 'egg' }).stage).toBe('adult')
+  })
+
+  it('drops a temperament it has no name or blurb for', () => {
+    expect(withPet({ temperament: 'grumpy' }).temperament).toBeUndefined()
+    expect(withPet({ temperament: 7 }).temperament).toBeUndefined()
+    expect(withPet({ temperament: 'devoted' }).temperament).toBe('devoted')
+  })
+
+  it('keeps a banked fire, either way round', () => {
+    expect(withPet({ warm: true }).warm).toBe(true)
+    expect(withPet({ warm: false }).warm).toBe(false)
+  })
+
+  it('cleans the discovered list, which the collection screen counts', () => {
+    const pet = withPet({
+      speciesId: 'blob',
+      discovered: ['egg', 'egg', 'blob', 'chimera', 7, null],
+    })
+    expect(pet.discovered).toEqual(['egg', 'blob'])
+  })
+
+  it('always lists the form the pet is actually wearing', () => {
+    expect(withPet({ speciesId: 'pudge', discovered: [] }).discovered).toEqual(['pudge'])
   })
 })
 
