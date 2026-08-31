@@ -51,6 +51,18 @@ const screenScene = new Transform()
 const CAMERA_POS: [number, number, number] = [0, 3.9, 9.0]
 const CAMERA_TARGET_Y = 1.35
 /**
+ * Where a shore aims instead.
+ *
+ * The water lies between the pet and the camera, and the bottom of the frame
+ * is only a length or so past the waterline -- so aimed at the usual height a
+ * beach shows a stripe of surf and no sea at all. Dropping the aim by a third
+ * of a length tips five degrees of sky out of the top of the picture and takes
+ * in three times as much water at the bottom, and the pet rides a little above
+ * the middle of the frame, which is where it wants to be with the sea in front
+ * of it anyway.
+ */
+const SHORE_TARGET_Y = 0.55
+/**
  * Framing is widened rather than dollied back: the terrain's haze starts at a
  * depth of 11 and the pet stands at about 9, so pulling the camera away would
  * walk the pet and the ground it stands on into the fog.
@@ -105,7 +117,7 @@ terrain.root.setParent(screenScene)
 
 const sea = createSea(gl)
 sea.root.setParent(screenScene)
-sea.setShore(biome.shore)
+sea.setShore(biome.shore, biome.relief)
 
 const weather = createWeather(gl)
 weather.root.setParent(screenScene)
@@ -328,7 +340,7 @@ function step(dt: number): void {
     homeId = app.biome.id
     biome = app.biome
     terrain.rebuild(terrainSeed, biome)
-    sea.setShore(biome.shore)
+    sea.setShore(biome.shore, biome.relief)
     petView.root.position.y = terrain.shape.groundY
     // New ground means the shelter may have moved to the other side.
     petView.setShelter({ ...terrain.shape.shelter, lamps: terrain.shape.lamps })
@@ -351,7 +363,7 @@ function step(dt: number): void {
   screenCamera.position.set(...CAMERA_POS)
   screenCamera.lookAt([
     CAMERA_POS[0] + Math.sin(cameraPan) * CAMERA_POS[2],
-    CAMERA_TARGET_Y,
+    biome.shore ? SHORE_TARGET_Y : CAMERA_TARGET_Y,
     CAMERA_POS[2] - Math.cos(cameraPan) * CAMERA_POS[2],
   ])
   screenCamera.updateMatrixWorld()
@@ -368,7 +380,7 @@ function step(dt: number): void {
   // One definition of what time it is in the pet's world, shared by the picture
   // and by the pet itself.
   const world = worldAt(app.worldNow())
-  seasonPalette.update(tintPalette(world.palette, biome.id, biome.materials))
+  seasonPalette.update(tintPalette(biome, world.season.id, world.nextSeason.id, world.seasonBlend))
 
   // The sun's direction is in world space; the screen camera never moves, so it
   // is cheaper to rotate it into view space here than in every shader.
@@ -422,12 +434,27 @@ function step(dt: number): void {
   visitors.setLamps(lampView, lampLevel)
 
   backdrop.setPalette(world.sky.top, world.sky.bottom)
+  // What is in the sky where the pet lives. Cloud shows with the daylight --
+  // picked out at midnight it is fog on the screen rather than weather -- and
+  // the ridges take the haze's own colour, so the far distance agrees with the
+  // near distance about what the air is doing today.
+  const sky = biome.sky
+  backdrop.setSky(
+    sky?.cloud ?? 0,
+    sky?.horizon ?? 0.64,
+    (sky ? 1 : 0) * (0.18 + world.daylight * 0.82),
+    sky?.ridges ?? 0,
+    world.haze,
+  )
   // Place the sun on the same arc that lights the scene, so the shadows and the
   // sky always agree. It sinks below the horizon and the moon takes over.
   const nightside = world.sunHeight <= 0
   // Shift the sun by the pan, or it would sit welded to the screen while the
   // world turned underneath it.
   const halfFovH = Math.atan(Math.tan((SCREEN_FOV * Math.PI) / 360) * (SCREEN_PX[0] / SCREEN_PX[1]))
+  // The same shift the sun gets, for the same reason: the sky is painted in
+  // screen space and has to turn with the head that is looking at it.
+  backdrop.setPan(cameraPan / (2 * halfFovH))
   backdrop.setSun(
     [
       0.5 - world.light.direction[0] * 0.55 - cameraPan / (2 * halfFovH),

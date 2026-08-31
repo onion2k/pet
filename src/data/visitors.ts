@@ -12,6 +12,10 @@ import { rows, type VoxelModel } from './voxel-format'
 export type VisitorId =
   | 'fireflies'
   | 'ball'
+  | 'beachball'
+  | 'football'
+  | 'pinecone'
+  | 'gull'
   | 'rabbit'
   | 'snowman'
   | 'flowers'
@@ -37,18 +41,23 @@ export type VisitorId =
   | 'hollyhocks'
 
 /**
- * The jobs a living visitor does, so a biome can fill them with its own.
+ * The jobs a visitor does, so a biome can fill them with its own.
  *
- * Objects are not in here: a ball is a ball wherever the pet lives, and a sled
- * is left out by whoever leaves sleds out. It is the creatures and the flowers
- * that make one place feel unlike another, and two of these roles carry a yard
- * game -- which is the point. A game asks for a role rather than for a named
- * visitor, so every biome can play all five while none of them looks alike.
+ * Four of them are alive and one is not. The toy started out on the universal
+ * list -- a ball is a ball wherever the pet lives -- and that was the thinnest
+ * part of the whole arrangement: the yard's one interactive object, identical
+ * on a village green and at the tideline. What rolls is a role like the rest
+ * now, so the beach gets a beach ball and the wood gets a cone off a tree,
+ * while FETCH goes on asking for whatever this place's toy happens to be.
+ *
+ * The sled, the snowman, the pumpkin and the leaf pile stay universal: they are
+ * things somebody leaves out or builds, and the season is what says whether
+ * they are there.
  */
-export type VisitorRole = 'flitter' | 'glow' | 'grazer' | 'bloom'
+export type VisitorRole = 'flitter' | 'glow' | 'grazer' | 'bloom' | 'toy'
 
 /** How a visitor moves, if at all. */
-export type VisitorMotion = 'still' | 'hop' | 'flutter' | 'roll'
+export type VisitorMotion = 'still' | 'hop' | 'flutter' | 'wheel' | 'roll'
 
 /** Where in the yard it stands. */
 export type VisitorSpot =
@@ -122,6 +131,138 @@ const ball: VoxelModel = {
       .bbb.
       .bbb.
       .....`),
+  ],
+}
+
+/**
+ * The beach's. Panelled rather than plain, and a size up on the meadow's: a
+ * beach ball is mostly air and reads as light, which is the joke of it.
+ */
+const beachball: VoxelModel = {
+  palette: { r: '#e34f4f', y: '#f2d24b', c: '#3fa9d8', a: '#f7f1e2' },
+  layers: [
+    rows(`
+      .....
+      .rrr.
+      .aaa.
+      .ccc.
+      .....`),
+    rows(`
+      .rrr.
+      rrrrr
+      aaaaa
+      ccccc
+      .ccc.`),
+    rows(`
+      .yyy.
+      yyyyy
+      aaaaa
+      ccccc
+      .ccc.`),
+    rows(`
+      .rrr.
+      rrrrr
+      aaaaa
+      ccccc
+      .ccc.`),
+    rows(`
+      .....
+      .rrr.
+      .aaa.
+      .ccc.
+      .....`),
+  ],
+}
+
+/** The village's. Somebody's, kicked over a wall and never asked after. */
+const football: VoxelModel = {
+  palette: { w: '#eceae2', k: '#2a2a2e' },
+  layers: [
+    rows(`
+      .....
+      .www.
+      .wkw.
+      .www.
+      .....`),
+    rows(`
+      .wkw.
+      wwwww
+      kwwwk
+      wwwww
+      .wkw.`),
+    rows(`
+      .www.
+      wkwkw
+      wwwww
+      wkwkw
+      .www.`),
+    rows(`
+      .wkw.
+      wwwww
+      kwwwk
+      wwwww
+      .wkw.`),
+    rows(`
+      .....
+      .www.
+      .wkw.
+      .www.
+      .....`),
+  ],
+}
+
+/**
+ * The wood's. Not a ball at all, which is the point -- nobody leaves a ball in
+ * a wood, and a cone rolls badly enough to be worth chasing.
+ */
+const pinecone: VoxelModel = {
+  palette: { b: '#6a4a2c', t: '#8a6438' },
+  layers: [
+    rows(`
+      ...
+      .b.
+      ...`),
+    rows(`
+      .t.
+      bbb
+      .t.`),
+    rows(`
+      .b.
+      tbt
+      .b.`),
+    rows(`
+      ...
+      .t.
+      ...`),
+  ],
+}
+
+/**
+ * The beach's flier: a gull, and a proper one.
+ *
+ * The three small birds in this file are the same five voxels in three colours,
+ * which is fine for something flitting about a hedge and no good at all for the
+ * bird that owns a coastline. This one is a wingspan first -- seven across,
+ * held out flat -- because that is the whole silhouette of a gull, and it wants
+ * to be read against the sky rather than examined.
+ */
+const gull: VoxelModel = {
+  palette: { w: '#f7f8f6', g: '#c9d2da', d: '#4a5560', y: '#e8b23f' },
+  layers: [
+    rows(`
+      .......
+      ...w...
+      ...w...`),
+    // Held out flat, pale on top and dark only at the tips, which is what a
+    // gull is from below: a white cross with black ends to it.
+    rows(`
+      ...y...
+      dggwggd
+      .gwwwg.`),
+    rows(`
+      .......
+      ..www..
+      ..www..`),
   ],
 }
 
@@ -734,6 +875,9 @@ export const VISITORS: Visitor[] = [
     spot: 'roam',
   },
   { id: 'ball', arrival: 'a ball has turned up in the yard', seasons: ['summer', 'autumn'], chance: 0.5, model: ball, height: 0.44, motion: 'roll', spot: 'roam' },
+  { id: 'beachball', arrival: 'a beach ball has blown up the sand', seasons: ['summer', 'autumn'], chance: 0.55, model: beachball, height: 0.56, motion: 'roll', spot: 'roam' },
+  { id: 'football', arrival: 'a football is out on the green', seasons: ['summer', 'autumn'], chance: 0.55, model: football, height: 0.42, motion: 'roll', spot: 'roam' },
+  { id: 'pinecone', arrival: 'a cone has come down off a tree', seasons: ['summer', 'autumn'], chance: 0.55, model: pinecone, height: 0.3, motion: 'roll', spot: 'roam' },
   { id: 'rabbit', friend: 'a rabbit', arrival: 'a rabbit is grazing on the verge', seasons: ['spring', 'summer'], chance: 0.4, model: rabbit, height: 0.74, motion: 'hop', spot: 'verge' },
   { id: 'snowman', arrival: 'somebody has built a snowman', seasons: ['winter'], chance: 0.55, model: snowman, height: 1.4, motion: 'still', spot: 'verge' },
   { id: 'flowers', arrival: 'wildflowers have come up', seasons: ['spring'], chance: 0.65, model: flowers, height: 0.64, motion: 'still', spot: 'verge' },
@@ -772,6 +916,7 @@ export const VISITORS: Visitor[] = [
     motion: 'flutter',
     spot: 'roam',
   },
+  { id: 'gull', friend: 'the gull', arrival: 'a gull is wheeling over the water', seasons: ['spring', 'summer'], chance: 0.55, model: gull, height: 0.5, motion: 'wheel', spot: 'roam' },
   { id: 'tern', friend: 'a tern', arrival: 'a tern is working the shoreline', seasons: ['spring', 'summer'], chance: 0.45, model: tern, height: 0.32, motion: 'flutter', spot: 'roam' },
   { id: 'crab', friend: 'a crab', arrival: 'a crab has come up the sand', seasons: ['spring', 'summer'], chance: 0.4, model: crab, height: 0.4, motion: 'hop', spot: 'verge' },
   { id: 'seapinks', arrival: 'the thrift is out on the bank', seasons: ['spring'], chance: 0.65, model: seapinks, height: 0.6, motion: 'still', spot: 'verge' },
@@ -814,12 +959,12 @@ export const VISITORS: Visitor[] = [
 ]
 
 /**
- * The ones that turn up wherever the pet lives. Everything else is a role its
- * biome fills, so moving house changes who is out there without ever changing
- * what there is to do.
+ * The ones that turn up wherever the pet lives: things left out or built rather
+ * than things that live somewhere. Everything else is a role its biome fills,
+ * so moving house changes who is out there -- and what is out there to be
+ * shoved about -- without ever changing what there is to do.
  */
 export const UNIVERSAL_VISITORS: VisitorId[] = [
-  'ball',
   'snowman',
   'pumpkin',
   'leafpile',

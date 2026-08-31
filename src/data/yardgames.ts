@@ -12,10 +12,10 @@ import type { Stage } from '../game/types'
  * scenery. A yard game is the fix: what is out there today is what there is to
  * do today.
  *
- * A game must not restate its visitor's season. Whether the ball is in the yard
- * already carries summer and autumn, so saying so again would make the read on
- * the menu a tautology that always looks promising. What a game wants is the
- * part presence does not already settle: the weather, and the hour.
+ * A game must not restate its visitor's season. Whether the toy is in the yard
+ * already carries the months it turns up in, so saying so again would make the
+ * read on the menu a tautology that always looks promising. What a game wants
+ * is the part presence does not already settle: the weather, and the hour.
  */
 
 export type YardGameId = 'fetch' | 'chase' | 'dive' | 'hill' | 'catch'
@@ -60,7 +60,7 @@ export interface YardGame {
 export const YARD_GAMES: YardGame[] = [
   {
     id: 'fetch',
-    needs: { visitor: 'ball' },
+    needs: { role: 'toy' },
     title: 'FETCH',
     note: 'Send it, and call it back.',
     hint: 'B TO WIND UP',

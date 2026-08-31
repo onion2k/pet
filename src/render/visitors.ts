@@ -368,7 +368,9 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
       return { x: entry.node.position.x, y: 0.34, z: entry.node.position.z }
     },
     playthingAt() {
-      const entry = entries.find((e) => e.visitor.id === 'ball')
+      // Whatever this place's toy is, rather than the meadow's ball by name:
+      // a roller is the thing the pet can get behind and shove.
+      const entry = entries.find((e) => e.visitor.motion === 'roll')
       if (!entry || !entry.present || entry.fade < 0.5) return null
       return { x: entry.node.position.x, z: entry.node.position.z }
     },
@@ -480,6 +482,30 @@ export function createVisitors(gl: OGLRenderingContext, groundY: number): Visito
             entry.node.rotation.y = Math.atan2(hop.toX - hop.fromX, hop.toZ - hop.fromZ)
             if (t >= 1) entry.node.rotation.x = Math.sin(entry.phase * 2.2) * 0.12 - 0.1
             else entry.node.rotation.x = 0
+            break
+          }
+          case 'wheel': {
+            // A gull does not flit: it holds a long circle on stiff wings,
+            // banking into the turn and losing and gaining a little height
+            // across it. Wider and higher than a flutter, and drawn out over
+            // twenty seconds, so it crosses the frame rather than fussing
+            // about in the middle of it.
+            const turn = entry.phase * 0.32
+            // Out over whatever is in front of the pet rather than round its
+            // head: the circle is pushed forward and up, so the bird crosses
+            // open ground -- or open water -- instead of being lost against the
+            // one thing in the frame that is already the size of a pet.
+            //
+            // It barely uses the pitch it was given, either. A roaming pitch is
+            // anywhere in a band nineteen lengths wide, and a bird holding a
+            // circle out at the end of that is a bird permanently off the side
+            // of the screen.
+            p.x = entry.home.x * 0.15 + Math.sin(turn) * 2.4
+            p.z = entry.home.z * 0.3 + Math.cos(turn) * 0.8 + 2.3
+            p.y = context.groundY + 1.75 + Math.sin(entry.phase * 0.51) * 0.4
+            // Facing along the circle, and rolled into it the way a wing is.
+            entry.node.rotation.y = turn
+            entry.node.rotation.z = 0.42 + Math.sin(entry.phase * 0.8) * 0.12
             break
           }
           case 'flutter': {

@@ -18,7 +18,7 @@ import {
   type Biome,
 } from '../data/biome'
 import { LANTERN, SHELTER, type Prop, type PropKey } from '../data/props'
-import type { Shore } from '../data/biome'
+import type { Relief } from '../data/biome'
 import { MATERIAL_INDEX, PROP_MATERIAL } from '../data/seasons'
 import { expandLayers } from '../data/voxel-format'
 import type { PaletteTexture } from './palette'
@@ -75,6 +75,11 @@ export interface TerrainShape {
   size: number
   /** Column height in voxels. */
   heightAt(x: number, z: number): number
+  /**
+   * Digs a column to a given height. Only the scatter uses this, and only for
+   * the footing under something built: everything else reads the ground.
+   */
+  levelAt(x: number, z: number, height: number): void
   /** World Y the pet stands on. */
   groundY: number
   /** World Y the water sits at, or null where there is none. */
@@ -138,36 +143,90 @@ function lampAt(
 }
 
 /**
- * How much of the way from the top of the beach to the patch's edge the ground
- * takes to go fully under. The rest is flat seabed.
+ * How much of the depth in front of the fall line the ground takes to get all
+ * the way down. The rest is flat: seabed under a shore, low ground under a
+ * hill.
+ *
+ * Short, because the frame is what it is: the camera sits low and looks
+ * slightly down, so the near edge of the picture is only a length and a half
+ * of ground beyond the fall line. Every unit the slope spends falling is a
+ * unit of whatever lies below it that never gets on screen.
  */
-const SHORE_RUN = 0.5
+const FALL_RUN = 0.2
 
-/** A voxel height as the 0..1 value the noise field is written in. */
-const heightValue = (height: number): number =>
-  (height - TERRAIN_BASE) / (2 * TERRAIN_RELIEF) + 0.5
+/** Layers above which a prop counts as tall, and is kept out of the foreground. */
+const TALL_PROP = 6
 
 /**
- * How far under the water a column is, 0 at the top of the beach and 1 out
- * where the seabed has levelled off. Eased at both ends so the beach meets the
- * clearing without a crease and the seabed flattens without a step.
+ * The most a built thing will dig through. Past this it is not a slope with a
+ * house on it, it is a house halfway up a cliff.
  */
-function shoreFall(z: number, shore: Shore): number {
-  const fromCol = TERRAIN_ROWS / 2 + shore.from / TERRAIN_VOXEL
-  // Under water well before the patch runs out, rather than only just by the
-  // edge. Spread over the whole remaining depth the noise still has a say
-  // halfway out, and a dune that keeps its head up out there is a sandbank
-  // sitting in open water -- which reads as a fault rather than as a beach.
-  // Finishing early leaves flat seabed under the far water instead.
-  const run = fromCol * SHORE_RUN
+const FOUNDATION_STEP = 3
+
+/** A voxel height as the 0..1 value the noise field is written in. */
+const heightValue = (height: number): number => (height - TERRAIN_BASE) / (2 * TERRAIN_RELIEF) + 0.5
+
+/** Smoothstep on an already-clamped 0..1. */
+const ease = (t: number): number => t * t * (3 - 2 * t)
+
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
+
+/**
+ * How far down the fall a column is: 0 at the line where the ground breaks and
+ * 1 out where it has levelled off again.
+ *
+ * It grows with z, which is to say the ground falls away *toward the camera*.
+ * On a shore that is what the sea is for -- two lengths off, a swell is
+ * something you can watch travelling and the surf is a line that runs up the
+ * sand and slides back, where twenty lengths off, behind the pet, all of it was
+ * four hazed pixels. On a hill it is what tells you that you are on top of one:
+ * ground that goes out of sight downward, and ridges beyond it in the sky.
+ */
+function fallAt(z: number, relief: Relief): number {
+  if (!relief.fall) return 0
+  const fromCol = TERRAIN_ROWS / 2 + relief.fall.from / TERRAIN_VOXEL
+  const run = (TERRAIN_ROWS - fromCol) * FALL_RUN
   if (run <= 0) return 0
-  const t = Math.min(1, Math.max(0, (fromCol - z) / run))
-  return t * t * (3 - 2 * t)
+  // Straight, rather than eased at both ends.
+  //
+  // The weight does two jobs at once: it drops the ground and it damps the
+  // noise, and this is the near foreground, so both have to be got right in
+  // about a length. Eased in, the band standing one voxel proud of a waterline
+  // came out half a length deep, which at this angle is a white stripe ruled
+  // across the frame rather than a line of foam. Eased out, the noise is gone
+  // by the first column and the waterline is a ruler.
+  //
+  // Straight, the mean is already under the water a fifth of the way in while
+  // four fifths of the relief is still there to wander it. What is left is a
+  // beach with a berm at the top and an edge that wanders -- and, on dry
+  // ground, a brow that breaks rather than rolling gently over.
+  return clamp01((z - fromCol) / run)
+}
+
+/**
+ * How far up the rise a column is, 0 on the flat and 1 at the back edge.
+ *
+ * Dunes behind a beach, and the shoulder of the hill behind a hilltop. Without
+ * it a place that falls away in front is a strip of ground with sky behind it;
+ * with it the patch reads bottom to top -- what is below, the flat the pet
+ * walks, and the ground going on up out of the frame.
+ *
+ * Eased, unlike the fall: this is the far distance, where a break in the slope
+ * would read as a fault rather than as a brow. It starts behind the shelter,
+ * which stands on its own level pad and would be tilted by ground that climbed
+ * out from under it.
+ */
+function riseAt(z: number, relief: Relief): number {
+  if (!relief.rise) return 0
+  const fromCol = TERRAIN_ROWS / 2 + relief.rise.from / TERRAIN_VOXEL
+  if (fromCol <= 0) return 0
+  return ease(clamp01((fromCol - z) / fromCol))
 }
 
 export function terrainShape(seed: string, biome: Biome): TerrainShape {
   const s = seedFrom(seed)
   const shore = biome.shore
+  const relief = biome.relief
   const halfX = TERRAIN_COLS / 2
   const halfZ = TERRAIN_ROWS / 2
   const laneX = LANE_HALF_X / TERRAIN_VOXEL
@@ -188,8 +247,26 @@ export function terrainShape(seed: string, biome: Biome): TerrainShape {
       const ex = (x - halfX) / laneX
       const ez = (z - halfZ) / laneZ
       const reach = Math.hypot(ex, ez)
-      const flatten = 1 - Math.min(1, Math.max(0, (reach - 1) / 0.5))
+      let flatten = 1 - Math.min(1, Math.max(0, (reach - 1) / 0.5))
+      // The lane's skirt reaches a good way in front of the lane itself, which
+      // on a shore is the whole of the beach. Left alone it levelled the sand
+      // the water breaks on, and the waterline came out ruled straight across
+      // the frame rather than wandering. So the falling ground takes the skirt
+      // away with it: past the top of the beach the relief is the beach's own.
+      const fall = relief ? fallAt(z, relief) : 0
+      if (fall > 0) flatten *= Math.max(0, 1 - fall * 3)
       value = value * (1 - flatten) + 0.5 * flatten
+
+      // Behind, the ground climbs. Pulled toward the height rather than added
+      // to, for the same reason the ground ahead is pulled down: the noise
+      // thins as it goes, so the ridge reads as one bank of sand or one
+      // shoulder of hill with a wandering top, and not as the ordinary relief
+      // shifted upward. Before the shelter's pad, which is levelled afterwards
+      // and has to stay level.
+      if (relief?.rise) {
+        const rise = riseAt(z, relief)
+        value = value * (1 - rise) + heightValue(relief.rise.to) * rise
+      }
 
       // The shelter gets its own level pad rather than a wider clearing, which
       // would push all the scenery out of the foreground. The pad runs forward
@@ -202,14 +279,14 @@ export function terrainShape(seed: string, biome: Biome): TerrainShape {
       const onPad = x >= padMinX && x < padMaxX && z >= shelter.oz - 1 && z < halfZ + 2
       if (onPad) value = 0.5
 
-      // Out past the shelter the ground falls away under the water. Pulling the
-      // height toward a single seabed value rather than subtracting from it
-      // damps the noise as it goes, which is what keeps the waterline one line
-      // rather than a scatter of islands -- while leaving enough of it near the
-      // top of the beach for the edge to wander the way an edge should.
-      if (shore) {
-        const fall = shoreFall(z, shore)
-        value = value * (1 - fall) + heightValue(shore.floor) * fall
+      // Out past the lane the ground falls away -- under water on a shore, into
+      // the low country under a hill. Pulling the height toward a single value
+      // rather than subtracting from it damps the noise as it goes, which is
+      // what keeps a waterline one line rather than a scatter of islands --
+      // while leaving enough of it near the brow for the edge to wander the way
+      // an edge should.
+      if (relief?.fall) {
+        value = value * (1 - fall) + heightValue(relief.fall.to) * fall
       }
 
       const height = Math.round(TERRAIN_BASE + (value - 0.5) * 2 * TERRAIN_RELIEF)
@@ -233,15 +310,17 @@ export function terrainShape(seed: string, biome: Biome): TerrainShape {
       })),
     ],
     heightAt: (x, z) =>
-      x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS
-        ? 0
-        : cache[z * TERRAIN_COLS + x]!,
+      x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS ? 0 : cache[z * TERRAIN_COLS + x]!,
+    levelAt: (x, z, height) => {
+      if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) return
+      cache[z * TERRAIN_COLS + x] = Math.max(1, height)
+    },
     groundY: TERRAIN_BASE * TERRAIN_VOXEL,
     seaY: shore ? shore.level * TERRAIN_VOXEL : null,
   }
 }
 
-interface Scenery {
+export interface Scenery {
   voxels: Map<number, Voxel>
   /** Highest voxel any prop reaches, so the field can be sized to fit. */
   top: number
@@ -253,7 +332,12 @@ interface Scenery {
  * each slot. Props keep clear of the pet's clearing and of each other, and only
  * sit on ground level enough to stand on.
  */
-function scatterProps(
+/**
+ * Exported for the tests, which have no GL context and so cannot build the
+ * mesh, but do need to know that a place is not coming out bare -- a prop rule
+ * that rejects everything looks exactly like a prop rule that works.
+ */
+export function scatterProps(
   shape: TerrainShape,
   biome: Biome,
   seed: number,
@@ -340,50 +424,97 @@ function scatterProps(
     }
   }
 
-  for (let cz = 0; cz < TERRAIN_ROWS; cz += PROP_SPACING) {
-    for (let cx = 0; cx < TERRAIN_COLS; cx += PROP_SPACING) {
-      if (hash2(cx, cz, seed ^ 0x1111) > biome.propDensity) continue
+  // How far apart the candidate slots are here. A wood closes the grid up; a
+  // hill and a village open it out.
+  const spacing = biome.propSpacing ?? PROP_SPACING
 
-      const prop = pick(hash2(cx, cz, seed ^ 0x4444))
-      const layers = expandLayers(prop.model)
-      const depth = layers[0]!.length
-      const width = layers[0]![0]!.length
-      const ox = cx + Math.floor(hash2(cx, cz, seed ^ 0x2222) * PROP_SPACING) - (width >> 1)
-      const oz = cz + Math.floor(hash2(cx, cz, seed ^ 0x3333) * PROP_SPACING) - (depth >> 1)
+  // Two passes over the same slots: what was built goes up first, and
+  // everything that grew is scattered around it afterwards.
+  //
+  // One pass put the buildings last in practice. A cottage needs seven columns
+  // clear in both directions, and by the time a hundred and fifty tufts and
+  // stones have each reserved their own breathing room the green is a lace of
+  // holes too small to take one -- so a village came out with two houses on it
+  // and no way to tell why.
+  for (const built of [true, false]) {
+    for (let cz = 0; cz < TERRAIN_ROWS; cz += spacing) {
+      for (let cx = 0; cx < TERRAIN_COLS; cx += spacing) {
+        if (hash2(cx, cz, seed ^ 0x1111) > biome.propDensity) continue
 
-      // Must fit on the patch, clear of the pet's ground, on level enough footing.
-      if (ox < 1 || oz < 1 || ox + width >= TERRAIN_COLS || oz + depth >= TERRAIN_ROWS) continue
-      let lowest = Infinity
-      let highest = -Infinity
-      let blocked = false
-      for (let z = oz; z < oz + depth && !blocked; z++) {
-        for (let x = ox; x < ox + width; x++) {
-          if (Math.hypot((x - halfX) / laneX, (z - halfZ) / laneZ) < 1) {
-            blocked = true
-            break
+        const prop = pick(hash2(cx, cz, seed ^ 0x4444))
+        if (!!prop.foundation !== built) continue
+        const layers = expandLayers(prop.model)
+        const depth = layers[0]!.length
+        const width = layers[0]![0]!.length
+        const ox = cx + Math.floor(hash2(cx, cz, seed ^ 0x2222) * spacing) - (width >> 1)
+        const oz = cz + Math.floor(hash2(cx, cz, seed ^ 0x3333) * spacing) - (depth >> 1)
+
+        // Nothing tall stands between the camera and the pet.
+        //
+        // The lane is kept clear already, but the ground in front of it is the
+        // nearest thing to the lens, and a fourteen-voxel pine two lengths from
+        // the camera is a trunk filling a third of the frame with the pet behind
+        // it. Low scenery there is what gives the foreground depth; anything
+        // with a crown on it belongs behind the pet.
+        if (layers.length > TALL_PROP && oz + depth > halfZ + laneZ) continue
+
+        // Must fit on the patch, clear of the pet's ground, on level enough footing.
+        if (ox < 1 || oz < 1 || ox + width >= TERRAIN_COLS || oz + depth >= TERRAIN_ROWS) continue
+        let lowest = Infinity
+        let highest = -Infinity
+        let blocked = false
+        for (let z = oz; z < oz + depth && !blocked; z++) {
+          for (let x = ox; x < ox + width; x++) {
+            if (Math.hypot((x - halfX) / laneX, (z - halfZ) / laneZ) < 1) {
+              blocked = true
+              break
+            }
+            if (taken.has(z * TERRAIN_COLS + x)) {
+              blocked = true
+              break
+            }
+            const h = shape.heightAt(x, z)
+            lowest = Math.min(lowest, h)
+            highest = Math.max(highest, h)
           }
-          if (taken.has(z * TERRAIN_COLS + x)) {
-            blocked = true
-            break
+        }
+        if (blocked) continue
+        // Grown things take the ground as they find it and are refused a slot
+        // that steps; built things dig their footing flat and are only refused a
+        // hillside. Without the second rule nothing with a footprint bigger than
+        // about five columns could ever be placed in open relief.
+        if (prop.foundation) {
+          if (highest - lowest > FOUNDATION_STEP) continue
+        } else if (highest - lowest > 1) continue
+        // Nothing stands in the surf. Read off the falling ground rather than off
+        // the height, the same way the wet sand is: a marram tuft pitched at the
+        // waterline is worse than a bare beach, and the deepest column of the
+        // footprint is the one that decides it.
+        if (biome.shore && biome.relief && fallAt(oz + depth, biome.relief) > 0) continue
+
+        // A foundation is dug to the middle of what it found, so a house sits
+        // into a slope rather than perching on the high corner of it. The
+        // levelling runs a column wider than the walls, which is the doorstep.
+        let base = lowest
+        if (prop.foundation) {
+          base = Math.round((highest + lowest) / 2)
+          for (let z = oz - 1; z < oz + depth + 1; z++) {
+            for (let x = ox - 1; x < ox + width + 1; x++) shape.levelAt(x, z, base)
           }
-          const h = shape.heightAt(x, z)
-          lowest = Math.min(lowest, h)
-          highest = Math.max(highest, h)
         }
-      }
-      if (blocked || highest - lowest > 1) continue
 
-      stamp(prop, ox, oz, lowest)
+        stamp(prop, ox, oz, base)
 
-      // Reserve the footprint plus the prop's own breathing room.
-      const pad = prop.spacing
-      for (let z = oz - pad; z < oz + depth + pad; z++) {
-        for (let x = ox - pad; x < ox + width + pad; x++) {
-          if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
-          taken.add(z * TERRAIN_COLS + x)
+        // Reserve the footprint plus the prop's own breathing room.
+        const pad = prop.spacing
+        for (let z = oz - pad; z < oz + depth + pad; z++) {
+          for (let x = ox - pad; x < ox + width + pad; x++) {
+            if (x < 0 || z < 0 || x >= TERRAIN_COLS || z >= TERRAIN_ROWS) continue
+            taken.add(z * TERRAIN_COLS + x)
+          }
         }
+        count++
       }
-      count++
     }
   }
 
@@ -603,7 +734,7 @@ export function createTerrain(
             // wants, so by height alone the whole lane the pet walks in came up
             // white.
             const beach = nextBiome.shore
-            if (beach && shoreFall(z, beach) > 0) {
+            if (beach && nextBiome.relief && fallAt(z, nextBiome.relief) > 0) {
               if (height <= beach.level) return voxel(MATERIAL_INDEX.wet)
               if (height === beach.level + 1) return voxel(MATERIAL_INDEX.foam)
             }
@@ -637,7 +768,6 @@ export function createTerrain(
       mesh.frustumCulled = false
       mesh.setParent(root)
     }
-
   }
 
   build(seed, biome)
