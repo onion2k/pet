@@ -137,6 +137,12 @@ Care keeps a pet well; the lineage is why you keep coming back.
   than to the pet carrying it, so a torch one pet walked out three dark nights
   for is still in the porch for the next, and NEW PET takes it, tally and all.
 
+  Earn the bobble hat and you will see it: the pet puts it on when it snows and
+  takes it off again in spring. Kit shows when it is *doing* something rather
+  than whenever it is owned — a pet wearing all eight at once would be a hat
+  stand, and would say nothing about the day. The rest of the eight have no
+  picture yet. See [Kit on the pet](#kit-on-the-pet).
+
   It is not a currency and cannot be traded: a second umbrella is worth nothing,
   so there is nothing to spend. The rule the whole list obeys is that kit does
   not make a good day better — it makes a bad day playable. Which is why simply
@@ -307,6 +313,34 @@ them. The shader is untouched by that: it poses each feature from the offset
 every vertex carries from its own centre, so it blinks and steers a disc without
 knowing it is not a rectangle. The patches that hide the painted features stay
 rectangles, because what they cover is rectangular.
+
+### Kit on the pet
+
+Earn a bobble hat and the pet wears it when it snows, so the yard says what the
+weather is doing — which is the one channel that never did.
+
+It is the face's trick a second time, and cost almost nothing because of that. A
+hat is a small voxel model merged into the pet's own mesh with the head's `part`
+on every vertex, after which it twists with the idle look-around, settles when
+the pet sleeps, bows when it is sad and rises with each stride — **without one
+line of the shader changing.**
+
+Where it goes is measured the way the face is. Eight items across a dozen forms
+would be ninety-six placements to write down and ninety-six chances for one to
+drift the next time a model is edited; measured, it is one pass that cannot
+disagree with the creature it is measuring. The catch is that the top of a model
+is not the top of a head — Mochimo has a tuft of four sparkles up there and the
+hatchling an antenna — so a layer has to be a decent share of the creature's
+fullest one to count as somewhere to put a hat. A wisp is not a head.
+
+Kit is built at the wearer's own voxel size, so its blocks line up with the
+head's. That is not the same as being one size for everyone: the forms are
+normalised to a single world height but are not all the same number of voxels
+tall, so a voxel is a shade bigger on a shorter creature and its hat is too.
+
+Being part of the one mesh is what buys all of that, and what it costs is a
+rebuild whenever the kit changes — which is why `setWorn` is called every frame
+and does nothing at all unless the answer has actually moved.
 
 The features sit a quarter of a voxel proud of the head; at a fiftieth they came
 out striped with z-fighting. The whites carry a dark rim behind them, because

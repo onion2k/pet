@@ -654,6 +654,15 @@ describe('what the kit is worth', () => {
     expect(h.app.forecast).toBeNull()
   })
 
+  it('has the pet wearing its hat in winter, and only then', () => {
+    // What the renderer is handed each frame. The yard is the one channel that
+    // has never said what the weather is doing, and a pet in a bobble hat says
+    // it without a word.
+    expect(kitted(['hat'], { season: 'winter' }).app.worn).toEqual(['hat'])
+    expect(kitted(['hat'], { season: 'summer' }).app.worn).toEqual([])
+    expect(kitted([], { season: 'winter' }).app.worn).toEqual([])
+  })
+
   it('keeps the pet warm in a bobble hat, without burning the kindling for it', () => {
     const h = kitted(['hat'], { season: 'winter' })
     h.app.larder.kindling = 2

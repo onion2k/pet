@@ -369,6 +369,10 @@ function step(dt: number): void {
   ])
   screenCamera.updateMatrixWorld()
 
+  // What the pet has on. Read every frame because it turns with the weather
+  // rather than with anything the game does; the view rebuilds only when the
+  // answer actually moves.
+  petView.setWorn(app.worn)
   petView.update(dt, elapsed, app.visual)
   particles.update(dt)
   backdrop.update(elapsed)

@@ -197,6 +197,20 @@ export function voxelArrays(
   return { position, normal, color, ao, part, emissive, material, faces }
 }
 
+/** Two sets of vertex arrays as one mesh's worth. */
+export function mergeArrays(a: VoxelArrays, b: VoxelArrays): VoxelArrays {
+  return {
+    position: a.position.concat(b.position),
+    normal: a.normal.concat(b.normal),
+    color: a.color.concat(b.color),
+    ao: a.ao.concat(b.ao),
+    part: a.part.concat(b.part),
+    emissive: a.emissive.concat(b.emissive),
+    material: a.material.concat(b.material),
+    faces: a.faces + b.faces,
+  }
+}
+
 /** Turns expanded arrays into a mesh. */
 export function geometryFrom(gl: OGLRenderingContext, arrays: VoxelArrays): Geometry {
   return new Geometry(gl, {
