@@ -1,4 +1,4 @@
-import { Geometry, Mesh, Plane, Program, Transform } from 'ogl'
+import { Geometry, Mesh, Program, Transform } from 'ogl'
 import type { OGLRenderingContext } from 'ogl'
 import { LAMP_COUNT } from '../data/biome'
 import type { VoxelModel } from '../data/voxel-format'
@@ -11,6 +11,7 @@ import {
   type VoxelGeometry,
 } from './voxel-mesh'
 import { buildFace, faceAnchors } from './face'
+import { createShadows, footprintOf } from './contact-shadow'
 import { buildWorn, kitAnchors } from './worn'
 import { doorstepOf } from './route'
 import type { KitId } from '../data/kit'
@@ -265,32 +266,6 @@ export const PET_HEIGHT = 1.85
 /** Fraction of the hop cycle spent in the air. The rest is stood on the ground. */
 const HOP_WINDOW = 0.38
 
-const shadowVert = /* glsl */ `
-  attribute vec3 position;
-  attribute vec2 uv;
-  uniform mat4 modelViewMatrix;
-  uniform mat4 projectionMatrix;
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-const shadowFrag = /* glsl */ `
-  precision highp float;
-  uniform float uStrength;
-  varying vec2 vUv;
-  void main() {
-    // Soft round contact patch. Without it the pet reads as floating above the
-    // ground rather than standing on it. Blended over the ground, the result is
-    // roughly grass * (1 - alpha), so alpha is what controls how dark it gets.
-    float d = length(vUv - 0.5) * 2.0;
-    float a = (1.0 - smoothstep(0.45, 1.0, d)) * uStrength;
-    gl_FragColor = vec4(0.02, 0.03, 0.02, a);
-  }
-`
-
 export type PetMood = {
   mood: number
   asleep: boolean
@@ -306,6 +281,9 @@ export type PetMood = {
 const WALK_SPEED = 0.7
 /** Stride cycles per second. */
 const STRIDE_RATE = 1.15
+
+/** How dark the pet's own contact patch is. */
+const PET_SHADOW = 0.78
 
 /** Roughly the pet's half-width, used to keep it clear of the shelter walls. */
 export const PET_RADIUS = 0.8
@@ -440,20 +418,12 @@ export class PetView {
     this.mesh.setParent(this.root)
     this.setModel(model, false)
 
-    this.shadow = new Mesh(gl, {
-      geometry: new Plane(gl, { width: PET_HEIGHT * 1.15, height: PET_HEIGHT * 1.15 }),
-      program: new Program(gl, {
-        vertex: shadowVert,
-        fragment: shadowFrag,
-        uniforms: { uStrength: { value: 0.78 } },
-        transparent: true,
-        depthWrite: false,
-      }),
-    })
-    this.shadow.rotation.x = -Math.PI / 2
-    // Just clear of the ground, so it never z-fights with the terrain surface.
-    this.shadow.position.y = 0.012
-    this.shadow.setParent(this.root)
+    // The pet's patch is sized from its own model rather than from a number,
+    // now that everything else in the yard is sized from its own.
+    const shadows = createShadows(gl)
+    const caster = shadows.add(this.root, footprintOf(model, PET_HEIGHT))
+    caster.strength = PET_SHADOW
+    this.shadow = caster.mesh
   }
 
   /** Swaps in a new form. Pass `animate` to play the reveal wipe. */
